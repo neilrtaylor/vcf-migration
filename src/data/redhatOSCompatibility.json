@@ -1,0 +1,262 @@
+{
+  "osEntries": [
+    {
+      "id": "rhel-9",
+      "displayName": "Red Hat Enterprise Linux 9.x",
+      "patterns": ["red hat enterprise linux 9", "rhel 9", "rhel9"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 100,
+      "notes": "Optimal for OpenShift Virtualization",
+      "documentationLink": "https://access.redhat.com/articles/973163"
+    },
+    {
+      "id": "rhel-8",
+      "displayName": "Red Hat Enterprise Linux 8.x",
+      "patterns": ["red hat enterprise linux 8", "rhel 8", "rhel8"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 100,
+      "notes": "Optimal for OpenShift Virtualization",
+      "documentationLink": "https://access.redhat.com/articles/973163"
+    },
+    {
+      "id": "rhel-7",
+      "displayName": "Red Hat Enterprise Linux 7.x",
+      "patterns": ["red hat enterprise linux 7", "rhel 7", "rhel7"],
+      "compatibilityStatus": "supported-with-caveats",
+      "compatibilityScore": 70,
+      "notes": "RHEL 7 approaching EOL, recommend upgrade to RHEL 8/9",
+      "recommendedUpgrade": "Upgrade to RHEL 8.x or 9.x",
+      "documentationLink": "https://access.redhat.com/support/policy/updates/errata",
+      "eolDate": "2024-06-30"
+    },
+    {
+      "id": "rhel-6",
+      "displayName": "Red Hat Enterprise Linux 6.x",
+      "patterns": ["red hat enterprise linux 6", "rhel 6", "rhel6"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 20,
+      "notes": "RHEL 6 is EOL and unsupported",
+      "recommendedUpgrade": "Must upgrade to RHEL 8.x or 9.x",
+      "documentationLink": "https://access.redhat.com/support/policy/updates/errata"
+    },
+    {
+      "id": "centos-stream-9",
+      "displayName": "CentOS Stream 9",
+      "patterns": ["centos stream 9", "centos-stream-9"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "Fully supported in OpenShift Virtualization",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "centos-stream-8",
+      "displayName": "CentOS Stream 8",
+      "patterns": ["centos stream 8", "centos-stream-8"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "Fully supported in OpenShift Virtualization",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "centos-7",
+      "displayName": "CentOS 7",
+      "patterns": ["centos 7", "centos linux 7", "centos7"],
+      "compatibilityStatus": "supported-with-caveats",
+      "compatibilityScore": 65,
+      "notes": "CentOS 7 EOL June 2024, migrate to CentOS Stream or RHEL",
+      "recommendedUpgrade": "Migrate to CentOS Stream 9 or RHEL 9",
+      "eolDate": "2024-06-30"
+    },
+    {
+      "id": "ubuntu-24",
+      "displayName": "Ubuntu 24.04 LTS",
+      "patterns": ["ubuntu 24", "ubuntu linux 24", "ubuntu server 24"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "LTS version fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "ubuntu-22",
+      "displayName": "Ubuntu 22.04 LTS",
+      "patterns": ["ubuntu 22", "ubuntu linux 22", "ubuntu server 22"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "LTS version fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "ubuntu-20",
+      "displayName": "Ubuntu 20.04 LTS",
+      "patterns": ["ubuntu 20", "ubuntu linux 20", "ubuntu server 20"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "LTS version fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "ubuntu-18",
+      "displayName": "Ubuntu 18.04 LTS",
+      "patterns": ["ubuntu 18", "ubuntu linux 18", "ubuntu server 18"],
+      "compatibilityStatus": "supported-with-caveats",
+      "compatibilityScore": 65,
+      "notes": "Ubuntu 18.04 approaching EOL (April 2028)",
+      "recommendedUpgrade": "Upgrade to Ubuntu 20.04 LTS or later",
+      "eolDate": "2028-04-30"
+    },
+    {
+      "id": "ubuntu-16",
+      "displayName": "Ubuntu 16.04",
+      "patterns": ["ubuntu 16", "ubuntu linux 16", "ubuntu server 16"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 30,
+      "notes": "Ubuntu 16.04 is EOL",
+      "recommendedUpgrade": "Upgrade to Ubuntu 20.04 LTS or later"
+    },
+    {
+      "id": "debian-12",
+      "displayName": "Debian 12 (Bookworm)",
+      "patterns": ["debian 12", "debian gnu/linux 12", "bookworm"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 90,
+      "notes": "Fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "debian-11",
+      "displayName": "Debian 11 (Bullseye)",
+      "patterns": ["debian 11", "debian gnu/linux 11", "bullseye"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 90,
+      "notes": "Fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "debian-10",
+      "displayName": "Debian 10 (Buster)",
+      "patterns": ["debian 10", "debian gnu/linux 10", "buster"],
+      "compatibilityStatus": "supported-with-caveats",
+      "compatibilityScore": 70,
+      "notes": "Debian 10 LTS support until 2024",
+      "recommendedUpgrade": "Upgrade to Debian 11 or 12"
+    },
+    {
+      "id": "sles-15",
+      "displayName": "SUSE Linux Enterprise Server 15",
+      "patterns": ["suse linux enterprise server 15", "sles 15", "sles15"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 90,
+      "notes": "SLES 15 SP3+ fully supported",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "windows-2022",
+      "displayName": "Windows Server 2022",
+      "patterns": ["windows server 2022", "microsoft windows server 2022"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "Fully supported with VirtIO drivers",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "windows-2019",
+      "displayName": "Windows Server 2019",
+      "patterns": ["windows server 2019", "microsoft windows server 2019"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 95,
+      "notes": "Fully supported with VirtIO drivers",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "windows-2016",
+      "displayName": "Windows Server 2016",
+      "patterns": ["windows server 2016", "microsoft windows server 2016"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 85,
+      "notes": "Supported, recommend upgrade to 2019/2022",
+      "recommendedUpgrade": "Consider upgrading to Windows Server 2019 or 2022",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "windows-2012r2",
+      "displayName": "Windows Server 2012 R2",
+      "patterns": ["windows server 2012 r2", "microsoft windows server 2012 r2"],
+      "compatibilityStatus": "supported-with-caveats",
+      "compatibilityScore": 50,
+      "notes": "Extended support ended Oct 2023, upgrade required",
+      "recommendedUpgrade": "Upgrade to Windows Server 2016 or later",
+      "eolDate": "2023-10-10"
+    },
+    {
+      "id": "windows-2012",
+      "displayName": "Windows Server 2012",
+      "patterns": ["windows server 2012", "microsoft windows server 2012"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 10,
+      "notes": "Windows Server 2012 is EOL and unsupported",
+      "recommendedUpgrade": "Must upgrade to Windows Server 2016 or later"
+    },
+    {
+      "id": "windows-2008",
+      "displayName": "Windows Server 2008/2008 R2",
+      "patterns": ["windows server 2008", "microsoft windows server 2008"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 5,
+      "notes": "Windows Server 2008 is EOL (Jan 2020) and unsupported",
+      "recommendedUpgrade": "Must upgrade to Windows Server 2016 or later"
+    },
+    {
+      "id": "windows-11",
+      "displayName": "Windows 11",
+      "patterns": ["windows 11", "microsoft windows 11"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 90,
+      "notes": "Supported with VirtIO drivers",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "windows-10",
+      "displayName": "Windows 10",
+      "patterns": ["windows 10", "microsoft windows 10"],
+      "compatibilityStatus": "fully-supported",
+      "compatibilityScore": 85,
+      "notes": "Supported with VirtIO drivers (21H2+)",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/"
+    },
+    {
+      "id": "solaris",
+      "displayName": "Oracle Solaris",
+      "patterns": ["solaris", "oracle solaris", "sun solaris"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 0,
+      "notes": "Solaris is not supported in OpenShift Virtualization",
+      "recommendedUpgrade": "Migrate workload to supported OS (RHEL, Ubuntu, Windows)"
+    },
+    {
+      "id": "freebsd",
+      "displayName": "FreeBSD",
+      "patterns": ["freebsd"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 0,
+      "notes": "FreeBSD is not supported in OpenShift Virtualization",
+      "recommendedUpgrade": "Migrate workload to supported OS (RHEL, Ubuntu, Windows)"
+    },
+    {
+      "id": "aix",
+      "displayName": "IBM AIX",
+      "patterns": ["aix", "ibm aix"],
+      "compatibilityStatus": "unsupported",
+      "compatibilityScore": 0,
+      "notes": "AIX is not supported (IBM Power platform)",
+      "recommendedUpgrade": "Migrate workload to supported OS (RHEL, Ubuntu, Windows)"
+    }
+  ],
+  "defaultEntry": {
+    "id": "unknown",
+    "displayName": "Unknown OS",
+    "compatibilityStatus": "unsupported",
+    "compatibilityScore": 30,
+    "notes": "OS not recognized in Red Hat compatibility matrix - manual verification required",
+    "documentationLink": "https://access.redhat.com/articles/973163"
+  }
+}

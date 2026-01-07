@@ -1,0 +1,84 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.file-upload {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+
+  &__progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  &__warnings {
+    padding: spacing.$spacing-04;
+    background-color: #fcf4d6; // Warning background
+    border-radius: 4px;
+    border-left: 3px solid theme.$support-warning;
+
+    h4 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-03;
+      color: theme.$text-primary;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: spacing.$spacing-05;
+
+      li {
+        @include type.type-style('body-compact-01');
+        color: theme.$text-secondary;
+        margin-bottom: spacing.$spacing-02;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+
+  &__error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: spacing.$spacing-05;
+  }
+
+  &__error {
+    width: 100%;
+    padding: spacing.$spacing-05;
+    background-color: #fff1f1; // Error background
+    border-radius: 4px;
+    border-left: 3px solid theme.$support-error;
+
+    h4 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-03;
+      color: theme.$support-error;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: spacing.$spacing-05;
+
+      li {
+        @include type.type-style('body-compact-01');
+        color: theme.$text-primary;
+        margin-bottom: spacing.$spacing-02;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}

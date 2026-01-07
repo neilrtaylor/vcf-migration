@@ -1,0 +1,60 @@
+// Loading skeleton styles
+@use '@carbon/styles/scss/spacing';
+
+.loading-skeleton {
+  padding: spacing.$spacing-05 0;
+
+  &__card {
+    background: var(--cds-layer-01, #f4f4f4);
+    padding: spacing.$spacing-05;
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__metric {
+    height: 48px;
+    margin: spacing.$spacing-04 0;
+  }
+
+  &__chart {
+    background: var(--cds-layer-01, #f4f4f4);
+    padding: spacing.$spacing-05;
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__chart-area {
+    height: 250px;
+    margin-top: spacing.$spacing-04;
+  }
+
+  &__table {
+    background: var(--cds-layer-01, #f4f4f4);
+    padding: spacing.$spacing-05;
+    border-radius: 4px;
+  }
+
+  &__table-header {
+    display: flex;
+    gap: spacing.$spacing-05;
+    padding: spacing.$spacing-03 0;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__table-row {
+    display: flex;
+    gap: spacing.$spacing-05;
+    padding: spacing.$spacing-03 0;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__content {
+    height: 400px;
+    margin-top: spacing.$spacing-05;
+  }
+}

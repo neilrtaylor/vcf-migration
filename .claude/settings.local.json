@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/neiltaylor/Documents/GitHub/vcf-migration show HEAD --stat)",
+      "Bash(git -C /Users/neiltaylor/Documents/GitHub/vcf-migration log --format=fuller)",
+      "Bash(git -C /Users/neiltaylor/Documents/GitHub/vcf-migration log --oneline -5)",
+      "Bash(ls:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run build:*)",
+      "Bash(lsof:*)",
+      "Bash(npm test:*)",
+      "WebSearch",
+      "WebFetch(domain:icones.js.org)"
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.storage-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: theme.$text-primary;
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__metric-tile {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__metric-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__metric-value {
+    @include type.type-style('heading-03');
+    color: theme.$text-primary;
+  }
+
+  &__chart-tile {
+    padding: spacing.$spacing-05;
+    min-height: 300px;
+    margin-bottom: spacing.$spacing-05;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__distribution {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-03;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__distribution-item {
+    display: flex;
+    justify-content: space-between;
+    padding: spacing.$spacing-02 0;
+    border-bottom: 1px solid theme.$border-subtle-01;
+  }
+
+  &__distribution-label {
+    @include type.type-style('body-compact-01');
+    color: theme.$text-primary;
+  }
+
+  &__distribution-value {
+    @include type.type-style('body-compact-01');
+    color: theme.$text-secondary;
+  }
+
+  &__placeholder {
+    @include type.type-style('body-01');
+    color: theme.$text-placeholder;
+    text-align: center;
+    padding: spacing.$spacing-05;
+  }
+}

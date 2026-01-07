@@ -1,0 +1,55 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.landing-page {
+  &__header {
+    text-align: center;
+    margin-bottom: spacing.$spacing-08;
+    padding-top: spacing.$spacing-07;
+
+    h1 {
+      @include type.type-style('heading-04');
+      margin-bottom: spacing.$spacing-05;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__description {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  &__upload-tile {
+    padding: spacing.$spacing-06;
+    margin-bottom: spacing.$spacing-08;
+  }
+
+  &__features {
+    padding-top: spacing.$spacing-07;
+
+    h2 {
+      @include type.type-style('heading-03');
+      margin-bottom: spacing.$spacing-06;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__feature-tile {
+    height: 100%;
+    padding: spacing.$spacing-05;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-03;
+      color: theme.$text-primary;
+    }
+
+    p {
+      @include type.type-style('body-compact-01');
+      color: theme.$text-secondary;
+    }
+  }
+}

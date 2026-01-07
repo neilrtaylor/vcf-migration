@@ -1,0 +1,35 @@
+@use '@carbon/styles/scss/spacing';
+
+.app-layout {
+  min-height: 100vh;
+
+  &__content {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-background);
+    min-height: calc(100vh - 48px); // Account for header height
+  }
+}
+
+// PDF Export Modal styles
+.pdf-export-modal {
+  &__description {
+    margin-bottom: spacing.$spacing-05;
+    color: var(--cds-text-secondary, #525252);
+    font-size: 0.875rem;
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  .cds--inline-loading {
+    margin-top: spacing.$spacing-04;
+  }
+
+  .cds--inline-notification {
+    margin-top: spacing.$spacing-04;
+  }
+}

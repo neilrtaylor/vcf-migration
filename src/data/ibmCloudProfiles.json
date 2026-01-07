@@ -1,0 +1,119 @@
+{
+  "vpcProfiles": {
+    "balanced": [
+      { "name": "bx2-2x8", "vcpus": 2, "memoryGiB": 8, "bandwidth": 4 },
+      { "name": "bx2-4x16", "vcpus": 4, "memoryGiB": 16, "bandwidth": 8 },
+      { "name": "bx2-8x32", "vcpus": 8, "memoryGiB": 32, "bandwidth": 16 },
+      { "name": "bx2-16x64", "vcpus": 16, "memoryGiB": 64, "bandwidth": 32 },
+      { "name": "bx2-32x128", "vcpus": 32, "memoryGiB": 128, "bandwidth": 64 },
+      { "name": "bx2-48x192", "vcpus": 48, "memoryGiB": 192, "bandwidth": 80 },
+      { "name": "bx2-64x256", "vcpus": 64, "memoryGiB": 256, "bandwidth": 80 },
+      { "name": "bx2-96x384", "vcpus": 96, "memoryGiB": 384, "bandwidth": 80 },
+      { "name": "bx2-128x512", "vcpus": 128, "memoryGiB": 512, "bandwidth": 80 }
+    ],
+    "compute": [
+      { "name": "cx2-2x4", "vcpus": 2, "memoryGiB": 4, "bandwidth": 4 },
+      { "name": "cx2-4x8", "vcpus": 4, "memoryGiB": 8, "bandwidth": 8 },
+      { "name": "cx2-8x16", "vcpus": 8, "memoryGiB": 16, "bandwidth": 16 },
+      { "name": "cx2-16x32", "vcpus": 16, "memoryGiB": 32, "bandwidth": 32 },
+      { "name": "cx2-32x64", "vcpus": 32, "memoryGiB": 64, "bandwidth": 64 },
+      { "name": "cx2-48x96", "vcpus": 48, "memoryGiB": 96, "bandwidth": 80 },
+      { "name": "cx2-64x128", "vcpus": 64, "memoryGiB": 128, "bandwidth": 80 },
+      { "name": "cx2-96x192", "vcpus": 96, "memoryGiB": 192, "bandwidth": 80 },
+      { "name": "cx2-128x256", "vcpus": 128, "memoryGiB": 256, "bandwidth": 80 }
+    ],
+    "memory": [
+      { "name": "mx2-2x16", "vcpus": 2, "memoryGiB": 16, "bandwidth": 4 },
+      { "name": "mx2-4x32", "vcpus": 4, "memoryGiB": 32, "bandwidth": 8 },
+      { "name": "mx2-8x64", "vcpus": 8, "memoryGiB": 64, "bandwidth": 16 },
+      { "name": "mx2-16x128", "vcpus": 16, "memoryGiB": 128, "bandwidth": 32 },
+      { "name": "mx2-32x256", "vcpus": 32, "memoryGiB": 256, "bandwidth": 64 },
+      { "name": "mx2-48x384", "vcpus": 48, "memoryGiB": 384, "bandwidth": 80 },
+      { "name": "mx2-64x512", "vcpus": 64, "memoryGiB": 512, "bandwidth": 80 },
+      { "name": "mx2-96x768", "vcpus": 96, "memoryGiB": 768, "bandwidth": 80 },
+      { "name": "mx2-128x1024", "vcpus": 128, "memoryGiB": 1024, "bandwidth": 80 }
+    ],
+    "veryHighMemory": [
+      { "name": "vx2d-2x28", "vcpus": 2, "memoryGiB": 28, "bandwidth": 4 },
+      { "name": "vx2d-4x56", "vcpus": 4, "memoryGiB": 56, "bandwidth": 8 },
+      { "name": "vx2d-8x112", "vcpus": 8, "memoryGiB": 112, "bandwidth": 16 },
+      { "name": "vx2d-16x224", "vcpus": 16, "memoryGiB": 224, "bandwidth": 32 },
+      { "name": "vx2d-44x616", "vcpus": 44, "memoryGiB": 616, "bandwidth": 80 },
+      { "name": "vx2d-88x1232", "vcpus": 88, "memoryGiB": 1232, "bandwidth": 80 },
+      { "name": "vx2d-176x2464", "vcpus": 176, "memoryGiB": 2464, "bandwidth": 80 }
+    ],
+    "ultraHighMemory": [
+      { "name": "ux2d-2x56", "vcpus": 2, "memoryGiB": 56, "bandwidth": 4 },
+      { "name": "ux2d-4x112", "vcpus": 4, "memoryGiB": 112, "bandwidth": 8 },
+      { "name": "ux2d-8x224", "vcpus": 8, "memoryGiB": 224, "bandwidth": 16 },
+      { "name": "ux2d-16x448", "vcpus": 16, "memoryGiB": 448, "bandwidth": 32 },
+      { "name": "ux2d-36x1008", "vcpus": 36, "memoryGiB": 1008, "bandwidth": 64 },
+      { "name": "ux2d-72x2016", "vcpus": 72, "memoryGiB": 2016, "bandwidth": 80 },
+      { "name": "ux2d-200x5600", "vcpus": 200, "memoryGiB": 5600, "bandwidth": 80 }
+    ]
+  },
+  "roksWorkerProfiles": [
+    { "name": "bx2-4x16", "vcpus": 4, "memoryGiB": 16, "useCase": "Development/testing" },
+    { "name": "bx2-8x32", "vcpus": 8, "memoryGiB": 32, "useCase": "Small workloads" },
+    { "name": "bx2-16x64", "vcpus": 16, "memoryGiB": 64, "useCase": "Medium workloads" },
+    { "name": "bx2-32x128", "vcpus": 32, "memoryGiB": 128, "useCase": "Standard production" },
+    { "name": "bx2-48x192", "vcpus": 48, "memoryGiB": 192, "useCase": "Large workloads" },
+    { "name": "mx2-16x128", "vcpus": 16, "memoryGiB": 128, "useCase": "Memory-intensive (small)" },
+    { "name": "mx2-32x256", "vcpus": 32, "memoryGiB": 256, "useCase": "Memory-intensive VMs" },
+    { "name": "mx2-48x384", "vcpus": 48, "memoryGiB": 384, "useCase": "Memory-intensive (large)" }
+  ],
+  "profileFamilies": {
+    "balanced": {
+      "name": "Balanced",
+      "prefix": "bx2",
+      "ratio": "1:4",
+      "description": "General purpose workloads with balanced CPU to memory ratio"
+    },
+    "compute": {
+      "name": "Compute",
+      "prefix": "cx2",
+      "ratio": "1:2",
+      "description": "CPU-intensive workloads"
+    },
+    "memory": {
+      "name": "Memory",
+      "prefix": "mx2",
+      "ratio": "1:8",
+      "description": "Memory-intensive workloads"
+    },
+    "veryHighMemory": {
+      "name": "Very High Memory",
+      "prefix": "vx2d",
+      "ratio": "1:14",
+      "description": "Large databases, analytics workloads"
+    },
+    "ultraHighMemory": {
+      "name": "Ultra High Memory",
+      "prefix": "ux2d",
+      "ratio": "1:28",
+      "description": "SAP HANA, in-memory databases"
+    }
+  },
+  "odfStorageClasses": [
+    {
+      "name": "ocs-storagecluster-ceph-rbd",
+      "type": "block",
+      "accessMode": "RWO",
+      "description": "Block storage for VM disks"
+    },
+    {
+      "name": "ocs-storagecluster-cephfs",
+      "type": "file",
+      "accessMode": "RWX",
+      "description": "Shared file storage"
+    }
+  ],
+  "defaults": {
+    "cpuOvercommitRatio": 1.5,
+    "memoryOvercommitRatio": 1.2,
+    "odfReplicationFactor": 3,
+    "odfEfficiencyFactor": 0.7,
+    "minWorkerNodes": 3,
+    "storageHeadroomPercent": 30
+  }
+}

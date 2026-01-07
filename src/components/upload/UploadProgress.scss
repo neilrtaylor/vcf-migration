@@ -1,0 +1,53 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.upload-progress {
+  padding: spacing.$spacing-05;
+  background-color: theme.$layer-01;
+  border-radius: 4px;
+  border: 1px solid theme.$border-subtle-01;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__filename {
+    @include type.type-style('body-compact-01');
+    color: theme.$text-primary;
+    font-weight: 600;
+  }
+
+  &__icon {
+    &--success {
+      color: theme.$support-success;
+    }
+
+    &--error {
+      color: theme.$support-error;
+    }
+  }
+
+  &__bar {
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__status {
+    min-height: 24px;
+  }
+
+  &__message {
+    @include type.type-style('body-compact-01');
+
+    &--success {
+      color: theme.$support-success;
+    }
+
+    &--error {
+      color: theme.$support-error;
+    }
+  }
+}

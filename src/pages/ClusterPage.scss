@@ -1,0 +1,76 @@
+// Cluster page styles
+@use '@carbon/styles/scss/spacing';
+
+.cluster-page {
+  &__title {
+    font-size: 2rem;
+    font-weight: 400;
+    margin-bottom: spacing.$spacing-03;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__subtitle {
+    font-size: 1rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__metric-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 140px;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__metric-label {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__metric-value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--cds-text-primary, #161616);
+    line-height: 1.2;
+  }
+
+  &__metric-detail {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-top: spacing.$spacing-02;
+  }
+
+  &__chart-tile {
+    margin-bottom: spacing.$spacing-05;
+    min-height: 320px;
+  }
+
+  &__secondary-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 100px;
+    margin-bottom: spacing.$spacing-05;
+
+    &--warning {
+      border-left: 4px solid #f1c21b;
+    }
+
+    &--error {
+      border-left: 4px solid #da1e28;
+    }
+  }
+
+  &__secondary-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--cds-text-primary, #161616);
+    margin-top: spacing.$spacing-02;
+  }
+}

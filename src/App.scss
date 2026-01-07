@@ -1,0 +1,44 @@
+// Global application styles
+@use '@carbon/styles/scss/reset';
+@use '@carbon/themes/scss/themes' as themes;
+@use '@carbon/styles/scss/theme' with (
+  $theme: themes.$g10
+);
+@use '@carbon/styles';
+
+// Global box-sizing
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+// Root element
+#root {
+  min-height: 100vh;
+}
+
+// Disabled sidenav link style
+.sidenav-link--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+// Hide default scrollbar styles for webkit browsers
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cds-layer-01);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cds-border-strong-01);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cds-icon-secondary);
+}

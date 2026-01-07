@@ -1,0 +1,165 @@
+{
+  "version": "2.6",
+  "checks": {
+    "tools-installed": {
+      "id": "tools-installed",
+      "name": "VMware Tools Installed",
+      "description": "VMware Tools must be installed for warm migration and guest customization",
+      "category": "tools",
+      "severity": "blocker",
+      "remediation": "Install VMware Tools via vCenter",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "tools-running": {
+      "id": "tools-running",
+      "name": "VMware Tools Running",
+      "description": "VMware Tools should be running for optimal migration",
+      "category": "tools",
+      "severity": "warning",
+      "remediation": "Start VMware Tools service in the guest OS",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "no-snapshots": {
+      "id": "no-snapshots",
+      "name": "No Active Snapshots",
+      "description": "Snapshots should be consolidated before migration",
+      "category": "storage",
+      "severity": "warning",
+      "remediation": "Consolidate or delete snapshots in vCenter",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "old-snapshots": {
+      "id": "old-snapshots",
+      "name": "No Old Snapshots",
+      "description": "Snapshots older than 30 days must be consolidated",
+      "category": "storage",
+      "severity": "blocker",
+      "remediation": "Delete or consolidate old snapshots before migration",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "cd-disconnected": {
+      "id": "cd-disconnected",
+      "name": "CD-ROM Disconnected",
+      "description": "CD-ROM drives must be disconnected (no ISO mounted)",
+      "category": "hardware",
+      "severity": "warning",
+      "remediation": "Disconnect CD-ROM drive in vCenter VM settings",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "hw-version": {
+      "id": "hw-version",
+      "name": "Hardware Version Compatible",
+      "description": "VM hardware version 10 or later required (14+ recommended)",
+      "category": "config",
+      "severity": "warning",
+      "thresholds": {
+        "minimum": 10,
+        "recommended": 14
+      },
+      "remediation": "Upgrade VM hardware version in vCenter (requires VM shutdown)",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "no-rdm": {
+      "id": "no-rdm",
+      "name": "No Raw Device Mappings",
+      "description": "RDM disks cannot be migrated directly and must be converted",
+      "category": "storage",
+      "severity": "blocker",
+      "remediation": "Convert RDM disks to VMDK before migration",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "no-shared-disks": {
+      "id": "no-shared-disks",
+      "name": "No Shared/Multi-Writer Disks",
+      "description": "Shared disks are not supported in OpenShift Virtualization",
+      "category": "storage",
+      "severity": "blocker",
+      "remediation": "Redesign shared disk architecture before migration",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "no-pci-passthrough": {
+      "id": "no-pci-passthrough",
+      "name": "No PCI/GPU Passthrough",
+      "description": "PCI passthrough and GPU devices are not supported",
+      "category": "hardware",
+      "severity": "blocker",
+      "remediation": "Remove PCI passthrough devices; consider alternative solutions for GPU workloads",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "network-adapter": {
+      "id": "network-adapter",
+      "name": "Network Adapter Compatible",
+      "description": "VMXNET3 adapter recommended; E1000/E1000E are legacy",
+      "category": "network",
+      "severity": "info",
+      "remediation": "Upgrade to VMXNET3 adapter for better performance",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    },
+    "no-usb": {
+      "id": "no-usb",
+      "name": "No USB Devices",
+      "description": "USB controllers and devices have limited support",
+      "category": "hardware",
+      "severity": "warning",
+      "remediation": "Remove USB controllers if not required",
+      "documentationLink": "https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+    }
+  },
+  "workflowPhases": [
+    {
+      "phase": 1,
+      "name": "Analysis",
+      "description": "Assess VMware environment compatibility and identify migration candidates",
+      "activities": [
+        "Run RVTools export",
+        "Upload to analyzer",
+        "Review MTV pre-flight results",
+        "Identify blockers and remediation steps"
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Preparation",
+      "description": "Resolve blockers and prepare VMs for migration",
+      "activities": [
+        "Consolidate snapshots",
+        "Disconnect CD-ROMs",
+        "Convert RDM to VMDK",
+        "Install/update VMware Tools",
+        "Upgrade hardware versions if needed"
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Migration",
+      "description": "Execute migration waves using MTV operator",
+      "activities": [
+        "Deploy MTV operator in OpenShift",
+        "Configure VMware provider",
+        "Create migration plans",
+        "Execute wave migrations",
+        "Monitor migration progress"
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Validation",
+      "description": "Verify migrated VMs and complete cutover",
+      "activities": [
+        "Verify VM functionality",
+        "Test application connectivity",
+        "Update DNS/load balancers",
+        "Decommission source VMs"
+      ]
+    }
+  ],
+  "scoringWeights": {
+    "toolsStatus": 15,
+    "snapshotStatus": 15,
+    "hardwareVersion": 10,
+    "storageConfig": 20,
+    "networkConfig": 10,
+    "osCompatibility": 20,
+    "specialHardware": 10
+  }
+}

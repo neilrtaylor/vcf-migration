@@ -1,0 +1,29 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.tables-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: theme.$text-primary;
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__table-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__placeholder {
+    @include type.type-style('body-01');
+    color: theme.$text-placeholder;
+    text-align: center;
+    padding: spacing.$spacing-07;
+  }
+}

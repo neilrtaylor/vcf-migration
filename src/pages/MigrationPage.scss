@@ -1,0 +1,293 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.migration-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: theme.$text-primary;
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__score-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: spacing.$spacing-06;
+    text-align: center;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 140px;
+  }
+
+  &__score-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__score-value {
+    font-size: 2.625rem;
+    font-weight: 300;
+    line-height: 1.19;
+    letter-spacing: 0;
+    margin-bottom: spacing.$spacing-03;
+
+    &--good {
+      color: theme.$support-success;
+    }
+
+    &--warning {
+      color: theme.$support-warning;
+    }
+
+    &--critical {
+      color: theme.$support-error;
+    }
+  }
+
+  &__score-detail {
+    @include type.type-style('body-compact-01');
+    color: theme.$text-secondary;
+  }
+
+  &__stat-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 100px;
+  }
+
+  &__stat-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__stat-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: theme.$text-primary;
+
+    &--error {
+      color: theme.$support-error;
+    }
+
+    &--warning {
+      color: theme.$support-warning;
+    }
+  }
+
+  &__tab-content {
+    padding-top: spacing.$spacing-05;
+  }
+
+  &__checks-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 200px;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__check-items {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-04;
+  }
+
+  &__check-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: spacing.$spacing-03;
+    background-color: theme.$layer-02;
+    border-radius: 4px;
+  }
+
+  &__chart-tile {
+    padding: spacing.$spacing-05;
+    min-height: 320px;
+    margin-bottom: spacing.$spacing-05;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  // ROKS Sizing styles
+  &__sizing-header {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: theme.$layer-accent-01;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-02;
+      color: theme.$text-primary;
+    }
+
+    p {
+      @include type.type-style('body-01');
+      color: theme.$text-secondary;
+    }
+  }
+
+  &__sizing-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 140px;
+
+    &--highlight {
+      border-left: 4px solid theme.$support-info;
+      background-color: theme.$layer-accent-01;
+    }
+  }
+
+  &__sizing-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__sizing-value {
+    font-size: 2rem;
+    font-weight: 600;
+    color: theme.$text-primary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__sizing-detail {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+  }
+
+  &__recommendation-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+
+    h4 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-05;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__recommendation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: spacing.$spacing-05;
+  }
+
+  &__recommendation-item {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-04;
+    background-color: theme.$layer-02;
+    border-radius: 4px;
+  }
+
+  &__recommendation-key {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__recommendation-value {
+    @include type.type-style('body-compact-01');
+    font-weight: 600;
+    color: theme.$text-primary;
+  }
+
+  &__os-note {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+    margin-top: spacing.$spacing-04;
+    font-style: italic;
+  }
+
+  &__distribution {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-03;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__distribution-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: spacing.$spacing-02 0;
+    border-bottom: 1px solid theme.$border-subtle-01;
+  }
+
+  &__placeholder {
+    @include type.type-style('body-01');
+    color: theme.$text-placeholder;
+    text-align: center;
+    padding: spacing.$spacing-05;
+  }
+
+  // Wave planning styles
+  &__wave-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 160px;
+
+    &--warning {
+      border-left: 4px solid theme.$support-error;
+    }
+
+    h4 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__wave-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: spacing.$spacing-04;
+  }
+
+  &__wave-stat {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-03;
+    background-color: theme.$layer-02;
+    border-radius: 4px;
+  }
+
+  &__wave-stat-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__wave-stat-value {
+    @include type.type-style('body-compact-01');
+    font-weight: 600;
+    color: theme.$text-primary;
+  }
+}

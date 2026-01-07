@@ -1,0 +1,40 @@
+// Error boundary styles
+@use '@carbon/styles/scss/spacing';
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: spacing.$spacing-07;
+
+  &__tile {
+    text-align: center;
+    max-width: 500px;
+    padding: spacing.$spacing-07;
+  }
+
+  &__icon {
+    color: var(--cds-support-error, #da1e28);
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: spacing.$spacing-04;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__message {
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-06;
+    line-height: 1.5;
+  }
+
+  &__actions {
+    display: flex;
+    gap: spacing.$spacing-04;
+    justify-content: center;
+  }
+}

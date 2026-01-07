@@ -1,0 +1,27 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.chart-wrapper {
+  width: 100%;
+
+  &__header {
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__title {
+    @include type.type-style('heading-compact-02');
+    color: theme.$text-primary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__subtitle {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+  }
+
+  &__content {
+    position: relative;
+    width: 100%;
+  }
+}

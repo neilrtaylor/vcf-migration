@@ -1,0 +1,75 @@
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.dashboard-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: theme.$text-primary;
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__metric-tile {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-05;
+    height: 100%;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__metric-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__metric-value {
+    @include type.type-style('heading-04');
+    color: theme.$text-primary;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__metric-detail {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-helper;
+  }
+
+  &__secondary-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: spacing.$spacing-04;
+    text-align: center;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__secondary-value {
+    @include type.type-style('heading-03');
+    color: theme.$text-primary;
+  }
+
+  &__chart-tile {
+    padding: spacing.$spacing-05;
+    min-height: 300px;
+    margin-bottom: spacing.$spacing-05;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__placeholder {
+    @include type.type-style('body-01');
+    color: theme.$text-placeholder;
+    text-align: center;
+    padding: spacing.$spacing-07;
+  }
+}

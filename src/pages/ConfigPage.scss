@@ -1,0 +1,103 @@
+// Configuration page styles
+@use '@carbon/styles/scss/spacing';
+
+.config-page {
+  &__title {
+    font-size: 2rem;
+    font-weight: 400;
+    margin-bottom: spacing.$spacing-03;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__subtitle {
+    font-size: 1rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__section-title {
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-top: spacing.$spacing-06;
+    margin-bottom: spacing.$spacing-05;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__metric-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 140px;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__metric-label {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__metric-value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--cds-text-primary, #161616);
+    line-height: 1.2;
+  }
+
+  &__metric-detail {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-top: spacing.$spacing-02;
+  }
+
+  &__chart-tile {
+    margin-bottom: spacing.$spacing-05;
+    min-height: 320px;
+  }
+
+  &__compliance-tile {
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    margin-bottom: spacing.$spacing-05;
+    padding: spacing.$spacing-05;
+
+    &--success {
+      border-left: 4px solid #24a148;
+    }
+
+    &--warning {
+      border-left: 4px solid #f1c21b;
+    }
+
+    &--error {
+      border-left: 4px solid #da1e28;
+    }
+  }
+
+  &__compliance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__compliance-label {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+  }
+
+  &__compliance-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__compliance-detail {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary, #525252);
+  }
+}
