@@ -290,4 +290,144 @@
     font-weight: 600;
     color: theme.$text-primary;
   }
+
+  // MTV Workflow styles
+  &__workflow-header {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: theme.$layer-accent-01;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-03;
+      color: theme.$text-primary;
+    }
+
+    p {
+      @include type.type-style('body-01');
+      color: theme.$text-secondary;
+      margin-bottom: spacing.$spacing-04;
+    }
+  }
+
+  &__workflow-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: spacing.$spacing-05;
+    flex-wrap: wrap;
+
+    > div:first-child {
+      flex: 1;
+      min-width: 250px;
+    }
+  }
+
+  &__workflow-docs {
+    margin-top: spacing.$spacing-03;
+  }
+
+  &__phase-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 280px;
+
+    &--phase-1 {
+      border-left: 4px solid #0f62fe; // Blue
+    }
+
+    &--phase-2 {
+      border-left: 4px solid #009d9a; // Teal
+    }
+
+    &--phase-3 {
+      border-left: 4px solid #8a3ffc; // Purple
+    }
+
+    &--phase-4 {
+      border-left: 4px solid #24a148; // Green
+    }
+  }
+
+  &__phase-header {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__phase-number {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    background-color: theme.$layer-02;
+    padding: spacing.$spacing-02 spacing.$spacing-03;
+    border-radius: 4px;
+  }
+
+  &__phase-name {
+    @include type.type-style('heading-compact-02');
+    color: theme.$text-primary;
+    margin: 0;
+  }
+
+  &__phase-description {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__phase-activities {
+    h5 {
+      @include type.type-style('label-01');
+      color: theme.$text-secondary;
+      margin-bottom: spacing.$spacing-02;
+    }
+
+    .cds--list--unordered {
+      margin-left: spacing.$spacing-05;
+    }
+
+    .cds--list__item {
+      @include type.type-style('body-compact-01');
+      color: theme.$text-primary;
+      margin-bottom: spacing.$spacing-02;
+    }
+  }
+
+  &__workflow-resources {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+
+    h4 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-04;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__resource-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-05;
+  }
+
+  // Cost estimation tile
+  &__cost-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: theme.$layer-accent-01;
+    border-left: 4px solid #0f62fe;
+
+    h4 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-03;
+      color: theme.$text-primary;
+    }
+  }
+
+  &__cost-description {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-04;
+  }
 }

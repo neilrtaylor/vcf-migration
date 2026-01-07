@@ -18,6 +18,7 @@ interface HorizontalBarChartProps {
   showLegend?: boolean;
   colors?: string[];
   formatValue?: (value: number) => string;
+  onBarClick?: (label: string, value: number) => void;
 }
 
 export function HorizontalBarChart({
@@ -29,6 +30,7 @@ export function HorizontalBarChart({
   showLegend = false,
   colors,
   formatValue,
+  onBarClick,
 }: HorizontalBarChartProps) {
   const labels = data.map((d) => d.label);
   const values = data.map((d) => d.value);
@@ -49,6 +51,14 @@ export function HorizontalBarChart({
 
   const options: ChartOptions<'bar'> = {
     ...defaultBarOptions,
+    onClick: onBarClick
+      ? (_event, activeElements) => {
+          if (activeElements.length > 0) {
+            const index = activeElements[0].index;
+            onBarClick(data[index].label, data[index].value);
+          }
+        }
+      : undefined,
     plugins: {
       ...defaultBarOptions.plugins,
       legend: {

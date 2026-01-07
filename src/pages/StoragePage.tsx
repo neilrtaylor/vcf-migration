@@ -1,14 +1,17 @@
 // Storage analysis page
 import { Grid, Column, Tile } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
-import { useData } from '@/hooks';
+import { useData, useChartFilter } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
 import { mibToGiB, mibToTiB, formatNumber } from '@/utils/formatters';
-import { HorizontalBarChart, DoughnutChart } from '@/components/charts';
+import { HorizontalBarChart, DoughnutChart, Heatmap } from '@/components/charts';
+import type { HeatmapCell } from '@/components/charts';
+import { FilterBadge } from '@/components/common/FilterBadge';
 import './StoragePage.scss';
 
 export function StoragePage() {
   const { rawData } = useData();
+  const { chartFilter, setFilter, clearFilter } = useChartFilter();
 
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
@@ -41,15 +44,6 @@ export function StoragePage() {
     }))
     .sort((a, b) => b.value - a.value);
 
-  // Top datastores by usage
-  const topDatastores = [...datastores]
-    .sort((a, b) => b.inUseMiB - a.inUseMiB)
-    .slice(0, 15)
-    .map((ds) => ({
-      label: ds.name,
-      value: mibToGiB(ds.inUseMiB),
-    }));
-
   // Datastores with high utilization (>80%)
   const highUtilDatastores = datastores
     .filter(ds => {
@@ -67,7 +61,18 @@ export function StoragePage() {
       value: ds.capacityMiB > 0 ? (ds.inUseMiB / ds.capacityMiB) * 100 : 0,
     }));
 
-  // Top storage consumers (VMs)
+  // Extract datastore type from label (format: "TYPE (count)")
+  const extractTypeFromLabel = (label: string): string => {
+    const match = label.match(/^(.+?)\s*\(/);
+    return match ? match[1] : label;
+  };
+
+  // Filter datastores based on active filter
+  const filteredDatastores = chartFilter && chartFilter.dimension === 'datastoreType'
+    ? datastores.filter(ds => (ds.type || 'Unknown') === extractTypeFromLabel(chartFilter.value))
+    : datastores;
+
+  // Top storage consumers (VMs) - all VMs (no direct datastore link)
   const topStorageVMs = [...vms]
     .sort((a, b) => b.provisionedMiB - a.provisionedMiB)
     .slice(0, 15)
@@ -75,6 +80,47 @@ export function StoragePage() {
       label: vm.vmName,
       value: mibToGiB(vm.provisionedMiB),
     }));
+
+  // Top datastores by usage - filtered
+  const topDatastoresFiltered = [...filteredDatastores]
+    .sort((a, b) => b.inUseMiB - a.inUseMiB)
+    .slice(0, 15)
+    .map((ds) => ({
+      label: ds.name,
+      value: mibToGiB(ds.inUseMiB),
+    }));
+
+  // Click handler for datastore type chart
+  const handleTypeClick = (label: string) => {
+    if (chartFilter?.value === label && chartFilter?.dimension === 'datastoreType') {
+      clearFilter();
+    } else {
+      setFilter('datastoreType', label, 'typeChart');
+    }
+  };
+
+  // Datastore utilization heatmap data (grouped by datacenter)
+  const datastoreUtilHeatmap: HeatmapCell[] = datastores
+    .filter(ds => ds.capacityMiB > 0)
+    .sort((a, b) => {
+      // Sort by datacenter, then by utilization
+      const dcCompare = (a.datacenter || '').localeCompare(b.datacenter || '');
+      if (dcCompare !== 0) return dcCompare;
+      const utilA = (a.inUseMiB / a.capacityMiB) * 100;
+      const utilB = (b.inUseMiB / b.capacityMiB) * 100;
+      return utilB - utilA;
+    })
+    .slice(0, 30) // Limit to 30 datastores
+    .map(ds => {
+      const utilization = (ds.inUseMiB / ds.capacityMiB) * 100;
+      const dsName = ds.name.length > 30 ? ds.name.substring(0, 27) + '...' : ds.name;
+      return {
+        row: dsName,
+        col: 'Utilization',
+        value: utilization,
+        label: `${utilization.toFixed(0)}%`,
+      };
+    });
 
   return (
     <div className="storage-page">
@@ -84,6 +130,13 @@ export function StoragePage() {
           <p className="storage-page__subtitle">
             Datastore capacity and utilization analysis
           </p>
+          {chartFilter && chartFilter.dimension === 'datastoreType' && (
+            <FilterBadge
+              dimension="Datastore Type"
+              value={extractTypeFromLabel(chartFilter.value)}
+              onClear={clearFilter}
+            />
+          )}
         </Column>
 
         {/* Summary metrics */}
@@ -120,10 +173,11 @@ export function StoragePage() {
           <Tile className="storage-page__chart-tile">
             <DoughnutChart
               title="Storage by Type"
-              subtitle="Capacity distribution across datastore types"
+              subtitle="Click a segment to filter datastores and VMs"
               data={typeChartData}
               height={280}
               formatValue={(v) => `${v.toFixed(1)} TiB`}
+              onSegmentClick={handleTypeClick}
             />
           </Tile>
         </Column>
@@ -146,8 +200,10 @@ export function StoragePage() {
         <Column lg={8} md={8} sm={4}>
           <Tile className="storage-page__chart-tile">
             <HorizontalBarChart
-              title="Top 15 Datastores by Usage"
-              data={topDatastores}
+              title={chartFilter?.dimension === 'datastoreType'
+                ? `Top Datastores (${filteredDatastores.length} ${extractTypeFromLabel(chartFilter.value)})`
+                : 'Top 15 Datastores by Usage'}
+              data={topDatastoresFiltered}
               height={400}
               valueLabel="Used"
               formatValue={(v) => `${v.toFixed(0)} GiB`}
@@ -200,6 +256,21 @@ export function StoragePage() {
             </span>
           </Tile>
         </Column>
+
+        {/* Datastore Utilization Heatmap */}
+        {datastoreUtilHeatmap.length > 0 && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="storage-page__chart-tile">
+              <Heatmap
+                title="Datastore Utilization"
+                subtitle="Utilization by datastore (Green <50%, Yellow 50-80%, Red >80%)"
+                data={datastoreUtilHeatmap}
+                height={Math.min(600, 100 + datastoreUtilHeatmap.length * 28)}
+                colorScale="utilization"
+              />
+            </Tile>
+          </Column>
+        )}
       </Grid>
     </div>
   );

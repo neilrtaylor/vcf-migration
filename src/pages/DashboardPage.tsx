@@ -1,16 +1,25 @@
 // Dashboard page - Executive summary
 import { Grid, Column, Tile } from '@carbon/react';
-import { useData, useVMs } from '@/hooks';
+import { useData, useVMs, useChartFilter } from '@/hooks';
 import { Navigate } from 'react-router-dom';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
 import { DoughnutChart, HorizontalBarChart } from '@/components/charts';
+import { FilterBadge } from '@/components/common/FilterBadge';
 import { POWER_STATE_CHART_COLORS } from '@/utils/chartConfig';
 import './DashboardPage.scss';
+
+// Map label to power state
+const labelToPowerState: Record<string, string> = {
+  'Powered On': 'poweredOn',
+  'Powered Off': 'poweredOff',
+  'Suspended': 'suspended',
+};
 
 export function DashboardPage() {
   const { rawData } = useData();
   const vms = useVMs();
+  const { chartFilter, setFilter, clearFilter } = useChartFilter();
 
   // Redirect to landing if no data
   if (!rawData) {
@@ -47,8 +56,13 @@ export function DashboardPage() {
     POWER_STATE_CHART_COLORS.suspended,
   ];
 
-  // OS distribution data
-  const osDistribution = vms.reduce((acc, vm) => {
+  // Filter VMs based on active chart filter
+  const filteredVMs = chartFilter && chartFilter.dimension === 'powerState'
+    ? vms.filter(vm => vm.powerState === labelToPowerState[chartFilter.value])
+    : vms;
+
+  // OS distribution data (from filtered VMs)
+  const osDistribution = filteredVMs.reduce((acc, vm) => {
     const os = vm.guestOS || 'Unknown';
     // Simplify OS names
     let category = os;
@@ -76,6 +90,15 @@ export function DashboardPage() {
     .slice(0, 10)
     .map(([label, value]) => ({ label, value }));
 
+  // Click handler for power state chart
+  const handlePowerStateClick = (label: string) => {
+    if (chartFilter?.value === label && chartFilter?.dimension === 'powerState') {
+      clearFilter();
+    } else {
+      setFilter('powerState', label, 'powerStateChart');
+    }
+  };
+
   return (
     <div className="dashboard-page">
       <Grid>
@@ -87,6 +110,13 @@ export function DashboardPage() {
               <> collected on {rawData.metadata.collectionDate.toLocaleDateString()}</>
             )}
           </p>
+          {chartFilter && chartFilter.dimension === 'powerState' && (
+            <FilterBadge
+              dimension="Power State"
+              value={chartFilter.value}
+              onClear={clearFilter}
+            />
+          )}
         </Column>
 
         {/* Key Metrics Row */}
@@ -164,10 +194,12 @@ export function DashboardPage() {
           <Tile className="dashboard-page__chart-tile">
             <DoughnutChart
               title="Power State Distribution"
+              subtitle="Click a segment to filter OS distribution"
               data={powerStateData}
               colors={powerStateColors}
               height={280}
               formatValue={(v) => `${v} VMs`}
+              onSegmentClick={handlePowerStateClick}
             />
           </Tile>
         </Column>
@@ -175,7 +207,9 @@ export function DashboardPage() {
         <Column lg={8} md={8} sm={4}>
           <Tile className="dashboard-page__chart-tile">
             <HorizontalBarChart
-              title="Top 10 Operating Systems"
+              title={chartFilter?.dimension === 'powerState'
+                ? `Top Operating Systems (${filteredVMs.length} ${chartFilter.value} VMs)`
+                : 'Top 10 Operating Systems'}
               data={osChartData}
               height={280}
               valueLabel="VMs"

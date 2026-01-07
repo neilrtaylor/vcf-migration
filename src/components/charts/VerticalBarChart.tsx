@@ -18,6 +18,7 @@ interface VerticalBarChartProps {
   showLegend?: boolean;
   colors?: string[];
   formatValue?: (value: number) => string;
+  onBarClick?: (label: string, value: number) => void;
 }
 
 export function VerticalBarChart({
@@ -29,6 +30,7 @@ export function VerticalBarChart({
   showLegend = false,
   colors,
   formatValue,
+  onBarClick,
 }: VerticalBarChartProps) {
   const labels = data.map((d) => d.label);
   const values = data.map((d) => d.value);
@@ -50,6 +52,14 @@ export function VerticalBarChart({
   const options: ChartOptions<'bar'> = {
     ...defaultBarOptions,
     indexAxis: 'x', // Vertical bars
+    onClick: onBarClick
+      ? (_event, activeElements) => {
+          if (activeElements.length > 0) {
+            const index = activeElements[0].index;
+            onBarClick(data[index].label, data[index].value);
+          }
+        }
+      : undefined,
     plugins: {
       ...defaultBarOptions.plugins,
       legend: {

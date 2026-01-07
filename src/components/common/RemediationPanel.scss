@@ -1,0 +1,114 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/colors' as *;
+
+.remediation-panel {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-05;
+  }
+
+  &__title {
+    @include type-style('heading-compact-02');
+    margin: 0;
+  }
+
+  &__summary {
+    display: flex;
+    gap: $spacing-03;
+  }
+
+  &__accordion {
+    .cds--accordion__content {
+      padding: $spacing-05;
+    }
+  }
+
+  &__item {
+    &--blocker {
+      border-left: 3px solid $red-60;
+    }
+
+    &--warning {
+      border-left: 3px solid $magenta-50;
+    }
+
+    &--info {
+      border-left: 3px solid $blue-60;
+    }
+  }
+
+  &__item-header {
+    display: flex;
+    align-items: center;
+    gap: $spacing-03;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+
+    &--blocker {
+      fill: $red-60;
+    }
+
+    &--warning {
+      fill: $magenta-50;
+    }
+
+    &--info {
+      fill: $blue-60;
+    }
+  }
+
+  &__item-name {
+    flex: 1;
+    @include type-style('body-compact-01');
+  }
+
+  &__item-content {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-04;
+  }
+
+  &__description {
+    @include type-style('body-01');
+    color: $gray-70;
+    margin: 0;
+  }
+
+  &__remediation {
+    background-color: $gray-10;
+    padding: $spacing-04;
+    border-radius: 4px;
+
+    h4 {
+      @include type-style('label-01');
+      margin: 0 0 $spacing-02 0;
+      color: $gray-70;
+    }
+
+    p {
+      @include type-style('body-compact-01');
+      margin: 0;
+    }
+  }
+
+  &__docs {
+    margin-top: $spacing-02;
+  }
+
+  &__vms {
+    h4 {
+      @include type-style('label-01');
+      margin: 0 0 $spacing-02 0;
+      color: $gray-70;
+    }
+
+    .cds--list--unordered {
+      margin-left: $spacing-05;
+    }
+  }
+}

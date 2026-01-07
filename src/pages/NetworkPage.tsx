@@ -4,7 +4,9 @@ import { Navigate } from 'react-router-dom';
 import { useData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber } from '@/utils/formatters';
-import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
+import { HorizontalBarChart, DoughnutChart, VerticalBarChart, Sunburst, NetworkTopology } from '@/components/charts';
+import type { HierarchyNode, TopologyNode, TopologyLink } from '@/components/charts';
+import { RedHatDocLinksGroup } from '@/components/common';
 import './NetworkPage.scss';
 
 export function NetworkPage() {
@@ -92,6 +94,114 @@ export function NetworkPage() {
 
   // VMs without network adapters
   const vmsWithoutNIC = vmNicCounts.filter(vm => vm.nicCount === 0).length;
+
+  // Build network hierarchy for sunburst
+  // Structure: Root -> vSwitches -> Port Groups -> VMs count
+  const networkHierarchy: HierarchyNode = {
+    name: 'Network',
+    children: [],
+  };
+
+  // Group by switch, then by port group
+  const switchMap = new Map<string, Map<string, number>>();
+  networks.forEach(nic => {
+    const switchName = nic.switchName || 'Standard Switch';
+    const portGroup = nic.networkName || 'Default';
+
+    if (!switchMap.has(switchName)) {
+      switchMap.set(switchName, new Map());
+    }
+    const portGroups = switchMap.get(switchName)!;
+    portGroups.set(portGroup, (portGroups.get(portGroup) || 0) + 1);
+  });
+
+  // Convert to hierarchy
+  switchMap.forEach((portGroups, switchName) => {
+    const switchNode: HierarchyNode = {
+      name: switchName,
+      children: [],
+    };
+
+    portGroups.forEach((count, portGroupName) => {
+      switchNode.children!.push({
+        name: portGroupName,
+        value: count,
+      });
+    });
+
+    networkHierarchy.children!.push(switchNode);
+  });
+
+  // Build topology nodes and links for force-directed graph
+  const topologyNodes: TopologyNode[] = [];
+  const topologyLinks: TopologyLink[] = [];
+  const nodeIds = new Set<string>();
+
+  // Add switch nodes
+  switchMap.forEach((portGroups, switchName) => {
+    const switchId = `switch-${switchName}`;
+    if (!nodeIds.has(switchId)) {
+      topologyNodes.push({
+        id: switchId,
+        name: switchName,
+        type: 'switch',
+        value: Array.from(portGroups.values()).reduce((a, b) => a + b, 0),
+      });
+      nodeIds.add(switchId);
+    }
+
+    // Add port group nodes and links to switch
+    portGroups.forEach((vmCount, portGroupName) => {
+      const pgId = `pg-${switchName}-${portGroupName}`;
+      if (!nodeIds.has(pgId)) {
+        topologyNodes.push({
+          id: pgId,
+          name: portGroupName,
+          type: 'portgroup',
+          group: switchName,
+          value: vmCount,
+        });
+        nodeIds.add(pgId);
+
+        // Link port group to switch
+        topologyLinks.push({
+          source: switchId,
+          target: pgId,
+        });
+      }
+    });
+  });
+
+  // Add top VMs as nodes (limit to prevent overcrowding)
+  const topVMsForTopology = [...vmNicCounts]
+    .sort((a, b) => b.nicCount - a.nicCount)
+    .slice(0, 20)
+    .filter(vm => vm.nicCount > 0);
+
+  topVMsForTopology.forEach(vm => {
+    const vmId = `vm-${vm.vmName}`;
+    topologyNodes.push({
+      id: vmId,
+      name: vm.vmName,
+      type: 'vm',
+      value: vm.nicCount,
+    });
+
+    // Link VM to its port groups
+    const vmNetworks = networks.filter(n => n.vmName === vm.vmName);
+    vmNetworks.forEach(nic => {
+      const switchName = nic.switchName || 'Standard Switch';
+      const portGroup = nic.networkName || 'Default';
+      const pgId = `pg-${switchName}-${portGroup}`;
+
+      if (nodeIds.has(pgId)) {
+        topologyLinks.push({
+          source: pgId,
+          target: vmId,
+        });
+      }
+    });
+  });
 
   return (
     <div className="network-page">
@@ -191,7 +301,7 @@ export function NetworkPage() {
         </Column>
 
         {/* Top VMs by NIC count */}
-        <Column lg={16} md={8} sm={4}>
+        <Column lg={8} md={8} sm={4}>
           <Tile className="network-page__chart-tile">
             <HorizontalBarChart
               title="Top 15 VMs by NIC Count"
@@ -200,6 +310,31 @@ export function NetworkPage() {
               height={400}
               valueLabel="NICs"
               formatValue={(v) => `${v} NICs`}
+            />
+          </Tile>
+        </Column>
+
+        {/* Network Hierarchy Sunburst */}
+        <Column lg={8} md={8} sm={4}>
+          <Tile className="network-page__chart-tile">
+            <Sunburst
+              title="Network Hierarchy"
+              subtitle="vSwitches > Port Groups > NIC Count"
+              data={networkHierarchy}
+              height={400}
+            />
+          </Tile>
+        </Column>
+
+        {/* Network Topology Force-Directed Graph */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="network-page__chart-tile">
+            <NetworkTopology
+              title="Network Topology"
+              subtitle="Interactive view of switches, port groups, and top VMs (drag to reposition, scroll to zoom)"
+              nodes={topologyNodes}
+              links={topologyLinks}
+              height={500}
             />
           </Tile>
         </Column>
@@ -232,6 +367,33 @@ export function NetworkPage() {
             <span className="network-page__secondary-value">
               {formatNumber(adapterTypes['Vmxnet3'] || adapterTypes['VMXNET3'] || 0)}
             </span>
+          </Tile>
+        </Column>
+
+        {/* Documentation Links */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="network-page__docs-tile">
+            <RedHatDocLinksGroup
+              title="OpenShift Virtualization Network Resources"
+              links={[
+                {
+                  href: 'https://docs.openshift.com/container-platform/latest/virt/virtual_machines/vm_networking/virt-networking-overview.html',
+                  label: 'Networking Overview',
+                  description: 'Overview of networking in OpenShift Virtualization',
+                },
+                {
+                  href: 'https://docs.openshift.com/container-platform/latest/networking/multiple_networks/understanding-multiple-networks.html',
+                  label: 'Multus CNI Plugin',
+                  description: 'Configure multiple networks using Multus CNI',
+                },
+                {
+                  href: 'https://docs.openshift.com/container-platform/latest/virt/virtual_machines/vm_networking/virt-attaching-vm-to-ovn-secondary-network.html',
+                  label: 'OVN Secondary Networks',
+                  description: 'Attach VMs to OVN secondary networks',
+                },
+              ]}
+              layout="horizontal"
+            />
           </Tile>
         </Column>
       </Grid>

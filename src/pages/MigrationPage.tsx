@@ -1,12 +1,19 @@
 // Migration readiness page with ROKS sizing
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel } from '@carbon/react';
+import { useState, useCallback } from 'react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, UnorderedList, ListItem, Button, InlineNotification } from '@carbon/react';
+import { Download } from '@carbon/icons-react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB, getHardwareVersionNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart } from '@/components/charts';
+import { RedHatDocLink, RemediationPanel } from '@/components/common';
+import type { RemediationItem } from '@/components/common';
+import { MTVYAMLGenerator, downloadBlob } from '@/services/export';
+import type { MTVExportOptions } from '@/types/mtvYaml';
 import osCompatibilityData from '@/data/redhatOSCompatibility.json';
 import ibmCloudProfiles from '@/data/ibmCloudProfiles.json';
+import mtvRequirements from '@/data/mtvRequirements.json';
 import './MigrationPage.scss';
 
 // OS Compatibility lookup
@@ -23,6 +30,8 @@ function getOSCompatibility(guestOS: string) {
 export function MigrationPage() {
   const { rawData } = useData();
   const vms = useVMs();
+  const [yamlExporting, setYamlExporting] = useState(false);
+  const [yamlExportSuccess, setYamlExportSuccess] = useState(false);
 
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
@@ -310,6 +319,154 @@ export function MigrationPage() {
     storageGiB: wave.vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
   })).filter(w => w.vmCount > 0);
 
+  // ===== REMEDIATION ITEMS FOR PRE-FLIGHT =====
+  const remediationItems: RemediationItem[] = [];
+
+  if (vmsWithoutTools > 0) {
+    remediationItems.push({
+      id: 'tools-installed',
+      name: mtvRequirements.checks['tools-installed'].name,
+      severity: 'blocker',
+      description: mtvRequirements.checks['tools-installed'].description,
+      remediation: mtvRequirements.checks['tools-installed'].remediation,
+      documentationLink: mtvRequirements.checks['tools-installed'].documentationLink,
+      affectedCount: vmsWithoutTools,
+    });
+  }
+
+  if (vmsWithOldSnapshots > 0) {
+    remediationItems.push({
+      id: 'old-snapshots',
+      name: mtvRequirements.checks['old-snapshots'].name,
+      severity: 'blocker',
+      description: mtvRequirements.checks['old-snapshots'].description,
+      remediation: mtvRequirements.checks['old-snapshots'].remediation,
+      documentationLink: mtvRequirements.checks['old-snapshots'].documentationLink,
+      affectedCount: vmsWithOldSnapshots,
+    });
+  }
+
+  if (vmsWithRDM > 0) {
+    remediationItems.push({
+      id: 'no-rdm',
+      name: mtvRequirements.checks['no-rdm'].name,
+      severity: 'blocker',
+      description: mtvRequirements.checks['no-rdm'].description,
+      remediation: mtvRequirements.checks['no-rdm'].remediation,
+      documentationLink: mtvRequirements.checks['no-rdm'].documentationLink,
+      affectedCount: vmsWithRDM,
+    });
+  }
+
+  if (vmsWithSharedDisks > 0) {
+    remediationItems.push({
+      id: 'no-shared-disks',
+      name: mtvRequirements.checks['no-shared-disks'].name,
+      severity: 'blocker',
+      description: mtvRequirements.checks['no-shared-disks'].description,
+      remediation: mtvRequirements.checks['no-shared-disks'].remediation,
+      documentationLink: mtvRequirements.checks['no-shared-disks'].documentationLink,
+      affectedCount: vmsWithSharedDisks,
+    });
+  }
+
+  if (vmsWithToolsNotRunning > 0) {
+    remediationItems.push({
+      id: 'tools-running',
+      name: mtvRequirements.checks['tools-running'].name,
+      severity: 'warning',
+      description: mtvRequirements.checks['tools-running'].description,
+      remediation: mtvRequirements.checks['tools-running'].remediation,
+      documentationLink: mtvRequirements.checks['tools-running'].documentationLink,
+      affectedCount: vmsWithToolsNotRunning,
+    });
+  }
+
+  if (vmsWithCdConnected > 0) {
+    remediationItems.push({
+      id: 'cd-disconnected',
+      name: mtvRequirements.checks['cd-disconnected'].name,
+      severity: 'warning',
+      description: mtvRequirements.checks['cd-disconnected'].description,
+      remediation: mtvRequirements.checks['cd-disconnected'].remediation,
+      documentationLink: mtvRequirements.checks['cd-disconnected'].documentationLink,
+      affectedCount: vmsWithCdConnected,
+    });
+  }
+
+  if (hwVersionCounts.outdated > 0) {
+    remediationItems.push({
+      id: 'hw-version',
+      name: mtvRequirements.checks['hw-version'].name,
+      severity: 'warning',
+      description: mtvRequirements.checks['hw-version'].description,
+      remediation: mtvRequirements.checks['hw-version'].remediation,
+      documentationLink: mtvRequirements.checks['hw-version'].documentationLink,
+      affectedCount: hwVersionCounts.outdated,
+    });
+  }
+
+  if (vmsWithLegacyNIC > 0) {
+    remediationItems.push({
+      id: 'network-adapter',
+      name: mtvRequirements.checks['network-adapter'].name,
+      severity: 'info',
+      description: mtvRequirements.checks['network-adapter'].description,
+      remediation: mtvRequirements.checks['network-adapter'].remediation,
+      documentationLink: mtvRequirements.checks['network-adapter'].documentationLink,
+      affectedCount: vmsWithLegacyNIC,
+    });
+  }
+
+  // ===== MTV YAML EXPORT =====
+  const handleYAMLExport = useCallback(async () => {
+    setYamlExporting(true);
+    setYamlExportSuccess(false);
+
+    try {
+      // Default export options - users can customize these in the generated YAML
+      const exportOptions: MTVExportOptions = {
+        namespace: 'openshift-mtv',
+        sourceProviderName: 'vmware-source',
+        destinationProviderName: 'host',
+        networkMapName: 'vmware-network-map',
+        storageMapName: 'vmware-storage-map',
+        defaultStorageClass: 'ocs-storagecluster-ceph-rbd',
+        targetNamespace: 'migrated-vms',
+        warm: false,
+        preserveStaticIPs: false,
+      };
+
+      const generator = new MTVYAMLGenerator(exportOptions);
+
+      // Create wave data for export
+      const waveExportData = waves
+        .filter(w => w.vms.length > 0)
+        .map(wave => ({
+          name: wave.name.replace(/Wave \d+: /, '').toLowerCase(),
+          vms: wave.vms.map(vmData => {
+            // Find the full VM data
+            const fullVm = poweredOnVMs.find(v => v.vmName === vmData.vmName);
+            return fullVm!;
+          }).filter(Boolean),
+        }));
+
+      // Generate and download the bundle
+      const blob = await generator.generateBundle(
+        waveExportData,
+        networks,
+        rawData.vDatastore
+      );
+
+      downloadBlob(blob, `mtv-migration-plan-${new Date().toISOString().split('T')[0]}.zip`);
+      setYamlExportSuccess(true);
+    } catch (error) {
+      console.error('YAML export failed:', error);
+    } finally {
+      setYamlExporting(false);
+    }
+  }, [waves, poweredOnVMs, networks, rawData.vDatastore]);
+
   return (
     <div className="migration-page">
       <Grid>
@@ -373,6 +530,7 @@ export function MigrationPage() {
               <Tab>Wave Planning</Tab>
               <Tab>OS Compatibility</Tab>
               <Tab>Complexity</Tab>
+              <Tab>MTV Workflow</Tab>
             </TabList>
             <TabPanels>
               {/* Pre-Flight Checks Panel */}
@@ -483,6 +641,16 @@ export function MigrationPage() {
                       </div>
                     </Tile>
                   </Column>
+
+                  {/* Remediation Panel */}
+                  {remediationItems.length > 0 && (
+                    <Column lg={16} md={8} sm={4}>
+                      <RemediationPanel
+                        items={remediationItems}
+                        title="Remediation Required"
+                      />
+                    </Column>
+                  )}
                 </Grid>
               </TabPanel>
 
@@ -563,6 +731,20 @@ export function MigrationPage() {
                           <span className="migration-page__recommendation-value">{recommendedProfile.useCase}</span>
                         </div>
                       </div>
+                    </Tile>
+                  </Column>
+
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__cost-tile">
+                      <h4>Cost Estimation</h4>
+                      <p className="migration-page__cost-description">
+                        Use the IBM Cloud Cost Estimator to calculate your ROKS cluster costs based on the recommended configuration.
+                      </p>
+                      <RedHatDocLink
+                        href="https://cloud.ibm.com/kubernetes/catalog/create?platformType=openshift"
+                        label="Open IBM Cloud ROKS Catalog"
+                        description="Configure and estimate costs for your OpenShift cluster"
+                      />
                     </Tile>
                   </Column>
                 </Grid>
@@ -649,6 +831,20 @@ export function MigrationPage() {
                           <span className="migration-page__recommendation-value">1:8 vCPU:Memory ratio - Memory-intensive workloads</span>
                         </div>
                       </div>
+                    </Tile>
+                  </Column>
+
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__cost-tile">
+                      <h4>Cost Estimation</h4>
+                      <p className="migration-page__cost-description">
+                        Estimate costs for {formatNumber(totalVSIs)} VPC Virtual Server Instances using the IBM Cloud Cost Estimator.
+                      </p>
+                      <RedHatDocLink
+                        href="https://cloud.ibm.com/vpc-ext/provision/vs"
+                        label="Open IBM Cloud VPC Catalog"
+                        description="Configure and estimate costs for VPC virtual servers"
+                      />
                     </Tile>
                   </Column>
                 </Grid>
@@ -789,6 +985,91 @@ export function MigrationPage() {
                         valueLabel="Score"
                         formatValue={(v) => `Score: ${v}`}
                       />
+                    </Tile>
+                  </Column>
+                </Grid>
+              </TabPanel>
+
+              {/* MTV Workflow Panel */}
+              <TabPanel>
+                <Grid className="migration-page__tab-content">
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__workflow-header">
+                      <div className="migration-page__workflow-header-content">
+                        <div>
+                          <h3>Migration Toolkit for Virtualization (MTV) Workflow</h3>
+                          <p>Follow these four phases for a successful migration to OpenShift Virtualization</p>
+                        </div>
+                        <Button
+                          kind="primary"
+                          size="md"
+                          renderIcon={Download}
+                          onClick={handleYAMLExport}
+                          disabled={yamlExporting || poweredOnVMs.length === 0}
+                        >
+                          {yamlExporting ? 'Generating...' : 'Export MTV YAML'}
+                        </Button>
+                      </div>
+                      {yamlExportSuccess && (
+                        <InlineNotification
+                          kind="success"
+                          title="Export complete"
+                          subtitle="MTV YAML templates downloaded. Review and customize before applying to your cluster."
+                          lowContrast
+                          hideCloseButton
+                          style={{ marginTop: '1rem' }}
+                        />
+                      )}
+                      <div className="migration-page__workflow-docs">
+                        <RedHatDocLink
+                          href="https://docs.openshift.com/container-platform/latest/virt/virtual_machines/importing_vms/virt-importing-vmware-vm.html"
+                          label="Official MTV Documentation"
+                          description="Complete guide to importing VMware VMs to OpenShift Virtualization"
+                        />
+                      </div>
+                    </Tile>
+                  </Column>
+
+                  {mtvRequirements.workflowPhases.map((phase) => (
+                    <Column key={phase.phase} lg={8} md={8} sm={4}>
+                      <Tile className={`migration-page__phase-tile migration-page__phase-tile--phase-${phase.phase}`}>
+                        <div className="migration-page__phase-header">
+                          <span className="migration-page__phase-number">Phase {phase.phase}</span>
+                          <h4 className="migration-page__phase-name">{phase.name}</h4>
+                        </div>
+                        <p className="migration-page__phase-description">{phase.description}</p>
+                        <div className="migration-page__phase-activities">
+                          <h5>Activities</h5>
+                          <UnorderedList>
+                            {phase.activities.map((activity, idx) => (
+                              <ListItem key={idx}>{activity}</ListItem>
+                            ))}
+                          </UnorderedList>
+                        </div>
+                      </Tile>
+                    </Column>
+                  ))}
+
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__workflow-resources">
+                      <h4>Additional Resources</h4>
+                      <div className="migration-page__resource-links">
+                        <RedHatDocLink
+                          href="https://github.com/RedHatQuickCourses/architect-the-ocpvirt"
+                          label="Architecture Course"
+                          description="Red Hat Quick Course - Architect OpenShift Virtualization"
+                        />
+                        <RedHatDocLink
+                          href="https://github.com/RedHatQuickCourses/ocpvirt-migration"
+                          label="Migration Course"
+                          description="Red Hat Quick Course - OpenShift Virtualization Migration"
+                        />
+                        <RedHatDocLink
+                          href="https://access.redhat.com/articles/973163"
+                          label="RHEL Life Cycle"
+                          description="Red Hat Enterprise Linux Life Cycle dates"
+                        />
+                      </div>
                     </Tile>
                   </Column>
                 </Grid>

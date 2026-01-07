@@ -1,0 +1,51 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+
+.redhat-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-02;
+
+  &--sm {
+    @include type-style('label-01');
+  }
+
+  &--md {
+    @include type-style('body-compact-01');
+  }
+
+  &--lg {
+    @include type-style('body-01');
+  }
+
+  &__wrapper {
+    display: inline-flex;
+  }
+
+  &__tooltip {
+    max-width: 300px;
+  }
+}
+
+.redhat-doc-links-group {
+  &__title {
+    @include type-style('heading-compact-01');
+    margin-bottom: $spacing-03;
+  }
+
+  &--vertical {
+    .redhat-doc-links-group__links {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-03;
+    }
+  }
+
+  &--horizontal {
+    .redhat-doc-links-group__links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: $spacing-04;
+    }
+  }
+}

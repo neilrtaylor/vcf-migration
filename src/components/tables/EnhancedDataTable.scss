@@ -1,0 +1,87 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+
+.enhanced-data-table {
+  &__sortable-header {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background-color: var(--cds-layer-hover);
+    }
+  }
+
+  &__header-content {
+    display: flex;
+    align-items: center;
+    gap: $spacing-02;
+  }
+
+  &__sort-icon {
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.5;
+
+    .enhanced-data-table__sortable-header:hover & {
+      opacity: 1;
+    }
+  }
+
+  &__empty {
+    text-align: center;
+    padding: $spacing-07 !important;
+    @include type-style('body-01');
+    color: var(--cds-text-secondary);
+  }
+
+  &__pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-03 0;
+    border-top: 1px solid var(--cds-border-subtle-01);
+    margin-top: $spacing-03;
+  }
+
+  &__pagination-info {
+    display: flex;
+    gap: $spacing-03;
+    align-items: center;
+  }
+
+  // Column visibility menu styles
+  &__column-menu {
+    min-width: 200px;
+  }
+
+  &__column-visible {
+    position: relative;
+
+    &::before {
+      content: '✓';
+      position: absolute;
+      left: $spacing-03;
+      color: var(--cds-icon-primary);
+      font-weight: 600;
+    }
+  }
+
+  // Override Carbon table styles for better integration
+  .cds--data-table-container {
+    padding-top: 0;
+  }
+
+  .cds--table-toolbar {
+    background-color: var(--cds-layer-01);
+  }
+
+  .cds--toolbar-search-container-expandable,
+  .cds--toolbar-search-container-persistent {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .cds--overflow-menu-options {
+    min-width: 180px;
+  }
+}

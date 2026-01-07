@@ -1,0 +1,95 @@
+// Network topology diagram styles
+@use '@carbon/styles/scss/spacing' as *;
+@use '@carbon/styles/scss/type' as *;
+
+.topology-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.topology-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #a8a8a8;
+  font-size: 14px;
+}
+
+.topology-tooltip {
+  position: fixed;
+  background: #161616;
+  color: #f4f4f4;
+  padding: $spacing-03 $spacing-04;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  max-width: 250px;
+
+  &__name {
+    @include type-style('heading-compact-01');
+    margin-bottom: $spacing-01;
+    color: #fff;
+  }
+
+  &__type {
+    @include type-style('label-01');
+    color: #a8a8a8;
+    text-transform: capitalize;
+    margin-bottom: $spacing-02;
+  }
+
+  &__value {
+    @include type-style('body-compact-01');
+    color: #78a9ff;
+    font-weight: 600;
+  }
+}
+
+.topology-legend {
+  position: absolute;
+  bottom: $spacing-04;
+  left: $spacing-04;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-04;
+  background: rgba(255, 255, 255, 0.9);
+  padding: $spacing-03 $spacing-04;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-02;
+  }
+
+  &__color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  &__label {
+    @include type-style('label-01');
+    color: #525252;
+  }
+}
+
+// SVG styles
+.links line {
+  stroke-linecap: round;
+}
+
+.nodes circle {
+  transition: stroke-width 0.15s ease;
+}
+
+.labels text {
+  user-select: none;
+}

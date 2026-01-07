@@ -5,6 +5,7 @@ import { useData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber, formatMiB, mibToGiB } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
+import { RedHatDocLinksGroup } from '@/components/common';
 import './ClusterPage.scss';
 
 export function ClusterPage() {
@@ -452,6 +453,33 @@ export function ClusterPage() {
             <span className="cluster-page__secondary-value">
               {formatNumber(hosts.filter(h => h.hyperthreading).length)}
             </span>
+          </Tile>
+        </Column>
+
+        {/* Documentation Links */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="cluster-page__docs-tile">
+            <RedHatDocLinksGroup
+              title="OpenShift Virtualization Cluster Resources"
+              links={[
+                {
+                  href: 'https://github.com/RedHatQuickCourses/architect-the-ocpvirt',
+                  label: 'Architecture Course',
+                  description: 'Red Hat Quick Course - Architect OpenShift Virtualization',
+                },
+                {
+                  href: 'https://access.redhat.com/articles/4820991',
+                  label: 'Resource Requirements',
+                  description: 'OpenShift Virtualization resource requirements and guidelines',
+                },
+                {
+                  href: 'https://docs.openshift.com/container-platform/latest/virt/install/preparing-cluster-for-virt.html',
+                  label: 'Cluster Preparation',
+                  description: 'Preparing your cluster for OpenShift Virtualization',
+                },
+              ]}
+              layout="horizontal"
+            />
           </Tile>
         </Column>
       </Grid>

@@ -18,6 +18,7 @@ interface PieChartProps {
   showLegend?: boolean;
   legendPosition?: 'top' | 'bottom' | 'left' | 'right';
   formatValue?: (value: number) => string;
+  onSegmentClick?: (label: string, value: number) => void;
 }
 
 export function PieChart({
@@ -29,6 +30,7 @@ export function PieChart({
   showLegend = true,
   legendPosition = 'right',
   formatValue,
+  onSegmentClick,
 }: PieChartProps) {
   const labels = data.map((d) => d.label);
   const values = data.map((d) => d.value);
@@ -47,6 +49,14 @@ export function PieChart({
 
   const options: ChartOptions<'pie'> = {
     ...defaultPieOptions,
+    onClick: onSegmentClick
+      ? (_event, activeElements) => {
+          if (activeElements.length > 0) {
+            const index = activeElements[0].index;
+            onSegmentClick(data[index].label, data[index].value);
+          }
+        }
+      : undefined,
     plugins: {
       ...defaultPieOptions.plugins,
       legend: {

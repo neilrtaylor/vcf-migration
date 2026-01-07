@@ -26,4 +26,9 @@
     text-align: center;
     padding: spacing.$spacing-07;
   }
+
+  &__name-cell {
+    font-weight: 600;
+    color: theme.$text-primary;
+  }
 }

@@ -1,6 +1,6 @@
 // Data context for global state management
 import { createContext, useReducer, useCallback, type ReactNode } from 'react';
-import { dataReducer, initialState, type DataState, type DataAction } from './dataReducer';
+import { dataReducer, initialState, type DataState, type DataAction, type ChartFilter } from './dataReducer';
 import type { RVToolsData, AnalysisResults } from '@/types';
 
 // Context value interface
@@ -9,6 +9,8 @@ interface DataContextValue extends DataState {
   setAnalysis: (analysis: AnalysisResults) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setChartFilter: (filter: ChartFilter | null) => void;
+  clearChartFilter: () => void;
   clearData: () => void;
   dispatch: React.Dispatch<DataAction>;
 }
@@ -42,6 +44,14 @@ export function DataProvider({ children }: DataProviderProps) {
     dispatch({ type: 'SET_ERROR', payload: error });
   }, []);
 
+  const setChartFilter = useCallback((filter: ChartFilter | null) => {
+    dispatch({ type: 'SET_CHART_FILTER', payload: filter });
+  }, []);
+
+  const clearChartFilter = useCallback(() => {
+    dispatch({ type: 'SET_CHART_FILTER', payload: null });
+  }, []);
+
   const clearData = useCallback(() => {
     dispatch({ type: 'CLEAR_DATA' });
   }, []);
@@ -52,6 +62,8 @@ export function DataProvider({ children }: DataProviderProps) {
     setAnalysis,
     setLoading,
     setError,
+    setChartFilter,
+    clearChartFilter,
     clearData,
     dispatch,
   };

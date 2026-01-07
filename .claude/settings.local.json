@@ -13,7 +13,8 @@
       "Bash(lsof:*)",
       "Bash(npm test:*)",
       "WebSearch",
-      "WebFetch(domain:icones.js.org)"
+      "WebFetch(domain:icones.js.org)",
+      "Bash(cat:*)"
     ]
   }
 }

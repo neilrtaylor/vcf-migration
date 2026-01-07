@@ -1,0 +1,70 @@
+// Heatmap component styles
+@use '@carbon/styles/scss/spacing' as *;
+@use '@carbon/styles/scss/type' as *;
+
+.heatmap-container {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.heatmap-cell {
+  transition: all 0.15s ease;
+
+  &:hover {
+    filter: brightness(1.1);
+  }
+}
+
+.heatmap-tooltip {
+  position: fixed;
+  background: #161616;
+  color: #f4f4f4;
+  padding: $spacing-03 $spacing-04;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  max-width: 250px;
+
+  &__title {
+    @include type-style('heading-compact-01');
+    margin-bottom: $spacing-01;
+    color: #fff;
+  }
+
+  &__subtitle {
+    @include type-style('label-01');
+    color: #a8a8a8;
+    margin-bottom: $spacing-02;
+  }
+
+  &__value {
+    @include type-style('body-compact-01');
+    color: #78a9ff;
+    font-weight: 600;
+  }
+}
+
+// Legend (optional)
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: $spacing-03;
+  margin-top: $spacing-04;
+  justify-content: center;
+
+  &__gradient {
+    width: 150px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  &__label {
+    @include type-style('label-01');
+    color: #525252;
+  }
+}

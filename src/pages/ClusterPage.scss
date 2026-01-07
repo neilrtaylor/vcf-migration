@@ -73,4 +73,11 @@
     color: var(--cds-text-primary, #161616);
     margin-top: spacing.$spacing-02;
   }
+
+  &__docs-tile {
+    padding: spacing.$spacing-05;
+    margin-top: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: var(--cds-layer-accent-01);
+  }
 }
