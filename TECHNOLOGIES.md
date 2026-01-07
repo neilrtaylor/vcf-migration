@@ -124,7 +124,7 @@ Using native browser APIs reduces external dependencies and improves portability
 
 Because a core use case for this application is **ingesting and interpreting exported VMware inventory data** (for example RVTools CSV or Excel workbooks), we include libraries that make reading and transforming those file formats in the browser reliable and performant.
 
-### 🚀 PapaParse
+### PapaParse
 
 **PapaParse** is one of the most robust CSV parsers for JavaScript. It runs in the browser or Node and is optimized for large files, streaming, header parsing, and type inference. It’s widely used in React applications that need to read CSV data without a backend service.  
 Key benefits:
@@ -136,7 +136,7 @@ Key benefits:
 
 ---
 
-### 📦 SheetJS / xlsx
+### SheetJS / xlsx
 
 **SheetJS (xlsx)** is a popular JavaScript library for reading and writing spreadsheet formats, including `.xlsx`, `.xls`, and other Excel variants directly in the browser or Node. For RVTools exports in Excel, SheetJS lets you parse sheets into JSON arrays or other programmatic data structures for UI consumption.
 
@@ -146,7 +146,7 @@ SheetJS is particularly useful when RVTools exports have multiple tabs (e.g. `vI
 
 ---
 
-### 📄 FileReader API (Web Standard)
+### FileReader API (Web Standard)
 
 The native **FileReader** Web API is used under the hood to read user-selected files (CSV/Excel) from disk into memory, creating binary or text blobs that parsing libraries (like PapaParse and SheetJS) turn into usable data structures.
 
@@ -159,7 +159,7 @@ Key features:
 
 ---
 
-### 🔍 JSON & Utility Transformations
+### JSON & Utility Transformations
 
 Once raw sheets or CSV are parsed, the app will typically normalize that data into JavaScript objects/arrays for use throughout the UI. This often uses:
 
