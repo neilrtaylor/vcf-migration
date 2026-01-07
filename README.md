@@ -1,73 +1,175 @@
-# React + TypeScript + Vite
+# VCF Migration
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern **React + TypeScript + Vite** web UI to support VMware Cloud Foundation (VCF) migration workflows — planning, execution and reporting to IBM Cloud Red Hat Open Shift Kubernetes (ROKs) and/or IBM Cloud Virtual Private Cloud (VPC) Virtual Server Instances (VSI).
 
-Currently, two official plugins are available:
+This project provides an interactive interface for visualizing, configuring, and driving migration actions related to VCF environments. Whether you’re assessing workloads for brownfield import, exporting inventory data, or orchestrating migration steps, this UI is designed to be a lightweight but powerful companion to your tooling.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## React Compiler
+This project leverages RVTools, which is a widely-used **Windows utility for VMware vSphere inventory and reporting**, designed to connect to a vCenter Server or individual ESXi hosts and pull detailed configuration and status information across your virtual environment. It displays data about VMs, hosts, datastores, networks, snapshots, VMware Tools status and more in an easy-to-navigate interface, with rich export options (CSV/XLSX) that make it ideal for audits, health checks, capacity planning, and migration planning. RVTools has long been a go-to for VMware administrators who need fast, comprehensive environment insights without installing agents on the infrastructure. See [RVTools – VMware Infrastructure Management​ | Dell USA](https://rvtoolit.com/rvtools.htm)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+For official details and downloads, see the RVTools page on Dell’s site, the current authorized host for the tool, [https://www.dell.com/en-us/shop/vmware/sl/rvtools](https://www.dell.com/en-us/shop/vmware/sl/rvtools). Also see [RVTools – VMware Infrastructure Management​ | Dell USA](https://www.dell.com/en-us/shop/vmware/sl/rvtools)
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Interactive Migration Dashboard** – See at-a-glance status and history  
+- **Inventory Reporting** – Parse and present data (ex: exported RVTools inventory)  
+- **Configuration UI** – Provide inputs needed for migration operations  
+- **Extensible Frontend Toolkit** – Built with React + TypeScript + Vite
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Getting Started
+
+These instructions will get the project up and running on your local machine for development and testing.
+
+### Prerequisites
+
+Make sure you have the following installed:
+
+- **Node.js** (>= 18.x)
+- **npm** (>= 9.x) or **yarn**
+
+---
+
+## Installation
+
+Clone the repo:
+
+```bash
+git clone https://github.com/neilrtaylor/vcf-migration.git
+cd vcf-migration
+````
+
+Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Run a local development server with hot reload:
+
+```bash
+npm run dev
+# or
+yarn dev
 ```
+
+This will open the app at `http://localhost:5173` (default Vite host/port).
+
+---
+
+## Build for Production
+
+Create an optimized production build:
+
+```bash
+npm run build
+# or
+yarn build
+```
+
+Serve the build locally for testing:
+
+```bash
+npm run preview
+# or
+yarn preview
+```
+
+---
+
+## Project Structure
+
+```text
+vcf-migration/
+├─ public/                 # Static assets
+├─ src/                    # Source code
+│   ├─ components/         # Reusable UI components
+│   ├─ pages/              # Route pages
+│   ├─ services/           # API and migration services
+│   ├─ styles/             # SCSS / styled sheets
+│   └─ index.tsx           # App entrypoint
+├─ .gitignore
+├─ package.json
+├─ tsconfig.json
+├─ vite.config.ts
+└─ README.md
+```
+
+---
+
+## Testing
+
+*(Add this section if you include tests later)*
+
+```bash
+npm run test
+# or
+yarn test
+```
+
+---
+
+## Backend Integration
+
+This UI expects a backend API that supports endpoints for:
+
+* Fetching migration inventories
+* Submitting migration jobs
+* Retrieving job status/progress
+* Serving configuration metadata
+
+You can stub/mock these endpoints during early development, or point to a live service matching your VCF migration tooling.
+
+---
+
+## Tips
+
+* Use your browser’s dev tools to inspect network requests while integrating with real APIs.
+* Leverage React DevTools for UI component state debugging.
+* If you’re working with Excel or CSV exports (like RVTools), consider using a client library (e.g., SheetJS) to parse files in the browser.
+
+---
+
+## Contributing
+
+Thanks for considering contributing! We follow a standard fork-and-pull request workflow:
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/foo`)
+3. Commit your changes
+4. Push to your branch (`git push origin feature/foo`)
+5. Open a Pull Request
+
+Please make sure your changes are linted and formatted consistently.
+
+---
+
+## Technologies
+
+This project uses a number of technologies — see the [TECHNOLOGIES](TECHNOLOGIES.md) file for details.
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgements
+
+Inspired by real-world VMware Cloud Foundation migration needs and built using:
+
+* React
+* TypeScript
+* Vite
+
