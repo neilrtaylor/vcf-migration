@@ -1,6 +1,6 @@
 // VSI (IBM Cloud VPC Virtual Server) Migration page
-import { useMemo } from 'react';
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel } from '@carbon/react';
+import { useState, useMemo } from 'react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, RadioButtonGroup, RadioButton, Dropdown, NumberInput } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
@@ -45,6 +45,11 @@ export function VSIMigrationPage() {
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
   }
+
+  // Wave planning mode: 'complexity' for traditional complexity-based waves, 'network' for subnet-based waves
+  const [wavePlanningMode, setWavePlanningMode] = useState<'complexity' | 'network'>('network');
+  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'ipPrefix'>('portGroup');
+  const [ipPrefixLength, setIpPrefixLength] = useState<number>(24);
 
   const poweredOnVMs = vms.filter(vm => vm.powerState === 'poweredOn');
   const snapshots = rawData.vSnapshot;
@@ -270,6 +275,13 @@ export function VSIMigrationPage() {
     const toolStatus = toolsMap.get(vm.vmName);
     const noTools = !toolStatus || toolStatus.toolsStatus === 'toolsNotInstalled';
 
+    // Get primary network info for network-based wave planning
+    const vmNetworks = networks.filter(n => n.vmName === vm.vmName);
+    const primaryNetwork = vmNetworks[0];
+    const networkName = primaryNetwork?.networkName || 'No Network';
+    const ipAddress = primaryNetwork?.ipv4Address || '';
+    const subnet = ipAddress ? ipAddress.split('.').slice(0, 3).join('.') + '.0/24' : 'Unknown';
+
     return {
       vmName: vm.vmName,
       complexity: complexityData?.score || 0,
@@ -278,43 +290,152 @@ export function VSIMigrationPage() {
       vcpus: vm.cpus,
       memoryGiB: Math.round(mibToGiB(vm.memory)),
       storageGiB: Math.round(mibToGiB(vm.provisionedMiB)),
+      networkName,
+      ipAddress,
+      subnet,
     };
   });
 
-  const waves: { name: string; description: string; vms: typeof vmWaveData }[] = [
-    { name: 'Wave 1: Pilot', description: 'Simple VMs with supported OS for initial validation', vms: [] },
-    { name: 'Wave 2: Quick Wins', description: 'Low complexity VMs ready for migration', vms: [] },
-    { name: 'Wave 3: Standard', description: 'Moderate complexity VMs', vms: [] },
-    { name: 'Wave 4: Complex', description: 'High complexity VMs requiring careful planning', vms: [] },
-    { name: 'Wave 5: Remediation', description: 'VMs with blockers requiring fixes before migration', vms: [] },
-  ];
+  // Complexity-based waves (traditional approach)
+  const complexityWaves = useMemo(() => {
+    const waveList: { name: string; description: string; vms: typeof vmWaveData }[] = [
+      { name: 'Wave 1: Pilot', description: 'Simple VMs with supported OS for initial validation', vms: [] },
+      { name: 'Wave 2: Quick Wins', description: 'Low complexity VMs ready for migration', vms: [] },
+      { name: 'Wave 3: Standard', description: 'Moderate complexity VMs', vms: [] },
+      { name: 'Wave 4: Complex', description: 'High complexity VMs requiring careful planning', vms: [] },
+      { name: 'Wave 5: Remediation', description: 'VMs with blockers requiring fixes before migration', vms: [] },
+    ];
 
-  vmWaveData.forEach(vm => {
-    if (vm.hasBlocker) {
-      waves[4].vms.push(vm);
-    } else if (vm.complexity <= 15 && vm.osStatus === 'supported') {
-      waves[0].vms.push(vm);
-    } else if (vm.complexity <= 30) {
-      waves[1].vms.push(vm);
-    } else if (vm.complexity <= 55) {
-      waves[2].vms.push(vm);
-    } else {
-      waves[3].vms.push(vm);
+    vmWaveData.forEach(vm => {
+      if (vm.hasBlocker) {
+        waveList[4].vms.push(vm);
+      } else if (vm.complexity <= 15 && vm.osStatus === 'supported') {
+        waveList[0].vms.push(vm);
+      } else if (vm.complexity <= 30) {
+        waveList[1].vms.push(vm);
+      } else if (vm.complexity <= 55) {
+        waveList[2].vms.push(vm);
+      } else {
+        waveList[3].vms.push(vm);
+      }
+    });
+
+    return waveList.filter(w => w.vms.length > 0);
+  }, [vmWaveData]);
+
+  // Helper function to calculate IP prefix based on CIDR length
+  const getIpPrefix = (ip: string, prefixLength: number): string => {
+    if (!ip) return 'Unknown';
+    const parts = ip.split('.');
+    if (parts.length !== 4) return 'Unknown';
+
+    const octetsToKeep = Math.floor(prefixLength / 8);
+    const remainingBits = prefixLength % 8;
+
+    const prefix = parts.slice(0, octetsToKeep).map(Number);
+
+    if (remainingBits > 0 && octetsToKeep < 4) {
+      const mask = 256 - Math.pow(2, 8 - remainingBits);
+      prefix.push(Number(parts[octetsToKeep]) & mask);
     }
-  });
 
-  const waveChartData = waves.map((wave, idx) => ({
-    label: `Wave ${idx + 1}`,
-    value: wave.vms.length,
-  })).filter(d => d.value > 0);
+    while (prefix.length < 4) {
+      prefix.push(0);
+    }
 
-  const waveResources = waves.map(wave => ({
-    name: wave.name,
-    vmCount: wave.vms.length,
-    vcpus: wave.vms.reduce((sum, vm) => sum + vm.vcpus, 0),
-    memoryGiB: wave.vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
-    storageGiB: wave.vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
-  })).filter(w => w.vmCount > 0);
+    return `${prefix.join('.')}/${prefixLength}`;
+  };
+
+  // Network-based waves: Group by port group or IP prefix
+  const networkWaves = useMemo(() => {
+    const groups = new Map<string, typeof vmWaveData>();
+
+    vmWaveData.forEach(vm => {
+      let key: string;
+
+      if (networkGroupBy === 'portGroup') {
+        key = vm.networkName || 'No Network';
+      } else {
+        if (vm.ipAddress) {
+          key = getIpPrefix(vm.ipAddress, ipPrefixLength);
+        } else {
+          key = `No IP: ${vm.networkName}`;
+        }
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(vm);
+    });
+
+    // Convert to wave format
+    const waves = Array.from(groups.entries()).map(([groupName, vms]) => {
+      const portGroups = [...new Set(vms.map(v => v.networkName).filter(n => n && n !== 'No Network'))];
+      const ipRanges = [...new Set(vms.map(v => v.ipAddress).filter(Boolean))];
+      const hasBlockers = vms.some(vm => vm.hasBlocker);
+      const avgComplexity = vms.reduce((sum, vm) => sum + vm.complexity, 0) / vms.length;
+
+      let description: string;
+      if (networkGroupBy === 'portGroup') {
+        description = ipRanges.length > 0
+          ? `IPs: ${ipRanges.slice(0, 3).join(', ')}${ipRanges.length > 3 ? ` +${ipRanges.length - 3} more` : ''}`
+          : 'No IP addresses detected';
+      } else {
+        description = portGroups.length > 0
+          ? `Port Group: ${portGroups.slice(0, 3).join(', ')}${portGroups.length > 3 ? ` +${portGroups.length - 3} more` : ''}`
+          : 'No port group info';
+      }
+
+      return {
+        name: groupName,
+        description,
+        vms,
+        vmCount: vms.length,
+        hasBlockers,
+        avgComplexity,
+        vcpus: vms.reduce((sum, vm) => sum + vm.vcpus, 0),
+        memoryGiB: vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
+        storageGiB: vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
+      };
+    });
+
+    // Sort: groups without blockers first, then by VM count ascending
+    return waves.sort((a, b) => {
+      if (a.hasBlockers !== b.hasBlockers) return a.hasBlockers ? 1 : -1;
+      return a.vmCount - b.vmCount;
+    });
+  }, [vmWaveData, networkGroupBy, ipPrefixLength]);
+
+  const waveChartData = wavePlanningMode === 'network'
+    ? networkWaves.map((wave) => ({
+        label: wave.name.length > 20 ? wave.name.substring(0, 17) + '...' : wave.name,
+        value: wave.vmCount,
+      })).slice(0, 10)
+    : complexityWaves.map((wave, waveIdx) => ({
+        label: `Wave ${waveIdx + 1}`,
+        value: wave.vms.length,
+      }));
+
+  const waveResources = wavePlanningMode === 'network'
+    ? networkWaves.map(wave => ({
+        name: wave.name,
+        description: wave.description,
+        vmCount: wave.vmCount,
+        vcpus: wave.vcpus,
+        memoryGiB: wave.memoryGiB,
+        storageGiB: wave.storageGiB,
+        hasBlockers: wave.hasBlockers,
+      }))
+    : complexityWaves.map(wave => ({
+        name: wave.name,
+        description: wave.description,
+        vmCount: wave.vms.length,
+        vcpus: wave.vms.reduce((sum, vm) => sum + vm.vcpus, 0),
+        memoryGiB: wave.vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
+        storageGiB: wave.vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
+        hasBlockers: false,
+      }));
 
   // ===== REMEDIATION ITEMS =====
   const remediationItems: RemediationItem[] = [];
@@ -718,20 +839,40 @@ export function VSIMigrationPage() {
                 <Grid className="migration-page__tab-content">
                   <Column lg={16} md={8} sm={4}>
                     <Tile className="migration-page__sizing-header">
-                      <h3>Migration Wave Planning</h3>
-                      <p>VMs organized into {waveResources.length} waves based on complexity and readiness</p>
+                      <div className="migration-page__wave-header">
+                        <div>
+                          <h3>Migration Wave Planning</h3>
+                          <p>
+                            {wavePlanningMode === 'network'
+                              ? `${waveResources.length} subnets for subnet-based migration with network cutover`
+                              : `VMs organized into ${waveResources.length} waves based on complexity and readiness`}
+                          </p>
+                        </div>
+                        <RadioButtonGroup
+                          legendText="Planning Mode"
+                          name="wave-planning-mode"
+                          valueSelected={wavePlanningMode}
+                          onChange={(value) => setWavePlanningMode(value as 'complexity' | 'network')}
+                          orientation="horizontal"
+                        >
+                          <RadioButton labelText="Network-Based" value="network" id="wave-network" />
+                          <RadioButton labelText="Complexity-Based" value="complexity" id="wave-complexity" />
+                        </RadioButtonGroup>
+                      </div>
                     </Tile>
                   </Column>
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__chart-tile">
                       <HorizontalBarChart
-                        title="VMs by Wave"
-                        subtitle="Distribution across migration waves"
+                        title={wavePlanningMode === 'network' ? 'VMs by Subnet' : 'VMs by Wave'}
+                        subtitle={wavePlanningMode === 'network' ? 'Distribution across subnets' : 'Distribution across migration waves'}
                         data={waveChartData}
                         height={280}
                         valueLabel="VMs"
-                        colors={['#24a148', '#1192e8', '#009d9a', '#ff832b', '#da1e28']}
+                        colors={wavePlanningMode === 'network'
+                          ? ['#0f62fe', '#009d9a', '#8a3ffc', '#1192e8', '#005d5d', '#6929c4', '#012749', '#9f1853', '#fa4d56', '#570408']
+                          : ['#24a148', '#1192e8', '#009d9a', '#ff832b', '#da1e28']}
                         formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
                       />
                     </Tile>
@@ -739,24 +880,33 @@ export function VSIMigrationPage() {
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__checks-tile">
-                      <h3>Wave Descriptions</h3>
+                      <h3>{wavePlanningMode === 'network' ? 'Subnets' : 'Wave Descriptions'}</h3>
                       <div className="migration-page__check-items">
-                        {waves.filter(w => w.vms.length > 0).map((wave, idx) => (
+                        {waveResources.slice(0, 8).map((wave, idx) => (
                           <div key={idx} className="migration-page__check-item">
-                            <span>{wave.name}</span>
-                            <Tag type={idx === 4 ? 'red' : idx === 3 ? 'magenta' : 'blue'}>
-                              {formatNumber(wave.vms.length)}
+                            <span>{wave.name.length > 30 ? wave.name.substring(0, 27) + '...' : wave.name}</span>
+                            <Tag type={wave.hasBlockers ? 'red' : wavePlanningMode === 'network' ? 'blue' : (idx === 4 ? 'red' : idx === 3 ? 'magenta' : 'blue')}>
+                              {formatNumber(wave.vmCount)}
                             </Tag>
                           </div>
                         ))}
+                        {waveResources.length > 8 && (
+                          <div className="migration-page__check-item">
+                            <span>+ {waveResources.length - 8} more {wavePlanningMode === 'network' ? 'subnets' : 'waves'}</span>
+                            <Tag type="gray">{formatNumber(waveResources.slice(8).reduce((sum, w) => sum + w.vmCount, 0))}</Tag>
+                          </div>
+                        )}
                       </div>
                     </Tile>
                   </Column>
 
-                  {waveResources.map((wave, idx) => (
+                  {waveResources.slice(0, 10).map((wave, idx) => (
                     <Column key={idx} lg={8} md={8} sm={4}>
-                      <Tile className={`migration-page__wave-tile ${idx === waveResources.length - 1 && wave.name.includes('Remediation') ? 'migration-page__wave-tile--warning' : ''}`}>
+                      <Tile className={`migration-page__wave-tile ${wave.hasBlockers ? 'migration-page__wave-tile--warning' : ''}`}>
                         <h4>{wave.name}</h4>
+                        {wave.description && (
+                          <p className="migration-page__wave-description">{wave.description}</p>
+                        )}
                         <div className="migration-page__wave-stats">
                           <div className="migration-page__wave-stat">
                             <span className="migration-page__wave-stat-label">VMs</span>
@@ -775,6 +925,9 @@ export function VSIMigrationPage() {
                             <span className="migration-page__wave-stat-value">{formatNumber(Math.round(wave.storageGiB / 1024))} TiB</span>
                           </div>
                         </div>
+                        {wave.hasBlockers && (
+                          <Tag type="red" style={{ marginTop: '0.5rem' }}>Contains blockers</Tag>
+                        )}
                       </Tile>
                     </Column>
                   ))}

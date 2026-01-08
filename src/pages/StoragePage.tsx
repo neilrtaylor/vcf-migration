@@ -20,11 +20,18 @@ export function StoragePage() {
   const datastores = rawData.vDatastore;
   const vms = rawData.vInfo.filter(vm => !vm.template);
 
-  // Calculate storage metrics
+  // Calculate datastore-level storage metrics
   const totalCapacityTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.capacityMiB, 0));
   const totalUsedTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.inUseMiB, 0));
   const totalFreeTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.freeMiB, 0));
   const avgUtilization = totalCapacityTiB > 0 ? (totalUsedTiB / totalCapacityTiB) * 100 : 0;
+
+  // Calculate VM-level storage metrics
+  const vmProvisionedMiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0);
+  const vmInUseMiB = vms.reduce((sum, vm) => sum + vm.inUseMiB, 0);
+  const vmProvisionedTiB = mibToTiB(vmProvisionedMiB);
+  const vmInUseTiB = mibToTiB(vmInUseMiB);
+  const vmStorageEfficiency = vmProvisionedMiB > 0 ? (vmInUseMiB / vmProvisionedMiB) * 100 : 0;
 
   // Datastore type distribution
   const typeDistribution = datastores.reduce((acc, ds) => {
@@ -169,6 +176,47 @@ export function StoragePage() {
             label="Avg Utilization"
             value={`${avgUtilization.toFixed(1)}%`}
             variant={avgUtilization > 80 ? 'warning' : 'info'}
+          />
+        </Column>
+
+        {/* VM Storage Metrics Section */}
+        <Column lg={16} md={8} sm={4}>
+          <h3 className="storage-page__section-title">VM Storage Allocation</h3>
+        </Column>
+
+        <Column lg={4} md={4} sm={2}>
+          <MetricCard
+            label="VM Provisioned"
+            value={`${vmProvisionedTiB.toFixed(1)} TiB`}
+            detail="Total allocated to VMs"
+            variant="purple"
+          />
+        </Column>
+
+        <Column lg={4} md={4} sm={2}>
+          <MetricCard
+            label="VM In Use"
+            value={`${vmInUseTiB.toFixed(1)} TiB`}
+            detail="Actually consumed"
+            variant="primary"
+          />
+        </Column>
+
+        <Column lg={4} md={4} sm={2}>
+          <MetricCard
+            label="Thin Savings"
+            value={`${(vmProvisionedTiB - vmInUseTiB).toFixed(1)} TiB`}
+            detail="Provisioned - In Use"
+            variant="success"
+          />
+        </Column>
+
+        <Column lg={4} md={4} sm={2}>
+          <MetricCard
+            label="Storage Efficiency"
+            value={`${vmStorageEfficiency.toFixed(0)}%`}
+            detail="In Use / Provisioned"
+            variant="info"
           />
         </Column>
 

@@ -257,6 +257,19 @@
   }
 
   // Wave planning styles
+  &__wave-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: spacing.$spacing-05;
+    flex-wrap: wrap;
+
+    > div:first-child {
+      flex: 1;
+      min-width: 300px;
+    }
+  }
+
   &__wave-tile {
     padding: spacing.$spacing-05;
     margin-bottom: spacing.$spacing-05;
@@ -268,9 +281,15 @@
 
     h4 {
       @include type.type-style('heading-compact-02');
-      margin-bottom: spacing.$spacing-04;
+      margin-bottom: spacing.$spacing-02;
       color: theme.$text-primary;
     }
+  }
+
+  &__wave-description {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-04;
   }
 
   &__wave-stats {

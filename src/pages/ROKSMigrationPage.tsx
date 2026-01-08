@@ -1,6 +1,6 @@
 // ROKS (OpenShift Virtualization) Migration page
 import { useState, useCallback, useMemo } from 'react';
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, UnorderedList, ListItem, Button, InlineNotification } from '@carbon/react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, UnorderedList, ListItem, Button, InlineNotification, RadioButtonGroup, RadioButton, Dropdown, NumberInput } from '@carbon/react';
 import { Download } from '@carbon/icons-react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
@@ -36,6 +36,9 @@ export function ROKSMigrationPage() {
   const [yamlExporting, setYamlExporting] = useState(false);
   const [yamlExportSuccess, setYamlExportSuccess] = useState(false);
   const [calculatorSizing, setCalculatorSizing] = useState<SizingResult | null>(null);
+  const [wavePlanningMode, setWavePlanningMode] = useState<'complexity' | 'network'>('network');
+  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'ipPrefix'>('portGroup');
+  const [ipPrefixLength, setIpPrefixLength] = useState<number>(24);
 
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
@@ -234,6 +237,8 @@ export function ROKSMigrationPage() {
     }));
 
   // ===== MIGRATION WAVE PLANNING =====
+
+  // Build VM data with network info
   const vmWaveData = poweredOnVMs.map(vm => {
     const complexityData = complexityScores.find(cs => cs.vmName === vm.vmName);
     const osCompat = getOSCompatibility(vm.guestOS);
@@ -241,6 +246,15 @@ export function ROKSMigrationPage() {
     const hasSnapshot = snapshots.some(s => s.vmName === vm.vmName && s.ageInDays > SNAPSHOT_BLOCKER_AGE_DAYS);
     const toolStatus = toolsMap.get(vm.vmName);
     const noTools = !toolStatus || toolStatus.toolsStatus === 'toolsNotInstalled';
+
+    // Get network info for this VM
+    const vmNetworks = networks.filter(n => n.vmName === vm.vmName);
+    const primaryNetwork = vmNetworks[0];
+    const networkName = primaryNetwork?.networkName || 'No Network';
+    const ipAddress = primaryNetwork?.ipv4Address || '';
+
+    // Derive subnet from IP (assuming /24 for simplicity)
+    const subnet = ipAddress ? ipAddress.split('.').slice(0, 3).join('.') + '.0/24' : 'Unknown';
 
     return {
       vmName: vm.vmName,
@@ -250,43 +264,167 @@ export function ROKSMigrationPage() {
       vcpus: vm.cpus,
       memoryGiB: Math.round(mibToGiB(vm.memory)),
       storageGiB: Math.round(mibToGiB(vm.provisionedMiB)),
+      networkName,
+      ipAddress,
+      subnet,
     };
   });
 
-  const waves: { name: string; description: string; vms: typeof vmWaveData }[] = [
-    { name: 'Wave 1: Pilot', description: 'Simple VMs with fully supported OS for initial validation', vms: [] },
-    { name: 'Wave 2: Quick Wins', description: 'Low complexity VMs ready for migration', vms: [] },
-    { name: 'Wave 3: Standard', description: 'Moderate complexity VMs', vms: [] },
-    { name: 'Wave 4: Complex', description: 'High complexity VMs requiring careful planning', vms: [] },
-    { name: 'Wave 5: Remediation', description: 'VMs with blockers requiring fixes before migration', vms: [] },
-  ];
+  // Helper function to calculate IP prefix based on CIDR length
+  const getIpPrefix = (ip: string, prefixLength: number): string => {
+    if (!ip) return 'Unknown';
+    const parts = ip.split('.');
+    if (parts.length !== 4) return 'Unknown';
 
-  vmWaveData.forEach(vm => {
-    if (vm.hasBlocker) {
-      waves[4].vms.push(vm);
-    } else if (vm.complexity <= 15 && vm.osStatus === 'fully-supported') {
-      waves[0].vms.push(vm);
-    } else if (vm.complexity <= 30) {
-      waves[1].vms.push(vm);
-    } else if (vm.complexity <= 55) {
-      waves[2].vms.push(vm);
-    } else {
-      waves[3].vms.push(vm);
+    // Calculate how many octets to keep based on prefix length
+    const octetsToKeep = Math.floor(prefixLength / 8);
+    const remainingBits = prefixLength % 8;
+
+    const prefix = parts.slice(0, octetsToKeep).map(Number);
+
+    if (remainingBits > 0 && octetsToKeep < 4) {
+      // Apply mask to partial octet
+      const mask = 256 - Math.pow(2, 8 - remainingBits);
+      prefix.push(Number(parts[octetsToKeep]) & mask);
     }
-  });
 
-  const waveChartData = waves.map((wave, idx) => ({
-    label: `Wave ${idx + 1}`,
-    value: wave.vms.length,
-  })).filter(d => d.value > 0);
+    // Pad with zeros
+    while (prefix.length < 4) {
+      prefix.push(0);
+    }
 
-  const waveResources = waves.map(wave => ({
-    name: wave.name,
-    vmCount: wave.vms.length,
-    vcpus: wave.vms.reduce((sum, vm) => sum + vm.vcpus, 0),
-    memoryGiB: wave.vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
-    storageGiB: wave.vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
-  })).filter(w => w.vmCount > 0);
+    return `${prefix.join('.')}/${prefixLength}`;
+  };
+
+  // Network-based waves: Group by port group or IP prefix
+  const networkWaves = useMemo(() => {
+    const groups = new Map<string, typeof vmWaveData>();
+
+    vmWaveData.forEach(vm => {
+      let key: string;
+
+      if (networkGroupBy === 'portGroup') {
+        // Group by VMware port group name
+        key = vm.networkName || 'No Network';
+      } else {
+        // Group by IP prefix with configurable length
+        if (vm.ipAddress) {
+          key = getIpPrefix(vm.ipAddress, ipPrefixLength);
+        } else {
+          key = `No IP: ${vm.networkName}`;
+        }
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(vm);
+    });
+
+    // Convert to waves, sorted by VM count (smaller first for pilot)
+    return Array.from(groups.entries())
+      .map(([groupName, vms]) => {
+        // Get additional info based on grouping method
+        const portGroups = [...new Set(vms.map(v => v.networkName).filter(n => n && n !== 'No Network'))];
+        const ipRanges = [...new Set(vms.map(v => v.ipAddress).filter(Boolean))];
+        const hasBlockers = vms.some(v => v.hasBlocker);
+        const avgComplexity = vms.reduce((sum, v) => sum + v.complexity, 0) / vms.length;
+
+        let description: string;
+        if (networkGroupBy === 'portGroup') {
+          description = ipRanges.length > 0
+            ? `IPs: ${ipRanges.slice(0, 3).join(', ')}${ipRanges.length > 3 ? ` +${ipRanges.length - 3} more` : ''}`
+            : 'No IP addresses detected';
+        } else {
+          description = portGroups.length > 0
+            ? `Port Group: ${portGroups.slice(0, 3).join(', ')}${portGroups.length > 3 ? ` +${portGroups.length - 3} more` : ''}`
+            : 'No port group info';
+        }
+
+        return {
+          name: groupName,
+          description,
+          vms,
+          vmCount: vms.length,
+          hasBlockers,
+          avgComplexity,
+          vcpus: vms.reduce((sum, vm) => sum + vm.vcpus, 0),
+          memoryGiB: vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
+          storageGiB: vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
+        };
+      })
+      .sort((a, b) => {
+        // Sort: groups with blockers last, then by VM count ascending
+        if (a.hasBlockers !== b.hasBlockers) return a.hasBlockers ? 1 : -1;
+        return a.vmCount - b.vmCount;
+      });
+  }, [vmWaveData, networkGroupBy, ipPrefixLength]);
+
+  // Complexity-based waves (original logic)
+  const complexityWaves = useMemo(() => {
+    const waves: { name: string; description: string; vms: typeof vmWaveData }[] = [
+      { name: 'Wave 1: Pilot', description: 'Simple VMs with fully supported OS for initial validation', vms: [] },
+      { name: 'Wave 2: Quick Wins', description: 'Low complexity VMs ready for migration', vms: [] },
+      { name: 'Wave 3: Standard', description: 'Moderate complexity VMs', vms: [] },
+      { name: 'Wave 4: Complex', description: 'High complexity VMs requiring careful planning', vms: [] },
+      { name: 'Wave 5: Remediation', description: 'VMs with blockers requiring fixes before migration', vms: [] },
+    ];
+
+    vmWaveData.forEach(vm => {
+      if (vm.hasBlocker) {
+        waves[4].vms.push(vm);
+      } else if (vm.complexity <= 15 && vm.osStatus === 'fully-supported') {
+        waves[0].vms.push(vm);
+      } else if (vm.complexity <= 30) {
+        waves[1].vms.push(vm);
+      } else if (vm.complexity <= 55) {
+        waves[2].vms.push(vm);
+      } else {
+        waves[3].vms.push(vm);
+      }
+    });
+
+    return waves;
+  }, [vmWaveData]);
+
+  // Select active waves based on mode
+  const waves = wavePlanningMode === 'network'
+    ? networkWaves.map((nw, idx) => ({
+        name: `Wave ${idx + 1}: ${nw.name.length > 30 ? nw.name.substring(0, 27) + '...' : nw.name}`,
+        description: nw.description,
+        vms: nw.vms,
+      }))
+    : complexityWaves;
+
+  const waveChartData = wavePlanningMode === 'network'
+    ? networkWaves.slice(0, 15).map((nw, idx) => ({
+        label: `Wave ${idx + 1}`,
+        value: nw.vmCount,
+      })).filter(d => d.value > 0)
+    : complexityWaves.map((wave, idx) => ({
+        label: `Wave ${idx + 1}`,
+        value: wave.vms.length,
+      })).filter(d => d.value > 0);
+
+  const waveResources = wavePlanningMode === 'network'
+    ? networkWaves.map((nw, idx) => ({
+        name: `Wave ${idx + 1}: ${nw.name.length > 25 ? nw.name.substring(0, 22) + '...' : nw.name}`,
+        description: nw.description,
+        vmCount: nw.vmCount,
+        vcpus: nw.vcpus,
+        memoryGiB: nw.memoryGiB,
+        storageGiB: nw.storageGiB,
+        hasBlockers: nw.hasBlockers,
+      }))
+    : complexityWaves.map(wave => ({
+        name: wave.name,
+        description: wave.description,
+        vmCount: wave.vms.length,
+        vcpus: wave.vms.reduce((sum, vm) => sum + vm.vcpus, 0),
+        memoryGiB: wave.vms.reduce((sum, vm) => sum + vm.memoryGiB, 0),
+        storageGiB: wave.vms.reduce((sum, vm) => sum + vm.storageGiB, 0),
+        hasBlockers: wave.name.includes('Remediation'),
+      })).filter(w => w.vmCount > 0);
 
   // ===== REMEDIATION ITEMS =====
   const remediationItems: RemediationItem[] = [];
@@ -858,20 +996,80 @@ export function ROKSMigrationPage() {
                 <Grid className="migration-page__tab-content">
                   <Column lg={16} md={8} sm={4}>
                     <Tile className="migration-page__sizing-header">
-                      <h3>Migration Wave Planning</h3>
-                      <p>VMs organized into {waveResources.length} waves based on complexity and readiness</p>
+                      <div className="migration-page__wave-header">
+                        <div>
+                          <h3>Migration Wave Planning</h3>
+                          <p>
+                            {wavePlanningMode === 'network'
+                              ? `${networkWaves.length} ${networkGroupBy === 'portGroup' ? 'port groups' : 'IP subnets'} for network-based migration with cutover`
+                              : `VMs organized into ${waveResources.length} waves based on complexity and readiness`
+                            }
+                          </p>
+                        </div>
+                        <RadioButtonGroup
+                          legendText="Wave Planning Mode"
+                          name="wave-mode"
+                          valueSelected={wavePlanningMode}
+                          onChange={(value) => setWavePlanningMode(value as 'complexity' | 'network')}
+                          orientation="horizontal"
+                        >
+                          <RadioButton
+                            id="wave-network"
+                            value="network"
+                            labelText="Network-based"
+                          />
+                          <RadioButton
+                            id="wave-complexity"
+                            value="complexity"
+                            labelText="Complexity-based"
+                          />
+                        </RadioButtonGroup>
+                      </div>
+                      {wavePlanningMode === 'network' && (
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                          <Dropdown
+                            id="network-group-by"
+                            titleText="Group VMs by"
+                            label="Select grouping method"
+                            items={[
+                              { id: 'portGroup', text: 'Port Group (VMware network segment)' },
+                              { id: 'ipPrefix', text: 'IP Prefix (subnet based on IP address)' },
+                            ]}
+                            selectedItem={{ id: networkGroupBy, text: networkGroupBy === 'portGroup' ? 'Port Group (VMware network segment)' : 'IP Prefix (subnet based on IP address)' }}
+                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem.id as 'portGroup' | 'ipPrefix')}
+                            style={{ minWidth: '280px' }}
+                          />
+                          {networkGroupBy === 'ipPrefix' && (
+                            <NumberInput
+                              id="ip-prefix-length"
+                              label="CIDR Prefix Length"
+                              helperText="e.g., /24 = 256 IPs, /16 = 65,536 IPs"
+                              min={8}
+                              max={30}
+                              step={1}
+                              value={ipPrefixLength}
+                              onChange={(_e, { value }) => value && setIpPrefixLength(Number(value))}
+                              style={{ minWidth: '180px' }}
+                            />
+                          )}
+                        </div>
+                      )}
                     </Tile>
                   </Column>
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__chart-tile">
                       <HorizontalBarChart
-                        title="VMs by Wave"
-                        subtitle="Distribution across migration waves"
+                        title={wavePlanningMode === 'network'
+                          ? (networkGroupBy === 'portGroup' ? 'VMs by Port Group' : 'VMs by IP Subnet')
+                          : 'VMs by Wave'}
+                        subtitle={wavePlanningMode === 'network'
+                          ? `Top ${Math.min(15, networkWaves.length)} of ${networkWaves.length} ${networkGroupBy === 'portGroup' ? 'port groups' : 'subnets'}`
+                          : 'Distribution across migration waves'
+                        }
                         data={waveChartData}
                         height={280}
                         valueLabel="VMs"
-                        colors={['#24a148', '#1192e8', '#009d9a', '#ff832b', '#da1e28']}
                         formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
                       />
                     </Tile>
@@ -879,24 +1077,32 @@ export function ROKSMigrationPage() {
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__checks-tile">
-                      <h3>Wave Descriptions</h3>
+                      <h3>{wavePlanningMode === 'network' ? (networkGroupBy === 'portGroup' ? 'Port Groups' : 'IP Subnets') : 'Wave Descriptions'}</h3>
                       <div className="migration-page__check-items">
-                        {waves.filter(w => w.vms.length > 0).map((wave, idx) => (
+                        {waveResources.slice(0, 10).map((wave, idx) => (
                           <div key={idx} className="migration-page__check-item">
-                            <span>{wave.name}</span>
-                            <Tag type={idx === 4 ? 'red' : idx === 3 ? 'magenta' : 'blue'}>
-                              {formatNumber(wave.vms.length)}
+                            <span title={wave.description}>{wave.name}</span>
+                            <Tag type={wave.hasBlockers ? 'red' : 'blue'}>
+                              {formatNumber(wave.vmCount)}
                             </Tag>
                           </div>
                         ))}
+                        {waveResources.length > 10 && (
+                          <div className="migration-page__check-item">
+                            <span>... and {waveResources.length - 10} more</span>
+                          </div>
+                        )}
                       </div>
                     </Tile>
                   </Column>
 
-                  {waveResources.map((wave, idx) => (
+                  {waveResources.slice(0, 20).map((wave, idx) => (
                     <Column key={idx} lg={8} md={8} sm={4}>
-                      <Tile className={`migration-page__wave-tile ${idx === waveResources.length - 1 && wave.name.includes('Remediation') ? 'migration-page__wave-tile--warning' : ''}`}>
+                      <Tile className={`migration-page__wave-tile ${wave.hasBlockers ? 'migration-page__wave-tile--warning' : ''}`}>
                         <h4>{wave.name}</h4>
+                        {wave.description && (
+                          <p className="migration-page__wave-description">{wave.description}</p>
+                        )}
                         <div className="migration-page__wave-stats">
                           <div className="migration-page__wave-stat">
                             <span className="migration-page__wave-stat-label">VMs</span>

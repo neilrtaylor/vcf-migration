@@ -15,6 +15,15 @@
     margin-bottom: spacing.$spacing-06;
   }
 
+  &__section-title {
+    @include type.type-style('heading-03');
+    margin-top: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-04;
+    color: theme.$text-primary;
+    border-bottom: 1px solid theme.$border-subtle-01;
+    padding-bottom: spacing.$spacing-03;
+  }
+
   &__metric-tile {
     display: flex;
     flex-direction: column;

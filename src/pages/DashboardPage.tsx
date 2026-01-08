@@ -39,7 +39,9 @@ export function DashboardPage() {
   const totalMemoryTiB = mibToTiB(totalMemoryMiB);
 
   const totalProvisionedMiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0);
-  const totalProvisionedTiB = totalProvisionedMiB / 1024 / 1024;
+  const totalProvisionedTiB = mibToTiB(totalProvisionedMiB);
+  const totalInUseMiB = vms.reduce((sum, vm) => sum + vm.inUseMiB, 0);
+  const totalInUseTiB = mibToTiB(totalInUseMiB);
 
   const uniqueClusters = new Set(vms.map(vm => vm.cluster).filter(Boolean)).size;
   const uniqueDatacenters = new Set(vms.map(vm => vm.datacenter).filter(Boolean)).size;
@@ -202,9 +204,18 @@ export function DashboardPage() {
 
         <Column lg={4} md={4} sm={4}>
           <MetricCard
-            label="Total Storage"
+            label="Provisioned Storage"
             value={`${totalProvisionedTiB.toFixed(1)} TiB`}
-            detail="Provisioned capacity"
+            detail="Total allocated capacity"
+            variant="purple"
+          />
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <MetricCard
+            label="In Use Storage"
+            value={`${totalInUseTiB.toFixed(1)} TiB`}
+            detail={`${((totalInUseMiB / totalProvisionedMiB) * 100).toFixed(0)}% of provisioned`}
             variant="purple"
           />
         </Column>

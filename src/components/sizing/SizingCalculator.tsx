@@ -8,6 +8,8 @@ import {
   Dropdown,
   Tag,
   Toggle,
+  RadioButtonGroup,
+  RadioButton,
 } from '@carbon/react';
 import { useData } from '@/hooks';
 import { formatNumber, formatBytes } from '@/utils/formatters';
@@ -59,6 +61,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
   const [cephOverhead, setCephOverhead] = useState(defaults.odfCephOverhead * 100);
   const [systemReservedMemory, setSystemReservedMemory] = useState(defaults.systemReservedMemoryGiB);
   const [nodeRedundancy, setNodeRedundancy] = useState(defaults.nodeRedundancy);
+  const [storageMetric, setStorageMetric] = useState<'provisioned' | 'inUse'>('provisioned');
 
   // Calculate per-node capacities
   const nodeCapacity = useMemo(() => {
@@ -110,7 +113,9 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     // Calculate totals directly from rawData
     const totalVCPUs = vms.reduce((sum, vm) => sum + vm.cpus, 0);
     const totalMemoryGiB = vms.reduce((sum, vm) => sum + vm.memory, 0) / 1024; // MiB to GiB
-    const totalStorageGiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0) / 1024; // MiB to GiB
+    const provisionedStorageGiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0) / 1024;
+    const inUseStorageGiB = vms.reduce((sum, vm) => sum + vm.inUseMiB, 0) / 1024;
+    const totalStorageGiB = storageMetric === 'provisioned' ? provisionedStorageGiB : inUseStorageGiB;
 
     // Nodes required for each dimension
     const nodesForCPU = Math.ceil(totalVCPUs / nodeCapacity.vcpuCapacity);
@@ -141,7 +146,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       limitingFactor,
       vmCount: vms.length,
     };
-  }, [hasData, rawData, nodeCapacity, nodeRedundancy]);
+  }, [hasData, rawData, nodeCapacity, nodeRedundancy, storageMetric]);
 
   // Notify parent component of sizing changes
   useEffect(() => {
@@ -279,6 +284,27 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
         <Column lg={8} md={4} sm={4}>
           <Tile className="sizing-calculator__section">
             <h3 className="sizing-calculator__section-title">ODF Storage Settings</h3>
+
+            <div className="sizing-calculator__radio-group">
+              <RadioButtonGroup
+                legendText="Storage Metric for Sizing"
+                name="storage-metric"
+                valueSelected={storageMetric}
+                onChange={(value) => setStorageMetric(value as 'provisioned' | 'inUse')}
+                orientation="horizontal"
+              >
+                <RadioButton
+                  id="storage-provisioned"
+                  value="provisioned"
+                  labelText="Provisioned (conservative)"
+                />
+                <RadioButton
+                  id="storage-inuse"
+                  value="inUse"
+                  labelText="In Use (current)"
+                />
+              </RadioButtonGroup>
+            </div>
 
             <Slider
               id="replica-factor"
