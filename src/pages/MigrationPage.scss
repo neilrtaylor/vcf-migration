@@ -27,11 +27,13 @@
 
   &__score-label {
     @include type.type-style('label-01');
+    display: block;
     color: theme.$text-secondary;
     margin-bottom: spacing.$spacing-03;
   }
 
   &__score-value {
+    display: block;
     font-size: 2.625rem;
     font-weight: 300;
     line-height: 1.19;
@@ -53,6 +55,7 @@
 
   &__score-detail {
     @include type.type-style('body-compact-01');
+    display: block;
     color: theme.$text-secondary;
   }
 
@@ -69,11 +72,13 @@
 
   &__stat-label {
     @include type.type-style('label-01');
+    display: block;
     color: theme.$text-secondary;
     margin-bottom: spacing.$spacing-02;
   }
 
   &__stat-value {
+    display: block;
     font-size: 1.75rem;
     font-weight: 600;
     color: theme.$text-primary;
@@ -166,11 +171,13 @@
 
   &__sizing-label {
     @include type.type-style('label-01');
+    display: block;
     color: theme.$text-secondary;
     margin-bottom: spacing.$spacing-03;
   }
 
   &__sizing-value {
+    display: block;
     font-size: 2rem;
     font-weight: 600;
     color: theme.$text-primary;
@@ -179,6 +186,7 @@
 
   &__sizing-detail {
     @include type.type-style('helper-text-01');
+    display: block;
     color: theme.$text-secondary;
   }
 

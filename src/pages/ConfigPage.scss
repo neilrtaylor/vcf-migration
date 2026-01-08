@@ -34,12 +34,14 @@
   }
 
   &__metric-label {
+    display: block;
     font-size: 0.875rem;
     color: var(--cds-text-secondary, #525252);
     margin-bottom: spacing.$spacing-03;
   }
 
   &__metric-value {
+    display: block;
     font-size: 2.5rem;
     font-weight: 600;
     color: var(--cds-text-primary, #161616);
@@ -47,6 +49,7 @@
   }
 
   &__metric-detail {
+    display: block;
     font-size: 0.875rem;
     color: var(--cds-text-secondary, #525252);
     margin-top: spacing.$spacing-02;
@@ -85,11 +88,13 @@
   }
 
   &__compliance-label {
+    display: block;
     font-size: 0.875rem;
     color: var(--cds-text-secondary, #525252);
   }
 
   &__compliance-value {
+    display: block;
     font-size: 1.75rem;
     font-weight: 600;
     color: var(--cds-text-primary, #161616);
@@ -97,6 +102,7 @@
   }
 
   &__compliance-detail {
+    display: block;
     font-size: 0.75rem;
     color: var(--cds-text-secondary, #525252);
   }

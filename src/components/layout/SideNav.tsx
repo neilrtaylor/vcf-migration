@@ -16,6 +16,7 @@ import {
   Migrate,
   Table,
   Upload,
+  Information,
 } from '@carbon/icons-react';
 import { useHasData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
@@ -133,6 +134,17 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           className={!hasData ? 'sidenav-link--disabled' : ''}
         >
           Data Tables
+        </SideNavLink>
+
+        <SideNavDivider />
+
+        <SideNavLink
+          renderIcon={Information}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.info)}
+          isActive={isActive(ROUTES.info)}
+        >
+          Sizing Guide
         </SideNavLink>
       </SideNavItems>
     </CarbonSideNav>

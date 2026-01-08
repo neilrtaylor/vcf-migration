@@ -7,7 +7,8 @@ import { useData, useVMs } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB, getHardwareVersionNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart } from '@/components/charts';
-import { RedHatDocLink, RemediationPanel } from '@/components/common';
+import { MetricCard, RedHatDocLink, RemediationPanel } from '@/components/common';
+import { SizingCalculator } from '@/components/sizing';
 import type { RemediationItem } from '@/components/common';
 import { MTVYAMLGenerator, downloadBlob } from '@/services/export';
 import type { MTVExportOptions } from '@/types/mtvYaml';
@@ -114,32 +115,6 @@ export function MigrationPage() {
     { label: 'Supported (Caveats)', value: osStatusCounts['supported-with-caveats'] || 0 },
     { label: 'Unsupported', value: osStatusCounts['unsupported'] || 0 },
   ].filter(d => d.value > 0);
-
-  // ===== ROKS SIZING CALCULATOR =====
-  const { defaults } = ibmCloudProfiles;
-
-  // Total resources for powered-on VMs
-  const totalVCPUs = poweredOnVMs.reduce((sum, vm) => sum + vm.cpus, 0);
-  const totalMemoryGiB = poweredOnVMs.reduce((sum, vm) => sum + mibToGiB(vm.memory), 0);
-  const totalStorageGiB = poweredOnVMs.reduce((sum, vm) => sum + mibToGiB(vm.provisionedMiB), 0);
-
-  // Apply overcommit ratios
-  const adjustedVCPUs = Math.ceil(totalVCPUs / defaults.cpuOvercommitRatio);
-  const adjustedMemoryGiB = Math.ceil(totalMemoryGiB / defaults.memoryOvercommitRatio);
-
-  // Calculate ODF storage needs (3x replication + overhead)
-  const odfStorageGiB = Math.ceil(totalStorageGiB * defaults.odfReplicationFactor / defaults.odfEfficiencyFactor);
-  const odfStorageTiB = (odfStorageGiB / 1024).toFixed(1);
-
-  // Recommend worker node profile based on workload
-  const recommendedProfile = ibmCloudProfiles.roksWorkerProfiles.find(p =>
-    p.vcpus >= 32 && p.memoryGiB >= 128
-  ) || ibmCloudProfiles.roksWorkerProfiles[3]; // Default to bx2-32x128
-
-  // Calculate number of workers needed
-  const workersForCPU = Math.ceil(adjustedVCPUs / (recommendedProfile.vcpus * 0.85)); // 85% usable
-  const workersForMemory = Math.ceil(adjustedMemoryGiB / (recommendedProfile.memoryGiB * 0.85));
-  const recommendedWorkers = Math.max(defaults.minWorkerNodes, workersForCPU, workersForMemory);
 
   // ===== READINESS SCORE CALCULATION =====
   const blockerCount = vmsWithoutTools + vmsWithOldSnapshots + vmsWithRDM + vmsWithSharedDisks;
@@ -498,26 +473,25 @@ export function MigrationPage() {
 
         {/* Quick Stats */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="migration-page__stat-tile">
-            <span className="migration-page__stat-label">VMs to Migrate</span>
-            <span className="migration-page__stat-value">{formatNumber(poweredOnVMs.length)}</span>
-          </Tile>
+          <MetricCard
+            label="VMs to Migrate"
+            value={formatNumber(poweredOnVMs.length)}
+            variant="primary"
+          />
         </Column>
         <Column lg={4} md={4} sm={2}>
-          <Tile className="migration-page__stat-tile">
-            <span className="migration-page__stat-label">Blockers</span>
-            <span className={`migration-page__stat-value ${blockerCount > 0 ? 'migration-page__stat-value--error' : ''}`}>
-              {formatNumber(blockerCount)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="Blockers"
+            value={formatNumber(blockerCount)}
+            variant={blockerCount > 0 ? 'error' : 'success'}
+          />
         </Column>
         <Column lg={4} md={4} sm={2}>
-          <Tile className="migration-page__stat-tile">
-            <span className="migration-page__stat-label">Warnings</span>
-            <span className={`migration-page__stat-value ${warningCount > 0 ? 'migration-page__stat-value--warning' : ''}`}>
-              {formatNumber(warningCount)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="Warnings"
+            value={formatNumber(warningCount)}
+            variant={warningCount > 0 ? 'warning' : 'success'}
+          />
         </Column>
 
         {/* Tabs for different sections */}
@@ -659,91 +633,33 @@ export function MigrationPage() {
                 <Grid className="migration-page__tab-content">
                   <Column lg={16} md={8} sm={4}>
                     <Tile className="migration-page__sizing-header">
-                      <h3>ROKS Cluster Sizing Recommendation</h3>
-                      <p>Based on {formatNumber(poweredOnVMs.length)} powered-on VMs for OpenShift Virtualization</p>
-                    </Tile>
-                  </Column>
-
-                  <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total vCPUs</span>
-                      <span className="migration-page__sizing-value">{formatNumber(totalVCPUs)}</span>
-                      <span className="migration-page__sizing-detail">
-                        {formatNumber(adjustedVCPUs)} adjusted (1.5:1 ratio)
-                      </span>
-                    </Tile>
-                  </Column>
-
-                  <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total Memory</span>
-                      <span className="migration-page__sizing-value">{formatNumber(Math.round(totalMemoryGiB))} GiB</span>
-                      <span className="migration-page__sizing-detail">
-                        {formatNumber(Math.round(adjustedMemoryGiB))} GiB adjusted (1.2:1 ratio)
-                      </span>
-                    </Tile>
-                  </Column>
-
-                  <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total Storage</span>
-                      <span className="migration-page__sizing-value">{formatNumber(Math.round(totalStorageGiB))} GiB</span>
-                      <span className="migration-page__sizing-detail">
-                        {odfStorageTiB} TiB ODF (3x replication)
-                      </span>
-                    </Tile>
-                  </Column>
-
-                  <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile migration-page__sizing-tile--highlight">
-                      <span className="migration-page__sizing-label">Recommended Workers</span>
-                      <span className="migration-page__sizing-value">{recommendedWorkers}</span>
-                      <span className="migration-page__sizing-detail">{recommendedProfile.name}</span>
+                      <h3>ROKS Bare Metal Cluster Sizing</h3>
+                      <p>
+                        Interactive sizing calculator for OpenShift Virtualization with ODF storage on NVMe drives.
+                        Adjust the parameters below to see how they affect node requirements.
+                      </p>
                     </Tile>
                   </Column>
 
                   <Column lg={16} md={8} sm={4}>
-                    <Tile className="migration-page__recommendation-tile">
-                      <h4>Recommended ROKS Configuration</h4>
-                      <div className="migration-page__recommendation-grid">
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">Worker Node Profile</span>
-                          <span className="migration-page__recommendation-value">{recommendedProfile.name}</span>
-                        </div>
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">Worker Count</span>
-                          <span className="migration-page__recommendation-value">{recommendedWorkers} nodes</span>
-                        </div>
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">Total Cluster vCPUs</span>
-                          <span className="migration-page__recommendation-value">{formatNumber(recommendedWorkers * recommendedProfile.vcpus)}</span>
-                        </div>
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">Total Cluster Memory</span>
-                          <span className="migration-page__recommendation-value">{formatNumber(recommendedWorkers * recommendedProfile.memoryGiB)} GiB</span>
-                        </div>
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">ODF Storage</span>
-                          <span className="migration-page__recommendation-value">{odfStorageTiB} TiB</span>
-                        </div>
-                        <div className="migration-page__recommendation-item">
-                          <span className="migration-page__recommendation-key">Use Case</span>
-                          <span className="migration-page__recommendation-value">{recommendedProfile.useCase}</span>
-                        </div>
-                      </div>
-                    </Tile>
+                    <SizingCalculator />
                   </Column>
 
                   <Column lg={16} md={8} sm={4}>
                     <Tile className="migration-page__cost-tile">
-                      <h4>Cost Estimation</h4>
+                      <h4>Important Notes</h4>
                       <p className="migration-page__cost-description">
-                        Use the IBM Cloud Cost Estimator to calculate your ROKS cluster costs based on the recommended configuration.
+                        • OpenShift Virtualization requires bare metal worker nodes with hardware virtualization (Intel VT-x/AMD-V)<br />
+                        • Hyperthreading efficiency typically provides 20-30% boost (1.25× multiplier for mixed workloads)<br />
+                        • Memory overcommitment is NOT recommended for VMs - total memory becomes the leading sizing factor<br />
+                        • CPU overcommitment ratio of 1.8:1 is the Red Hat conservative recommendation (max 10:1)<br />
+                        • ODF with 3-way replication provides data protection; 75% operational capacity ensures room for rebalancing<br />
+                        • N+2 redundancy ensures cluster availability during maintenance and unexpected failures
                       </p>
                       <RedHatDocLink
                         href="https://cloud.ibm.com/kubernetes/catalog/create?platformType=openshift"
                         label="Open IBM Cloud ROKS Catalog"
-                        description="Configure and estimate costs for your OpenShift cluster"
+                        description="Configure and estimate costs for your bare metal OpenShift cluster"
                       />
                     </Tile>
                   </Column>
@@ -761,31 +677,35 @@ export function MigrationPage() {
                   </Column>
 
                   <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total VSIs</span>
-                      <span className="migration-page__sizing-value">{formatNumber(totalVSIs)}</span>
-                    </Tile>
+                    <MetricCard
+                      label="Total VSIs"
+                      value={formatNumber(totalVSIs)}
+                      variant="primary"
+                    />
                   </Column>
 
                   <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Unique Profiles</span>
-                      <span className="migration-page__sizing-value">{formatNumber(uniqueProfiles)}</span>
-                    </Tile>
+                    <MetricCard
+                      label="Unique Profiles"
+                      value={formatNumber(uniqueProfiles)}
+                      variant="info"
+                    />
                   </Column>
 
                   <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total vCPUs</span>
-                      <span className="migration-page__sizing-value">{formatNumber(vsiTotalVCPUs)}</span>
-                    </Tile>
+                    <MetricCard
+                      label="Total vCPUs"
+                      value={formatNumber(vsiTotalVCPUs)}
+                      variant="teal"
+                    />
                   </Column>
 
                   <Column lg={4} md={4} sm={2}>
-                    <Tile className="migration-page__sizing-tile">
-                      <span className="migration-page__sizing-label">Total Memory</span>
-                      <span className="migration-page__sizing-value">{formatNumber(vsiTotalMemory)} GiB</span>
-                    </Tile>
+                    <MetricCard
+                      label="Total Memory"
+                      value={`${formatNumber(vsiTotalMemory)} GiB`}
+                      variant="purple"
+                    />
                   </Column>
 
                   <Column lg={8} md={8} sm={4}>

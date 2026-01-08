@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
 import { DoughnutChart, HorizontalBarChart } from '@/components/charts';
-import { FilterBadge } from '@/components/common/FilterBadge';
+import { FilterBadge, MetricCard } from '@/components/common';
 import { POWER_STATE_CHART_COLORS } from '@/utils/chartConfig';
 import './DashboardPage.scss';
 
@@ -121,72 +121,80 @@ export function DashboardPage() {
 
         {/* Key Metrics Row */}
         <Column lg={4} md={4} sm={4}>
-          <Tile className="dashboard-page__metric-tile">
-            <span className="dashboard-page__metric-label">Total VMs</span>
-            <span className="dashboard-page__metric-value">{formatNumber(totalVMs)}</span>
-            <span className="dashboard-page__metric-detail">
-              {formatNumber(poweredOnVMs)} powered on
-            </span>
-          </Tile>
+          <MetricCard
+            label="Total VMs"
+            value={formatNumber(totalVMs)}
+            detail={`${formatNumber(poweredOnVMs)} powered on`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={4}>
-          <Tile className="dashboard-page__metric-tile">
-            <span className="dashboard-page__metric-label">Total vCPUs</span>
-            <span className="dashboard-page__metric-value">{formatNumber(totalVCPUs)}</span>
-            <span className="dashboard-page__metric-detail">
-              Avg {(totalVCPUs / totalVMs).toFixed(1)} per VM
-            </span>
-          </Tile>
+          <MetricCard
+            label="Total vCPUs"
+            value={formatNumber(totalVCPUs)}
+            detail={`Avg ${(totalVCPUs / totalVMs).toFixed(1)} per VM`}
+            variant="info"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={4}>
-          <Tile className="dashboard-page__metric-tile">
-            <span className="dashboard-page__metric-label">Total Memory</span>
-            <span className="dashboard-page__metric-value">{totalMemoryGiB.toFixed(0)} GiB</span>
-            <span className="dashboard-page__metric-detail">
-              Avg {(totalMemoryGiB / totalVMs).toFixed(1)} GiB per VM
-            </span>
-          </Tile>
+          <MetricCard
+            label="Total Memory"
+            value={`${totalMemoryGiB.toFixed(0)} GiB`}
+            detail={`Avg ${(totalMemoryGiB / totalVMs).toFixed(1)} GiB per VM`}
+            variant="teal"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={4}>
-          <Tile className="dashboard-page__metric-tile">
-            <span className="dashboard-page__metric-label">Total Storage</span>
-            <span className="dashboard-page__metric-value">{totalProvisionedTiB.toFixed(1)} TiB</span>
-            <span className="dashboard-page__metric-detail">
-              Provisioned capacity
-            </span>
-          </Tile>
+          <MetricCard
+            label="Total Storage"
+            value={`${totalProvisionedTiB.toFixed(1)} TiB`}
+            detail="Provisioned capacity"
+            variant="purple"
+          />
         </Column>
 
         {/* Secondary Metrics */}
-        <Column lg={4} md={4} sm={2}>
-          <Tile className="dashboard-page__secondary-tile">
-            <span className="dashboard-page__metric-label">Templates</span>
-            <span className="dashboard-page__secondary-value">{formatNumber(templates)}</span>
-          </Tile>
+        <Column lg={3} md={4} sm={2}>
+          <MetricCard
+            label="ESXi Hosts"
+            value={formatNumber(rawData.vHost.length)}
+            variant="default"
+          />
+        </Column>
+
+        <Column lg={3} md={4} sm={2}>
+          <MetricCard
+            label="Clusters"
+            value={formatNumber(uniqueClusters)}
+            variant="default"
+          />
+        </Column>
+
+        <Column lg={3} md={4} sm={2}>
+          <MetricCard
+            label="Datacenters"
+            value={formatNumber(uniqueDatacenters)}
+            variant="default"
+          />
+        </Column>
+
+        <Column lg={3} md={4} sm={2}>
+          <MetricCard
+            label="Datastores"
+            value={formatNumber(rawData.vDatastore.length)}
+            variant="default"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="dashboard-page__secondary-tile">
-            <span className="dashboard-page__metric-label">Clusters</span>
-            <span className="dashboard-page__secondary-value">{formatNumber(uniqueClusters)}</span>
-          </Tile>
-        </Column>
-
-        <Column lg={4} md={4} sm={2}>
-          <Tile className="dashboard-page__secondary-tile">
-            <span className="dashboard-page__metric-label">Datacenters</span>
-            <span className="dashboard-page__secondary-value">{formatNumber(uniqueDatacenters)}</span>
-          </Tile>
-        </Column>
-
-        <Column lg={4} md={4} sm={2}>
-          <Tile className="dashboard-page__secondary-tile">
-            <span className="dashboard-page__metric-label">Datastores</span>
-            <span className="dashboard-page__secondary-value">{formatNumber(rawData.vDatastore.length)}</span>
-          </Tile>
+          <MetricCard
+            label="Templates"
+            value={formatNumber(templates)}
+            variant="default"
+          />
         </Column>
 
         {/* Charts */}

@@ -6,7 +6,7 @@ import { ROUTES } from '@/utils/constants';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
 import { HorizontalBarChart, VerticalBarChart, Heatmap } from '@/components/charts';
 import type { HeatmapCell } from '@/components/charts';
-import { FilterBadge } from '@/components/common/FilterBadge';
+import { FilterBadge, MetricCard } from '@/components/common';
 import './ComputePage.scss';
 
 // Helper to get CPU bucket for a VM
@@ -168,33 +168,37 @@ export function ComputePage() {
 
         {/* Summary metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="compute-page__metric-tile">
-            <span className="compute-page__metric-label">Total vCPUs</span>
-            <span className="compute-page__metric-value">{formatNumber(totalVCPUs)}</span>
-            <span className="compute-page__metric-detail">{formatNumber(poweredOnVCPUs)} powered on</span>
-          </Tile>
+          <MetricCard
+            label="Total vCPUs"
+            value={formatNumber(totalVCPUs)}
+            detail={`${formatNumber(poweredOnVCPUs)} powered on`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="compute-page__metric-tile">
-            <span className="compute-page__metric-label">Total Memory</span>
-            <span className="compute-page__metric-value">{totalMemoryGiB.toFixed(0)} GiB</span>
-            <span className="compute-page__metric-detail">{poweredOnMemoryGiB.toFixed(0)} GiB powered on</span>
-          </Tile>
+          <MetricCard
+            label="Total Memory"
+            value={`${totalMemoryGiB.toFixed(0)} GiB`}
+            detail={`${poweredOnMemoryGiB.toFixed(0)} GiB powered on`}
+            variant="teal"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="compute-page__metric-tile">
-            <span className="compute-page__metric-label">Avg vCPUs/VM</span>
-            <span className="compute-page__metric-value">{(totalVCPUs / vms.length).toFixed(1)}</span>
-          </Tile>
+          <MetricCard
+            label="Avg vCPUs/VM"
+            value={(totalVCPUs / vms.length).toFixed(1)}
+            variant="info"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="compute-page__metric-tile">
-            <span className="compute-page__metric-label">Avg Memory/VM</span>
-            <span className="compute-page__metric-value">{(totalMemoryGiB / vms.length).toFixed(1)} GiB</span>
-          </Tile>
+          <MetricCard
+            label="Avg Memory/VM"
+            value={`${(totalMemoryGiB / vms.length).toFixed(1)} GiB`}
+            variant="info"
+          />
         </Column>
 
         {/* CPU Distribution */}

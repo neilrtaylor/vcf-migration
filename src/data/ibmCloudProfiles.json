@@ -52,15 +52,40 @@
       { "name": "ux2d-200x5600", "vcpus": 200, "memoryGiB": 5600, "bandwidth": 80 }
     ]
   },
-  "roksWorkerProfiles": [
-    { "name": "bx2-4x16", "vcpus": 4, "memoryGiB": 16, "useCase": "Development/testing" },
-    { "name": "bx2-8x32", "vcpus": 8, "memoryGiB": 32, "useCase": "Small workloads" },
-    { "name": "bx2-16x64", "vcpus": 16, "memoryGiB": 64, "useCase": "Medium workloads" },
-    { "name": "bx2-32x128", "vcpus": 32, "memoryGiB": 128, "useCase": "Standard production" },
-    { "name": "bx2-48x192", "vcpus": 48, "memoryGiB": 192, "useCase": "Large workloads" },
-    { "name": "mx2-16x128", "vcpus": 16, "memoryGiB": 128, "useCase": "Memory-intensive (small)" },
-    { "name": "mx2-32x256", "vcpus": 32, "memoryGiB": 256, "useCase": "Memory-intensive VMs" },
-    { "name": "mx2-48x384", "vcpus": 48, "memoryGiB": 384, "useCase": "Memory-intensive (large)" }
+  "bareMetalProfiles": [
+    {
+      "name": "bx2d.metal.96x384",
+      "cores": 48,
+      "threads": 96,
+      "memoryGiB": 384,
+      "nvmeDrives": 8,
+      "nvmeSizeGiB": 3200,
+      "totalNvmeGiB": 25600,
+      "useCase": "OpenShift Virtualization - Standard",
+      "description": "Balanced bare metal with NVMe for ODF storage"
+    },
+    {
+      "name": "bx2d.metal.192x768",
+      "cores": 96,
+      "threads": 192,
+      "memoryGiB": 768,
+      "nvmeDrives": 16,
+      "nvmeSizeGiB": 3200,
+      "totalNvmeGiB": 51200,
+      "useCase": "OpenShift Virtualization - Large",
+      "description": "High-capacity bare metal for dense VM workloads"
+    },
+    {
+      "name": "mx2d.metal.96x768",
+      "cores": 48,
+      "threads": 96,
+      "memoryGiB": 768,
+      "nvmeDrives": 8,
+      "nvmeSizeGiB": 3200,
+      "totalNvmeGiB": 25600,
+      "useCase": "Memory-intensive VMs",
+      "description": "Memory-optimized bare metal for high-memory workloads"
+    }
   ],
   "profileFamilies": {
     "balanced": {
@@ -108,12 +133,40 @@
       "description": "Shared file storage"
     }
   ],
-  "defaults": {
-    "cpuOvercommitRatio": 1.5,
-    "memoryOvercommitRatio": 1.2,
-    "odfReplicationFactor": 3,
-    "odfEfficiencyFactor": 0.7,
+  "odfSizing": {
+    "replicaFactor": 3,
+    "operationalCapacityPercent": 75,
+    "cephOverheadPercent": 15,
+    "nodeRedundancy": 2,
+    "minOdfNodes": 3,
+    "nearFullThresholdPercent": 85,
+    "fullThresholdPercent": 95,
+    "description": "ODF usable = Raw / ReplicaFactor × OperationalCapacity × (1 - CephOverhead)"
+  },
+  "ocpVirtSizing": {
+    "cpuOvercommitMax": 10,
+    "cpuOvercommitRecommended": 4,
+    "cpuOvercommitConservative": 1.8,
+    "memoryOvercommitRecommended": 1,
+    "hyperthreadingEfficiencyDefault": 1.25,
+    "hyperthreadingEfficiencyMin": 1.15,
+    "hyperthreadingEfficiencyMax": 1.5,
+    "systemReservedCpuMillicores": 500,
+    "systemReservedMemoryGiB": 12,
+    "nodeRedundancy": 2,
     "minWorkerNodes": 3,
-    "storageHeadroomPercent": 30
+    "description": "Red Hat recommends no memory overcommit for VMs; CPU max 1.8x physical cores; HT efficiency typically 1.2-1.3x"
+  },
+  "defaults": {
+    "cpuOvercommitRatio": 1.8,
+    "memoryOvercommitRatio": 1.0,
+    "hyperthreadingMultiplier": 1.25,
+    "odfReplicationFactor": 3,
+    "odfOperationalCapacity": 0.75,
+    "odfCephOverhead": 0.15,
+    "minWorkerNodes": 3,
+    "nodeRedundancy": 2,
+    "storageHeadroomPercent": 30,
+    "systemReservedMemoryGiB": 12
   }
 }

@@ -1,0 +1,186 @@
+// Information page styles
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.info-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__section-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__calculator-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-06;
+    background-color: var(--cds-layer-01, #f4f4f4);
+    border: 2px solid var(--cds-border-strong-01, #8d8d8d);
+  }
+
+  &__section-title {
+    @include type.type-style('heading-03');
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-04;
+    padding-bottom: spacing.$spacing-03;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+  }
+
+  &__description {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__accordion-content {
+    padding: spacing.$spacing-04 0;
+
+    h4 {
+      @include type.type-style('heading-compact-02');
+      color: var(--cds-text-primary, #161616);
+      margin-bottom: spacing.$spacing-03;
+    }
+
+    p {
+      @include type.type-style('body-01');
+      color: var(--cds-text-secondary, #525252);
+      margin-bottom: spacing.$spacing-04;
+    }
+
+    ul, ol {
+      margin-left: spacing.$spacing-05;
+      margin-bottom: spacing.$spacing-04;
+
+      li {
+        @include type.type-style('body-01');
+        color: var(--cds-text-secondary, #525252);
+        margin-bottom: spacing.$spacing-02;
+      }
+    }
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: spacing.$spacing-04;
+
+    th, td {
+      @include type.type-style('body-compact-01');
+      padding: spacing.$spacing-03;
+      text-align: left;
+      border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+    }
+
+    th {
+      @include type.type-style('label-01');
+      color: var(--cds-text-secondary, #525252);
+      background-color: var(--cds-layer-02, #f4f4f4);
+      font-weight: 600;
+    }
+
+    td {
+      color: var(--cds-text-primary, #161616);
+    }
+
+    &--compact {
+      td:first-child {
+        @include type.type-style('label-01');
+        color: var(--cds-text-secondary, #525252);
+      }
+
+      td:last-child {
+        text-align: right;
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__note {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-secondary, #525252);
+    font-style: italic;
+    margin-top: spacing.$spacing-03;
+  }
+
+  &__callout {
+    padding: spacing.$spacing-04;
+    border-radius: 4px;
+    margin: spacing.$spacing-04 0;
+
+    &--info {
+      background-color: var(--cds-highlight, #d0e2ff);
+      border-left: 4px solid var(--cds-support-info, #0043ce);
+    }
+
+    &--warning {
+      background-color: #fff8e1;
+      border-left: 4px solid var(--cds-support-warning, #f1c21b);
+    }
+
+    &--success {
+      background-color: #defbe6;
+      border-left: 4px solid var(--cds-support-success, #24a148);
+    }
+  }
+
+  &__formula-block {
+    background-color: var(--cds-layer-02, #f4f4f4);
+    padding: spacing.$spacing-04;
+    border-radius: 4px;
+    margin: spacing.$spacing-04 0;
+  }
+
+  &__formula {
+    @include type.type-style('code-02');
+    background-color: var(--cds-layer-02, #f4f4f4);
+    padding: spacing.$spacing-02 spacing.$spacing-03;
+    border-radius: 4px;
+    margin: spacing.$spacing-02 0;
+    display: block;
+
+    code {
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--cds-text-primary, #161616);
+    }
+  }
+
+  &__reference-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    height: 100%;
+
+    h3 {
+      @include type.type-style('heading-compact-02');
+      color: var(--cds-text-primary, #161616);
+      margin-bottom: spacing.$spacing-04;
+    }
+  }
+
+  &__decision-tree {
+    margin-left: spacing.$spacing-05;
+    counter-reset: step;
+
+    li {
+      @include type.type-style('body-01');
+      color: var(--cds-text-secondary, #525252);
+      margin-bottom: spacing.$spacing-03;
+      padding-left: spacing.$spacing-02;
+    }
+  }
+
+  &__docs-tile {
+    padding: spacing.$spacing-05;
+    margin-top: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: var(--cds-layer-accent-01, #e0e0e0);
+  }
+}

@@ -6,7 +6,7 @@ import { ROUTES } from '@/utils/constants';
 import { mibToGiB, mibToTiB, formatNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, Heatmap } from '@/components/charts';
 import type { HeatmapCell } from '@/components/charts';
-import { FilterBadge } from '@/components/common/FilterBadge';
+import { FilterBadge, MetricCard } from '@/components/common';
 import './StoragePage.scss';
 
 export function StoragePage() {
@@ -141,31 +141,35 @@ export function StoragePage() {
 
         {/* Summary metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__metric-tile">
-            <span className="storage-page__metric-label">Total Capacity</span>
-            <span className="storage-page__metric-value">{totalCapacityTiB.toFixed(1)} TiB</span>
-          </Tile>
+          <MetricCard
+            label="Total Capacity"
+            value={`${totalCapacityTiB.toFixed(1)} TiB`}
+            variant="purple"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__metric-tile">
-            <span className="storage-page__metric-label">Used Storage</span>
-            <span className="storage-page__metric-value">{totalUsedTiB.toFixed(1)} TiB</span>
-          </Tile>
+          <MetricCard
+            label="Used Storage"
+            value={`${totalUsedTiB.toFixed(1)} TiB`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__metric-tile">
-            <span className="storage-page__metric-label">Free Storage</span>
-            <span className="storage-page__metric-value">{totalFreeTiB.toFixed(1)} TiB</span>
-          </Tile>
+          <MetricCard
+            label="Free Storage"
+            value={`${totalFreeTiB.toFixed(1)} TiB`}
+            variant="success"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__metric-tile">
-            <span className="storage-page__metric-label">Avg Utilization</span>
-            <span className="storage-page__metric-value">{avgUtilization.toFixed(1)}%</span>
-          </Tile>
+          <MetricCard
+            label="Avg Utilization"
+            value={`${avgUtilization.toFixed(1)}%`}
+            variant={avgUtilization > 80 ? 'warning' : 'info'}
+          />
         </Column>
 
         {/* Datastore Type Distribution */}

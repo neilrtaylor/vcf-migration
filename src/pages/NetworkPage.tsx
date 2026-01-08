@@ -6,7 +6,7 @@ import { ROUTES } from '@/utils/constants';
 import { formatNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart, Sunburst, NetworkTopology } from '@/components/charts';
 import type { HierarchyNode, TopologyNode, TopologyLink } from '@/components/charts';
-import { RedHatDocLinksGroup } from '@/components/common';
+import { MetricCard, RedHatDocLinksGroup } from '@/components/common';
 import './NetworkPage.scss';
 
 export function NetworkPage() {
@@ -215,34 +215,36 @@ export function NetworkPage() {
 
         {/* Summary metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="network-page__metric-tile">
-            <span className="network-page__metric-label">Total NICs</span>
-            <span className="network-page__metric-value">{formatNumber(networks.length)}</span>
-            <span className="network-page__metric-detail">{formatNumber(connectedNICs)} connected</span>
-          </Tile>
+          <MetricCard
+            label="Total NICs"
+            value={formatNumber(networks.length)}
+            detail={`${formatNumber(connectedNICs)} connected`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="network-page__metric-tile">
-            <span className="network-page__metric-label">Port Groups</span>
-            <span className="network-page__metric-value">{formatNumber(uniqueNetworks)}</span>
-          </Tile>
+          <MetricCard
+            label="Port Groups"
+            value={formatNumber(uniqueNetworks)}
+            variant="info"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="network-page__metric-tile">
-            <span className="network-page__metric-label">Virtual Switches</span>
-            <span className="network-page__metric-value">{formatNumber(uniqueSwitches)}</span>
-          </Tile>
+          <MetricCard
+            label="Virtual Switches"
+            value={formatNumber(uniqueSwitches)}
+            variant="teal"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="network-page__metric-tile">
-            <span className="network-page__metric-label">Avg NICs/VM</span>
-            <span className="network-page__metric-value">
-              {vms.length > 0 ? (networks.length / vms.length).toFixed(1) : '0'}
-            </span>
-          </Tile>
+          <MetricCard
+            label="Avg NICs/VM"
+            value={vms.length > 0 ? (networks.length / vms.length).toFixed(1) : '0'}
+            variant="default"
+          />
         </Column>
 
         {/* Adapter Type Distribution */}

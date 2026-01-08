@@ -114,26 +114,39 @@ export function generateExcelReport(rawData: RVToolsData): XLSX.WorkBook {
   const migrationSheet = XLSX.utils.json_to_sheet(migrationData);
   XLSX.utils.book_append_sheet(workbook, migrationSheet, 'Migration Readiness');
 
-  // ===== ROKS Sizing Sheet =====
-  const { defaults } = ibmCloudProfiles;
+  // ===== ROKS Bare Metal Sizing Sheet =====
+  const { bareMetalProfiles, odfSizing, ocpVirtSizing } = ibmCloudProfiles;
   const totalVCPUs = poweredOnVMs.reduce((sum: number, vm: VirtualMachine) => sum + vm.cpus, 0);
   const totalMemoryGiB = poweredOnVMs.reduce((sum: number, vm: VirtualMachine) => sum + mibToGiB(vm.memory), 0);
   const totalStorageGiB = poweredOnVMs.reduce((sum: number, vm: VirtualMachine) => sum + mibToGiB(vm.provisionedMiB), 0);
 
-  const adjustedVCPUs = Math.ceil(totalVCPUs / defaults.cpuOvercommitRatio);
-  const adjustedMemoryGiB = Math.ceil(totalMemoryGiB / defaults.memoryOvercommitRatio);
-  const odfStorageGiB = Math.ceil(totalStorageGiB * defaults.odfReplicationFactor / defaults.odfEfficiencyFactor);
+  // ODF sizing calculations
+  const replicaFactor = odfSizing.replicaFactor;
+  const operationalCapacity = odfSizing.operationalCapacityPercent / 100;
+  const cephEfficiency = 1 - (odfSizing.cephOverheadPercent / 100);
+  const requiredRawStorageGiB = Math.ceil(totalStorageGiB * replicaFactor / operationalCapacity / cephEfficiency);
 
-  const recommendedProfile = ibmCloudProfiles.roksWorkerProfiles.find(p =>
-    p.vcpus >= 32 && p.memoryGiB >= 128
-  ) || ibmCloudProfiles.roksWorkerProfiles[3];
+  const adjustedVCPUs = Math.ceil(totalVCPUs / ocpVirtSizing.cpuOvercommitConservative);
 
-  const workersForCPU = Math.ceil(adjustedVCPUs / (recommendedProfile.vcpus * 0.85));
-  const workersForMemory = Math.ceil(adjustedMemoryGiB / (recommendedProfile.memoryGiB * 0.85));
-  const recommendedWorkers = Math.max(defaults.minWorkerNodes, workersForCPU, workersForMemory);
+  const recommendedProfile = bareMetalProfiles.find((p: { name: string }) =>
+    p.name === 'bx2d.metal.96x384'
+  ) || bareMetalProfiles[0];
+
+  const usableThreadsPerNode = Math.floor(recommendedProfile.threads * 0.85);
+  const usableMemoryPerNode = recommendedProfile.memoryGiB - ocpVirtSizing.systemReservedMemoryGiB;
+  const usableNvmePerNode = recommendedProfile.totalNvmeGiB;
+
+  const nodesForCPU = Math.ceil(adjustedVCPUs / usableThreadsPerNode);
+  const nodesForMemory = Math.ceil(totalMemoryGiB / usableMemoryPerNode);
+  const nodesForStorage = Math.ceil(requiredRawStorageGiB / usableNvmePerNode);
+  const baseNodeCount = Math.max(odfSizing.minOdfNodes, nodesForCPU, nodesForMemory, nodesForStorage);
+  const recommendedWorkers = baseNodeCount + ocpVirtSizing.nodeRedundancy;
+
+  const totalClusterNvmeGiB = recommendedWorkers * recommendedProfile.totalNvmeGiB;
+  const odfActualUsableTiB = ((totalClusterNvmeGiB / replicaFactor) * operationalCapacity * cephEfficiency / 1024).toFixed(1);
 
   const roksData = [
-    ['ROKS Cluster Sizing', ''],
+    ['ROKS Bare Metal Cluster Sizing', ''],
     [''],
     ['Source Environment', ''],
     ['Total VMs', poweredOnVMs.length],
@@ -142,15 +155,23 @@ export function generateExcelReport(rawData: RVToolsData): XLSX.WorkBook {
     ['Total Storage (GiB)', Math.round(totalStorageGiB)],
     [''],
     ['Adjusted Requirements', ''],
-    ['Adjusted vCPUs (1.5:1 ratio)', adjustedVCPUs],
-    ['Adjusted Memory (1.2:1 ratio)', Math.round(adjustedMemoryGiB)],
-    ['ODF Storage (3x replication)', Math.round(odfStorageGiB / 1024) + ' TiB'],
+    ['Adjusted vCPUs (1.8:1 ratio)', adjustedVCPUs],
+    ['VM Memory (no overcommit)', Math.round(totalMemoryGiB)],
+    ['Required Raw NVMe (TiB)', Math.round(requiredRawStorageGiB / 1024)],
     [''],
-    ['Recommended ROKS Configuration', ''],
-    ['Worker Profile', recommendedProfile.name],
-    ['Worker Count', recommendedWorkers],
-    ['Total Cluster vCPUs', recommendedWorkers * recommendedProfile.vcpus],
-    ['Total Cluster Memory (GiB)', recommendedWorkers * recommendedProfile.memoryGiB],
+    ['ODF Storage Sizing', ''],
+    ['Replica Factor', '3x mirroring'],
+    ['Operational Capacity', '75%'],
+    ['Ceph Overhead', '~15%'],
+    ['ODF Usable Capacity (TiB)', odfActualUsableTiB],
+    [''],
+    ['Recommended Bare Metal Configuration', ''],
+    ['Node Profile', recommendedProfile.name],
+    ['Worker Nodes (N+2)', recommendedWorkers],
+    ['Total Physical Cores', recommendedWorkers * recommendedProfile.cores],
+    ['Total Threads', recommendedWorkers * recommendedProfile.threads],
+    ['Total Memory (GiB)', recommendedWorkers * recommendedProfile.memoryGiB],
+    ['Total Raw NVMe (TiB)', Math.round(totalClusterNvmeGiB / 1024)],
   ];
   const roksSheet = XLSX.utils.aoa_to_sheet(roksData);
   XLSX.utils.book_append_sheet(workbook, roksSheet, 'ROKS Sizing');

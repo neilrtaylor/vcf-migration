@@ -5,7 +5,7 @@ import { useData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber, formatMiB, mibToGiB } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
-import { RedHatDocLinksGroup } from '@/components/common';
+import { MetricCard, RedHatDocLinksGroup } from '@/components/common';
 import './ClusterPage.scss';
 
 export function ClusterPage() {
@@ -214,35 +214,39 @@ export function ClusterPage() {
 
         {/* Summary metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="cluster-page__metric-tile">
-            <span className="cluster-page__metric-label">Total Clusters</span>
-            <span className="cluster-page__metric-value">{formatNumber(totalClusters)}</span>
-            <span className="cluster-page__metric-detail">{avgVmsPerCluster} VMs/cluster avg</span>
-          </Tile>
+          <MetricCard
+            label="Total Clusters"
+            value={formatNumber(totalClusters)}
+            detail={`${avgVmsPerCluster} VMs/cluster avg`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="cluster-page__metric-tile">
-            <span className="cluster-page__metric-label">Total Hosts</span>
-            <span className="cluster-page__metric-value">{formatNumber(totalHosts)}</span>
-            <span className="cluster-page__metric-detail">{avgVmsPerHost} VMs/host avg</span>
-          </Tile>
+          <MetricCard
+            label="Total Hosts"
+            value={formatNumber(totalHosts)}
+            detail={`${avgVmsPerHost} VMs/host avg`}
+            variant="info"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="cluster-page__metric-tile">
-            <span className="cluster-page__metric-label">Total CPU Cores</span>
-            <span className="cluster-page__metric-value">{formatNumber(totalCpuCores)}</span>
-            <span className="cluster-page__metric-detail">{cpuOvercommitRatio}:1 vCPU ratio</span>
-          </Tile>
+          <MetricCard
+            label="Total CPU Cores"
+            value={formatNumber(totalCpuCores)}
+            detail={`${cpuOvercommitRatio}:1 vCPU ratio`}
+            variant="teal"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="cluster-page__metric-tile">
-            <span className="cluster-page__metric-label">Total Memory</span>
-            <span className="cluster-page__metric-value">{formatMiB(totalMemoryMiB, 0)}</span>
-            <span className="cluster-page__metric-detail">{memoryOvercommitRatio}:1 memory ratio</span>
-          </Tile>
+          <MetricCard
+            label="Total Memory"
+            value={formatMiB(totalMemoryMiB, 0)}
+            detail={`${memoryOvercommitRatio}:1 memory ratio`}
+            variant="purple"
+          />
         </Column>
 
         {/* HA Status */}
@@ -427,33 +431,35 @@ export function ClusterPage() {
 
         {/* Health indicators */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`cluster-page__secondary-tile ${hostsNotConnected > 0 ? 'cluster-page__secondary-tile--error' : ''}`}>
-            <span className="cluster-page__metric-label">Disconnected Hosts</span>
-            <span className="cluster-page__secondary-value">{formatNumber(hostsNotConnected)}</span>
-          </Tile>
+          <MetricCard
+            label="Disconnected Hosts"
+            value={formatNumber(hostsNotConnected)}
+            variant={hostsNotConnected > 0 ? 'error' : 'success'}
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`cluster-page__secondary-tile ${hostsHighCpuUtil > 0 ? 'cluster-page__secondary-tile--warning' : ''}`}>
-            <span className="cluster-page__metric-label">High CPU (&gt;80%)</span>
-            <span className="cluster-page__secondary-value">{formatNumber(hostsHighCpuUtil)}</span>
-          </Tile>
+          <MetricCard
+            label="High CPU (>80%)"
+            value={formatNumber(hostsHighCpuUtil)}
+            variant={hostsHighCpuUtil > 0 ? 'warning' : 'success'}
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`cluster-page__secondary-tile ${hostsHighMemUtil > 0 ? 'cluster-page__secondary-tile--warning' : ''}`}>
-            <span className="cluster-page__metric-label">High Memory (&gt;80%)</span>
-            <span className="cluster-page__secondary-value">{formatNumber(hostsHighMemUtil)}</span>
-          </Tile>
+          <MetricCard
+            label="High Memory (>80%)"
+            value={formatNumber(hostsHighMemUtil)}
+            variant={hostsHighMemUtil > 0 ? 'warning' : 'success'}
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="cluster-page__secondary-tile">
-            <span className="cluster-page__metric-label">Hyperthreading Enabled</span>
-            <span className="cluster-page__secondary-value">
-              {formatNumber(hosts.filter(h => h.hyperthreading).length)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="Hyperthreading Enabled"
+            value={formatNumber(hosts.filter(h => h.hyperthreading).length)}
+            variant="info"
+          />
         </Column>
 
         {/* Documentation Links */}

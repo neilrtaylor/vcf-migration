@@ -135,6 +135,7 @@ export const ROUTES = {
   config: '/config',
   migration: '/migration',
   tables: '/tables',
+  info: '/info',
 } as const;
 
 // Local storage keys

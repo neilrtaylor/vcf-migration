@@ -14,7 +14,10 @@
       "Bash(npm test:*)",
       "WebSearch",
       "WebFetch(domain:icones.js.org)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:developers.redhat.com)",
+      "WebFetch(domain:fullvalence.com)",
+      "WebFetch(domain:access.redhat.com)"
     ]
   }
 }

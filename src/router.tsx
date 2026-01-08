@@ -10,6 +10,7 @@ import { ClusterPage } from '@/pages/ClusterPage';
 import { ConfigPage } from '@/pages/ConfigPage';
 import { MigrationPage } from '@/pages/MigrationPage';
 import { TablesPage } from '@/pages/TablesPage';
+import { InfoPage } from '@/pages/InfoPage';
 import { ROUTES } from '@/utils/constants';
 
 export const router = createBrowserRouter([
@@ -52,6 +53,10 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.tables.slice(1),
         element: <TablesPage />,
+      },
+      {
+        path: ROUTES.info.slice(1),
+        element: <InfoPage />,
       },
       {
         path: '*',

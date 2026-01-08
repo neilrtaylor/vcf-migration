@@ -5,6 +5,7 @@ import { useData } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, getHardwareVersionNumber, formatHardwareVersion } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
+import { MetricCard } from '@/components/common';
 import './ConfigPage.scss';
 
 export function ConfigPage() {
@@ -187,45 +188,41 @@ export function ConfigPage() {
 
         {/* Summary metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="config-page__metric-tile">
-            <span className="config-page__metric-label">Total VMs</span>
-            <span className="config-page__metric-value">{formatNumber(vms.length)}</span>
-            <span className="config-page__metric-detail">
-              {formatNumber(recommendedHWCount)} at HW v{HW_VERSION_RECOMMENDED}+
-            </span>
-          </Tile>
+          <MetricCard
+            label="Total VMs"
+            value={formatNumber(vms.length)}
+            detail={`${formatNumber(recommendedHWCount)} at HW v${HW_VERSION_RECOMMENDED}+`}
+            variant="primary"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="config-page__metric-tile">
-            <span className="config-page__metric-label">VMware Tools Status</span>
-            <span className="config-page__metric-value">
-              {formatNumber(toolsStatusMap['Current'] || 0)}
-            </span>
-            <span className="config-page__metric-detail">
-              {tools.length > 0
-                ? `${Math.round(((toolsStatusMap['Current'] || 0) / tools.length) * 100)}% current`
-                : 'N/A'}
-            </span>
-          </Tile>
+          <MetricCard
+            label="VMware Tools Current"
+            value={formatNumber(toolsStatusMap['Current'] || 0)}
+            detail={tools.length > 0
+              ? `${Math.round(((toolsStatusMap['Current'] || 0) / tools.length) * 100)}% current`
+              : 'N/A'}
+            variant="success"
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="config-page__metric-tile">
-            <span className="config-page__metric-label">VMs with Snapshots</span>
-            <span className="config-page__metric-value">{formatNumber(vmsWithSnapshots)}</span>
-            <span className="config-page__metric-detail">
-              {formatNumber(snapshots.length)} total snapshots
-            </span>
-          </Tile>
+          <MetricCard
+            label="VMs with Snapshots"
+            value={formatNumber(vmsWithSnapshots)}
+            detail={`${formatNumber(snapshots.length)} total snapshots`}
+            variant={vmsWithSnapshots > 0 ? 'warning' : 'success'}
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="config-page__metric-tile">
-            <span className="config-page__metric-label">CD-ROM Connected</span>
-            <span className="config-page__metric-value">{formatNumber(vmsWithCdConnected)}</span>
-            <span className="config-page__metric-detail">VMs need disconnection</span>
-          </Tile>
+          <MetricCard
+            label="CD-ROM Connected"
+            value={formatNumber(vmsWithCdConnected)}
+            detail="VMs need disconnection"
+            variant={vmsWithCdConnected > 0 ? 'warning' : 'success'}
+          />
         </Column>
 
         {/* Hardware Version Distribution */}

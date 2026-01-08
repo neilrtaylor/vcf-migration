@@ -1,0 +1,199 @@
+// Interactive sizing calculator styles
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+@use '@carbon/colors';
+
+.sizing-calculator {
+  &__section {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    min-height: 200px;
+  }
+
+  &__section-title {
+    @include type.type-style('heading-compact-02');
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-05;
+    padding-bottom: spacing.$spacing-03;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+  }
+
+  &__profile-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-03;
+    margin-top: spacing.$spacing-05;
+  }
+
+  &__toggle-row {
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__info-text {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-top: spacing.$spacing-04;
+    padding: spacing.$spacing-03;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    border-radius: 4px;
+
+    .label {
+      font-weight: 600;
+      color: var(--cds-text-primary, #161616);
+    }
+  }
+
+  &__results {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: var(--cds-layer-accent-01, #e0e0e0);
+  }
+
+  &__subtitle {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__result-card {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01, #f4f4f4);
+    border-radius: 4px;
+    border-left: 4px solid var(--cds-border-subtle-01, #e0e0e0);
+    margin-bottom: spacing.$spacing-04;
+
+    &--cpu {
+      border-left-color: #0f62fe; // Blue
+    }
+
+    &--memory {
+      border-left-color: #009d9a; // Teal
+    }
+
+    &--storage {
+      border-left-color: #8a3ffc; // Purple
+    }
+
+    &--efficiency {
+      border-left-color: #24a148; // Green
+    }
+  }
+
+  &__result-label {
+    @include type.type-style('label-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-02;
+    display: block;
+  }
+
+  &__result-value {
+    @include type.type-style('heading-03');
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-02;
+    display: block;
+  }
+
+  &__result-detail {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-secondary, #525252);
+    display: block;
+  }
+
+  &__workload-results {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: var(--cds-layer-01, #ffffff);
+    border: 2px solid var(--cds-border-strong-01, #8d8d8d);
+  }
+
+  &__workload-card {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-04;
+    text-align: center;
+
+    &--total {
+      background-color: var(--cds-layer-accent-01, #e0e0e0);
+      border: 2px solid var(--cds-support-success, #24a148);
+    }
+  }
+
+  &__workload-label {
+    @include type.type-style('label-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-02;
+    display: block;
+  }
+
+  &__workload-value {
+    @include type.type-style('heading-03');
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-02;
+    display: block;
+
+    &--large {
+      @include type.type-style('heading-04');
+      color: var(--cds-support-success, #24a148);
+    }
+  }
+
+  &__workload-nodes {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-secondary, #525252);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: spacing.$spacing-02;
+
+    &--limiting {
+      color: var(--cds-text-primary, #161616);
+      font-weight: 600;
+    }
+  }
+
+  &__formula-display {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    border-radius: 4px;
+    text-align: center;
+
+    code {
+      @include type.type-style('code-02');
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--cds-text-primary, #161616);
+
+      strong {
+        color: var(--cds-support-success, #24a148);
+      }
+    }
+  }
+
+  &__no-data {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    text-align: center;
+
+    p {
+      @include type.type-style('body-01');
+      color: var(--cds-text-secondary, #525252);
+      margin: 0;
+    }
+  }
+
+  // Carbon slider overrides for better spacing
+  :global {
+    .cds--slider-container {
+      margin-bottom: spacing.$spacing-05;
+    }
+
+    .cds--dropdown {
+      margin-bottom: spacing.$spacing-04;
+    }
+  }
+}

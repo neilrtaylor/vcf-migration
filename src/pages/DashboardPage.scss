@@ -25,18 +25,21 @@
 
   &__metric-label {
     @include type.type-style('label-01');
+    display: block;
     color: theme.$text-secondary;
     margin-bottom: spacing.$spacing-02;
   }
 
   &__metric-value {
     @include type.type-style('heading-04');
+    display: block;
     color: theme.$text-primary;
     margin-bottom: spacing.$spacing-02;
   }
 
   &__metric-detail {
     @include type.type-style('helper-text-01');
+    display: block;
     color: theme.$text-helper;
   }
 
@@ -51,6 +54,7 @@
 
   &__secondary-value {
     @include type.type-style('heading-03');
+    display: block;
     color: theme.$text-primary;
   }
 

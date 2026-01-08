@@ -24,12 +24,14 @@
 
   &__metric-label {
     @include type.type-style('label-01');
+    display: block;
     color: theme.$text-secondary;
     margin-bottom: spacing.$spacing-02;
   }
 
   &__metric-value {
     @include type.type-style('heading-03');
+    display: block;
     color: theme.$text-primary;
   }
 

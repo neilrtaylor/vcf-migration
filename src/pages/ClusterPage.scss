@@ -26,12 +26,14 @@
   }
 
   &__metric-label {
+    display: block;
     font-size: 0.875rem;
     color: var(--cds-text-secondary, #525252);
     margin-bottom: spacing.$spacing-03;
   }
 
   &__metric-value {
+    display: block;
     font-size: 2.5rem;
     font-weight: 600;
     color: var(--cds-text-primary, #161616);
@@ -39,6 +41,7 @@
   }
 
   &__metric-detail {
+    display: block;
     font-size: 0.875rem;
     color: var(--cds-text-secondary, #525252);
     margin-top: spacing.$spacing-02;
@@ -68,6 +71,7 @@
   }
 
   &__secondary-value {
+    display: block;
     font-size: 1.75rem;
     font-weight: 600;
     color: var(--cds-text-primary, #161616);
