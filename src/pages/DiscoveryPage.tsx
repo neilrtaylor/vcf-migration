@@ -165,7 +165,7 @@ export function DiscoveryPage() {
     <div className="discovery-page">
       <Grid>
         <Column lg={16} md={8} sm={4}>
-          <h1 className="discovery-page__title">Infrastructure Discovery</h1>
+          <h1 className="discovery-page__title">Workload Discovery</h1>
           <p className="discovery-page__subtitle">
             Workload detection, appliance identification, and infrastructure insights
           </p>

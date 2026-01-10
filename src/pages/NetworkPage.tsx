@@ -26,11 +26,13 @@ export function NetworkPage() {
   const uniqueNetworks = new Set(networks.map(n => n.networkName)).size;
   const uniqueSwitches = new Set(networks.map(n => n.switchName).filter(Boolean)).size;
 
-  // Check if we have meaningful connected data (at least some NICs have connected=true)
-  // If no NICs are connected, the Connected column might be missing from the RVTools export
-  const hasConnectedData = networks.some(n => n.connected === true);
-  const connectedNICs = networks.filter(n => n.connected).length;
-  const disconnectedNICs = hasConnectedData ? networks.filter(n => !n.connected).length : 0;
+  // Connection status - check both connected and disconnected NICs
+  // The Connected column shows adapter connection state (connected to virtual switch)
+  const connectedNICs = networks.filter(n => n.connected === true).length;
+  const disconnectedNICs = networks.filter(n => n.connected === false).length;
+  // If all NICs show as disconnected, it might be a data issue or all NICs are genuinely disconnected
+  // We show the counts regardless to give visibility into the data
+  const hasConnectedData = connectedNICs > 0 || (networks.length > 0 && disconnectedNICs < networks.length);
 
   // NIC adapter type distribution (normalize to handle case variations)
   const adapterTypes = networks.reduce((acc, nic) => {
@@ -314,11 +316,11 @@ export function NetworkPage() {
     });
   });
 
-  // Add top VMs as nodes (limit to prevent overcrowding)
+  // Add VMs as nodes - show all VMs with NICs, but limit to reasonable number for performance
   const topVMsForTopology = [...vmNicCounts]
+    .filter(vm => vm.nicCount > 0)
     .sort((a, b) => b.nicCount - a.nicCount)
-    .slice(0, 20)
-    .filter(vm => vm.nicCount > 0);
+    .slice(0, 100); // Show up to 100 VMs
 
   topVMsForTopology.forEach(vm => {
     const vmId = `vm-${vm.vmName}`;
@@ -362,6 +364,8 @@ export function NetworkPage() {
             value={formatNumber(networks.length)}
             detail={hasConnectedData ? `${formatNumber(connectedNICs)} connected` : undefined}
             variant="primary"
+            tooltip="Count of all virtual network adapters across all VMs."
+            docSection="network"
           />
         </Column>
 
@@ -370,6 +374,8 @@ export function NetworkPage() {
             label="Port Groups"
             value={formatNumber(uniqueNetworks)}
             variant="info"
+            tooltip="Unique network port groups configured in the environment."
+            docSection="network"
           />
         </Column>
 
@@ -378,6 +384,8 @@ export function NetworkPage() {
             label="Virtual Switches"
             value={formatNumber(uniqueSwitches)}
             variant="teal"
+            tooltip="vSwitches (standard or distributed) in the environment."
+            docSection="network"
           />
         </Column>
 
@@ -386,6 +394,7 @@ export function NetworkPage() {
             label="Avg NICs/VM"
             value={vms.length > 0 ? (networks.length / vms.length).toFixed(1) : '0'}
             variant="default"
+            tooltip="Average number of virtual network adapters per VM."
           />
         </Column>
 
@@ -472,23 +481,23 @@ export function NetworkPage() {
 
         {/* Network Topology Force-Directed Graph */}
         <Column lg={16} md={8} sm={4}>
-          <Tile className="network-page__chart-tile">
+          <Tile className="network-page__topology-tile">
             <NetworkTopology
               title="Network Topology"
-              subtitle="Interactive view of switches, port groups, and top VMs (drag to reposition, scroll to zoom)"
+              subtitle={`Interactive view of ${topologyNodes.filter(n => n.type === 'switch').length} switches, ${topologyNodes.filter(n => n.type === 'portgroup').length} port groups, and ${topologyNodes.filter(n => n.type === 'vm').length} VMs (drag to reposition, scroll to zoom)`}
               nodes={topologyNodes}
               links={topologyLinks}
-              height={500}
+              height={550}
             />
           </Tile>
         </Column>
 
         {/* Health indicators */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`network-page__secondary-tile ${hasConnectedData && disconnectedNICs > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
+          <Tile className={`network-page__secondary-tile ${disconnectedNICs > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
             <span className="network-page__metric-label">Disconnected NICs</span>
             <span className="network-page__secondary-value">
-              {hasConnectedData ? formatNumber(disconnectedNICs) : 'No data'}
+              {formatNumber(disconnectedNICs)}
             </span>
           </Tile>
         </Column>

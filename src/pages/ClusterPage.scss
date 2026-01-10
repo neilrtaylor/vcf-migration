@@ -128,4 +128,9 @@
     gap: spacing.$spacing-02;
     flex-wrap: wrap;
   }
+
+  &__table-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
 }

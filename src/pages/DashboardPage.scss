@@ -91,4 +91,101 @@
     text-align: center;
     padding: spacing.$spacing-07;
   }
+
+  &__source-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: var(--cds-layer-accent-01);
+    border-left: 4px solid var(--cds-link-primary, #0f62fe);
+  }
+
+  &__source-title {
+    @include type.type-style('heading-compact-02');
+    color: theme.$text-primary;
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__source-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: spacing.$spacing-05;
+  }
+
+  &__source-item {
+    background-color: var(--cds-layer-01);
+    padding: spacing.$spacing-04;
+    border-radius: 4px;
+  }
+
+  &__source-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: spacing.$spacing-02;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  &__source-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    min-width: 120px;
+    margin-right: spacing.$spacing-03;
+  }
+
+  &__source-value {
+    @include type.type-style('body-01');
+    color: theme.$text-primary;
+    font-weight: 600;
+  }
+
+  // Configuration Analysis tiles
+  &__config-tile {
+    display: flex;
+    flex-direction: column;
+    padding: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-05;
+    border-left: 4px solid var(--cds-border-subtle-01);
+    min-height: 120px;
+
+    &--success {
+      border-left-color: var(--cds-support-success, #24a148);
+    }
+
+    &--warning {
+      border-left-color: var(--cds-support-warning, #f1c21b);
+    }
+
+    &--error {
+      border-left-color: var(--cds-support-error, #da1e28);
+    }
+
+    &--info {
+      border-left-color: var(--cds-link-primary, #0f62fe);
+    }
+  }
+
+  &__config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__config-label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+  }
+
+  &__config-value {
+    @include type.type-style('heading-03');
+    color: theme.$text-primary;
+    margin-bottom: spacing.$spacing-01;
+  }
+
+  &__config-detail {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-helper;
+  }
 }

@@ -50,6 +50,35 @@
   &__chart-tile {
     margin-bottom: spacing.$spacing-05;
     min-height: 320px;
+
+    // Full width for topology diagram
+    &--full-width {
+      .topology-container {
+        width: 100%;
+
+        svg {
+          width: 100%;
+          min-height: 500px;
+        }
+      }
+    }
+  }
+
+  // Network topology specific styles
+  &__topology-tile {
+    margin-bottom: spacing.$spacing-05;
+    min-height: 550px;
+    padding: spacing.$spacing-05;
+
+    .topology-container {
+      width: 100%;
+      height: 100%;
+
+      svg {
+        width: 100%;
+        display: block;
+      }
+    }
   }
 
   &__secondary-tile {

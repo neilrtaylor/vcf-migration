@@ -37,9 +37,9 @@ export function ROKSMigrationPage() {
   const [yamlExportSuccess, setYamlExportSuccess] = useState(false);
   const [calculatorSizing, setCalculatorSizing] = useState<SizingResult | null>(null);
   const [wavePlanningMode, setWavePlanningMode] = useState<'complexity' | 'network'>('network');
-  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'portGroupPrefix' | 'ipPrefix'>('portGroup');
+  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'portGroupPrefix' | 'ipPrefix' | 'cluster'>('cluster');
   const [ipPrefixLength, setIpPrefixLength] = useState<number>(24);
-  const [portGroupPrefixLength, setPortGroupPrefixLength] = useState<number>(20);
+  const [portGroupPrefixLength, setPortGroupPrefixLength] = useState<number>(10);
 
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
@@ -300,6 +300,7 @@ export function ROKSMigrationPage() {
       networkName,
       ipAddress,
       subnet,
+      cluster: vm.cluster || 'No Cluster',
     };
   });
 
@@ -329,14 +330,17 @@ export function ROKSMigrationPage() {
     return `${prefix.join('.')}/${prefixLength}`;
   };
 
-  // Network-based waves: Group by port group, port group prefix, or IP prefix
+  // Network-based waves: Group by port group, port group prefix, IP prefix, or cluster
   const networkWaves = useMemo(() => {
     const groups = new Map<string, typeof vmWaveData>();
 
     vmWaveData.forEach(vm => {
       let key: string;
 
-      if (networkGroupBy === 'portGroup') {
+      if (networkGroupBy === 'cluster') {
+        // Group by VMware cluster
+        key = vm.cluster;
+      } else if (networkGroupBy === 'portGroup') {
         // Group by full VMware port group name
         key = vm.networkName || 'No Network';
       } else if (networkGroupBy === 'portGroupPrefix') {
@@ -1084,12 +1088,13 @@ export function ROKSMigrationPage() {
                             id="network-group-by"
                             titleText="Group VMs by"
                             label="Select grouping method"
-                            items={['portGroup', 'portGroupPrefix', 'ipPrefix']}
-                            itemToString={(item) => item === 'portGroup' ? 'Port Group (exact name match)'
+                            items={['cluster', 'portGroup', 'portGroupPrefix', 'ipPrefix']}
+                            itemToString={(item) => item === 'cluster' ? 'Cluster (VMware cluster)'
+                              : item === 'portGroup' ? 'Port Group (exact name match)'
                               : item === 'portGroupPrefix' ? 'Port Group Prefix (first N characters)'
                               : item === 'ipPrefix' ? 'IP Prefix (subnet based on IP address)' : ''}
                             selectedItem={networkGroupBy}
-                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'portGroupPrefix' | 'ipPrefix')}
+                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'portGroupPrefix' | 'ipPrefix' | 'cluster')}
                             style={{ minWidth: '300px' }}
                           />
                           {networkGroupBy === 'portGroupPrefix' && (

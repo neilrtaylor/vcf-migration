@@ -1,9 +1,9 @@
 // Dashboard page - Executive summary
-import { Grid, Column, Tile } from '@carbon/react';
+import { Grid, Column, Tile, Tag } from '@carbon/react';
 import { useData, useVMs, useChartFilter } from '@/hooks';
 import { Navigate } from 'react-router-dom';
-import { ROUTES } from '@/utils/constants';
-import { formatNumber, mibToGiB, mibToTiB } from '@/utils/formatters';
+import { ROUTES, HW_VERSION_MINIMUM, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
+import { formatNumber, mibToGiB, mibToTiB, getHardwareVersionNumber } from '@/utils/formatters';
 import { DoughnutChart, HorizontalBarChart, VerticalBarChart } from '@/components/charts';
 import { FilterBadge, MetricCard } from '@/components/common';
 import { POWER_STATE_CHART_COLORS } from '@/utils/chartConfig';
@@ -154,6 +154,41 @@ export function DashboardPage() {
     }
   };
 
+  // vCenter source info
+  const vSources = rawData.vSource || [];
+
+  // ===== CONFIGURATION ANALYSIS =====
+  const tools = rawData.vTools || [];
+  const snapshots = rawData.vSnapshot || [];
+  const cdDrives = rawData.vCD || [];
+
+  // VMware Tools status
+  const toolsNotInstalled = tools.filter(t =>
+    t.toolsStatus?.toLowerCase().includes('notinstalled')
+  ).length;
+  const toolsCurrent = tools.filter(t =>
+    t.toolsStatus?.toLowerCase().includes('ok') ||
+    t.toolsStatus?.toLowerCase() === 'toolsok'
+  ).length;
+
+  // Hardware version compliance
+  const outdatedHWCount = vms.filter(vm =>
+    getHardwareVersionNumber(vm.hardwareVersion) < HW_VERSION_MINIMUM
+  ).length;
+
+  // Snapshot issues
+  const snapshotsBlockers = snapshots.filter(s => s.ageInDays > SNAPSHOT_BLOCKER_AGE_DAYS).length;
+  const vmsWithSnapshots = new Set(snapshots.map(s => s.vmName)).size;
+
+  // CD-ROM connected
+  const vmsWithCdConnected = new Set(cdDrives.filter(cd => cd.connected).map(cd => cd.vmName)).size;
+
+  // Consolidation needed
+  const vmsNeedConsolidation = vms.filter(vm => vm.consolidationNeeded).length;
+
+  // Count of issues (for summary)
+  const configIssuesCount = toolsNotInstalled + snapshotsBlockers + vmsWithCdConnected + outdatedHWCount;
+
   return (
     <div className="dashboard-page">
       <Grid>
@@ -174,6 +209,49 @@ export function DashboardPage() {
           )}
         </Column>
 
+        {/* vCenter Source Info */}
+        {vSources.length > 0 && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="dashboard-page__source-tile">
+              <h3 className="dashboard-page__source-title">Source Environment</h3>
+              <div className="dashboard-page__source-grid">
+                {vSources.map((source, idx) => (
+                  <div key={idx} className="dashboard-page__source-item">
+                    <div className="dashboard-page__source-row">
+                      <span className="dashboard-page__source-label">vCenter Server:</span>
+                      <span className="dashboard-page__source-value">{source.server}</span>
+                    </div>
+                    {source.version && (
+                      <div className="dashboard-page__source-row">
+                        <span className="dashboard-page__source-label">Version:</span>
+                        <span className="dashboard-page__source-value">{source.version}{source.build ? ` (Build ${source.build})` : ''}</span>
+                      </div>
+                    )}
+                    {source.fullName && (
+                      <div className="dashboard-page__source-row">
+                        <span className="dashboard-page__source-label">Product:</span>
+                        <span className="dashboard-page__source-value">{source.fullName}</span>
+                      </div>
+                    )}
+                    {source.ipAddress && (
+                      <div className="dashboard-page__source-row">
+                        <span className="dashboard-page__source-label">IP Address:</span>
+                        <span className="dashboard-page__source-value">{source.ipAddress}</span>
+                      </div>
+                    )}
+                    {source.apiVersion && (
+                      <div className="dashboard-page__source-row">
+                        <span className="dashboard-page__source-label">API Version:</span>
+                        <span className="dashboard-page__source-value">{source.apiVersion}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Tile>
+          </Column>
+        )}
+
         {/* Key Metrics Row */}
         <Column lg={4} md={4} sm={4}>
           <MetricCard
@@ -181,6 +259,8 @@ export function DashboardPage() {
             value={formatNumber(totalVMs)}
             detail={`${formatNumber(poweredOnVMs)} powered on`}
             variant="primary"
+            tooltip="Count of all virtual machines in the environment, excluding templates."
+            docSection="dashboard"
           />
         </Column>
 
@@ -190,6 +270,8 @@ export function DashboardPage() {
             value={formatNumber(totalVCPUs)}
             detail={`Avg ${(totalVCPUs / totalVMs).toFixed(1)} per VM`}
             variant="info"
+            tooltip="Sum of all virtual CPU cores allocated across all VMs."
+            docSection="dashboard"
           />
         </Column>
 
@@ -199,6 +281,8 @@ export function DashboardPage() {
             value={`${totalMemoryTiB.toFixed(1)} TiB`}
             detail={`Avg ${(totalMemoryGiB / totalVMs).toFixed(1)} GiB per VM`}
             variant="teal"
+            tooltip="Total memory allocated to all VMs, displayed in TiB."
+            docSection="dashboard"
           />
         </Column>
 
@@ -208,15 +292,31 @@ export function DashboardPage() {
             value={`${totalProvisionedTiB.toFixed(1)} TiB`}
             detail="Total allocated capacity"
             variant="purple"
+            tooltip="Total storage capacity allocated (thin + thick provisioned) to VMs."
+            docSection="dashboard"
           />
         </Column>
 
+        {/* Storage metrics row - side by side */}
         <Column lg={4} md={4} sm={4}>
           <MetricCard
             label="In Use Storage"
             value={`${totalInUseTiB.toFixed(1)} TiB`}
             detail={`${((totalInUseMiB / totalProvisionedMiB) * 100).toFixed(0)}% of provisioned`}
             variant="purple"
+            tooltip="Actual storage consumed by VMs on datastores."
+            docSection="dashboard"
+          />
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <MetricCard
+            label="Storage Efficiency"
+            value={`${((totalInUseMiB / totalProvisionedMiB) * 100).toFixed(0)}%`}
+            detail={`${(totalProvisionedTiB - totalInUseTiB).toFixed(1)} TiB unallocated`}
+            variant="success"
+            tooltip="Percentage of provisioned storage that is actually in use. Higher values indicate less over-provisioning."
+            docSection="dashboard"
           />
         </Column>
 
@@ -231,6 +331,7 @@ export function DashboardPage() {
             label="ESXi Hosts"
             value={formatNumber(rawData.vHost.length)}
             variant="default"
+            tooltip="Total number of ESXi hypervisor hosts in the environment."
           />
         </Column>
 
@@ -239,6 +340,8 @@ export function DashboardPage() {
             label="Clusters"
             value={formatNumber(uniqueClusters)}
             variant="default"
+            tooltip="Number of distinct VMware clusters containing VMs."
+            docSection="cluster"
           />
         </Column>
 
@@ -247,6 +350,7 @@ export function DashboardPage() {
             label="Datacenters"
             value={formatNumber(uniqueDatacenters)}
             variant="default"
+            tooltip="Number of distinct datacenters in the vCenter hierarchy."
           />
         </Column>
 
@@ -255,6 +359,8 @@ export function DashboardPage() {
             label="Datastores"
             value={formatNumber(rawData.vDatastore.length)}
             variant="default"
+            tooltip="Total number of storage datastores available to VMs."
+            docSection="storage"
           />
         </Column>
 
@@ -263,6 +369,7 @@ export function DashboardPage() {
             label="Templates"
             value={formatNumber(templates)}
             variant="default"
+            tooltip="VM templates (not counted in Total VMs) used for cloning new VMs."
           />
         </Column>
 
@@ -339,6 +446,130 @@ export function DashboardPage() {
               valueLabel="Ratio"
               formatValue={(v) => `${v}:1`}
             />
+          </Tile>
+        </Column>
+
+        {/* Configuration Analysis Section */}
+        <Column lg={16} md={8} sm={4}>
+          <h2 className="dashboard-page__section-title">Configuration Analysis</h2>
+        </Column>
+
+        {/* Configuration Summary Card */}
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${configIssuesCount > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">Configuration Issues</span>
+              <Tag type={configIssuesCount > 0 ? 'red' : 'green'} size="sm">
+                {configIssuesCount > 0 ? 'Action Needed' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(configIssuesCount)}</span>
+            <span className="dashboard-page__config-detail">
+              Items requiring attention
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${toolsNotInstalled > 0 ? 'dashboard-page__config-tile--error' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">Tools Not Installed</span>
+              <Tag type={toolsNotInstalled > 0 ? 'red' : 'green'} size="sm">
+                {toolsNotInstalled > 0 ? 'Blocker' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(toolsNotInstalled)}</span>
+            <span className="dashboard-page__config-detail">
+              Required for migration
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${snapshotsBlockers > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">Old Snapshots</span>
+              <Tag type={snapshotsBlockers > 0 ? 'red' : 'green'} size="sm">
+                {snapshotsBlockers > 0 ? 'Blocker' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(snapshotsBlockers)}</span>
+            <span className="dashboard-page__config-detail">
+              Over {SNAPSHOT_BLOCKER_AGE_DAYS} days old
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${outdatedHWCount > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">Outdated HW Version</span>
+              <Tag type={outdatedHWCount > 0 ? 'magenta' : 'green'} size="sm">
+                {outdatedHWCount > 0 ? 'Upgrade' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(outdatedHWCount)}</span>
+            <span className="dashboard-page__config-detail">
+              Below HW v{HW_VERSION_MINIMUM}
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${vmsWithCdConnected > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">CD-ROM Connected</span>
+              <Tag type={vmsWithCdConnected > 0 ? 'magenta' : 'green'} size="sm">
+                {vmsWithCdConnected > 0 ? 'Disconnect' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(vmsWithCdConnected)}</span>
+            <span className="dashboard-page__config-detail">
+              Disconnect before migration
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className={`dashboard-page__config-tile ${vmsNeedConsolidation > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">Need Consolidation</span>
+              <Tag type={vmsNeedConsolidation > 0 ? 'magenta' : 'green'} size="sm">
+                {vmsNeedConsolidation > 0 ? 'Warning' : 'OK'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(vmsNeedConsolidation)}</span>
+            <span className="dashboard-page__config-detail">
+              Disk consolidation needed
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className="dashboard-page__config-tile dashboard-page__config-tile--info">
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">VMware Tools Current</span>
+              <Tag type="blue" size="sm">Info</Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(toolsCurrent)}</span>
+            <span className="dashboard-page__config-detail">
+              {tools.length > 0 ? `${Math.round((toolsCurrent / tools.length) * 100)}% of VMs` : 'N/A'}
+            </span>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={4} sm={4}>
+          <Tile className="dashboard-page__config-tile dashboard-page__config-tile--info">
+            <div className="dashboard-page__config-header">
+              <span className="dashboard-page__config-label">VMs with Snapshots</span>
+              <Tag type={vmsWithSnapshots > 0 ? 'high-contrast' : 'green'} size="sm">
+                {vmsWithSnapshots > 0 ? 'Review' : 'None'}
+              </Tag>
+            </div>
+            <span className="dashboard-page__config-value">{formatNumber(vmsWithSnapshots)}</span>
+            <span className="dashboard-page__config-detail">
+              {formatNumber(snapshots.length)} total snapshots
+            </span>
           </Tile>
         </Column>
       </Grid>

@@ -13,6 +13,7 @@ import {
   Network_3,
   SoftwareResourceCluster,
   Chip,
+  GroupResource,
   Settings,
   Kubernetes,
   VirtualMachine,
@@ -21,6 +22,7 @@ import {
   Table,
   Upload,
   Information,
+  Book,
 } from '@carbon/icons-react';
 import { useHasData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
@@ -121,6 +123,16 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
         </SideNavLink>
 
         <SideNavLink
+          renderIcon={GroupResource}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.resourcePools, true)}
+          isActive={isActive(ROUTES.resourcePools)}
+          className={!hasData ? 'sidenav-link--disabled' : ''}
+        >
+          Resource Pools
+        </SideNavLink>
+
+        <SideNavLink
           renderIcon={Settings}
           href="#"
           onClick={(e) => handleNavClick(e, ROUTES.config, true)}
@@ -167,7 +179,7 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           isActive={isActive(ROUTES.discovery)}
           className={!hasData ? 'sidenav-link--disabled' : ''}
         >
-          Discovery
+          Workload Discovery
         </SideNavLink>
 
         <SideNavLink
@@ -189,6 +201,15 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           isActive={isActive(ROUTES.info)}
         >
           Sizing Guide
+        </SideNavLink>
+
+        <SideNavLink
+          renderIcon={Book}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.documentation)}
+          isActive={isActive(ROUTES.documentation)}
+        >
+          Documentation
         </SideNavLink>
       </SideNavItems>
     </CarbonSideNav>

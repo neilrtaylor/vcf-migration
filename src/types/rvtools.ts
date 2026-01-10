@@ -199,7 +199,10 @@ export interface VClusterInfo {
   overallStatus: string;
   vmCount: number;
   hostCount: number;
+  numEffectiveHosts: number;
   totalCpuMHz: number;
+  numCpuCores: number;
+  numCpuThreads: number;
   effectiveCpuMHz: number;
   totalMemoryMiB: number;
   effectiveMemoryMiB: number;

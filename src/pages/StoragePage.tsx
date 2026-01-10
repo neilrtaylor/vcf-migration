@@ -152,6 +152,8 @@ export function StoragePage() {
             label="Total Capacity"
             value={`${totalCapacityTiB.toFixed(1)} TiB`}
             variant="purple"
+            tooltip="Total raw capacity of all datastores."
+            docSection="storage"
           />
         </Column>
 
@@ -160,6 +162,8 @@ export function StoragePage() {
             label="Used Storage"
             value={`${totalUsedTiB.toFixed(1)} TiB`}
             variant="primary"
+            tooltip="Total space consumed across all datastores."
+            docSection="storage"
           />
         </Column>
 
@@ -168,6 +172,8 @@ export function StoragePage() {
             label="Free Storage"
             value={`${totalFreeTiB.toFixed(1)} TiB`}
             variant="success"
+            tooltip="Available free space across all datastores."
+            docSection="storage"
           />
         </Column>
 
@@ -176,6 +182,8 @@ export function StoragePage() {
             label="Avg Utilization"
             value={`${avgUtilization.toFixed(1)}%`}
             variant={avgUtilization > 80 ? 'warning' : 'info'}
+            tooltip="Percentage of datastore capacity in use. Above 80% should be monitored."
+            docSection="storage"
           />
         </Column>
 
@@ -190,6 +198,8 @@ export function StoragePage() {
             value={`${vmProvisionedTiB.toFixed(1)} TiB`}
             detail="Total allocated to VMs"
             variant="purple"
+            tooltip="Total storage capacity allocated (thin + thick provisioned) to VMs."
+            docSection="dashboard"
           />
         </Column>
 
@@ -199,6 +209,8 @@ export function StoragePage() {
             value={`${vmInUseTiB.toFixed(1)} TiB`}
             detail="Actually consumed"
             variant="primary"
+            tooltip="Actual storage consumed by VMs on datastores."
+            docSection="dashboard"
           />
         </Column>
 
@@ -208,6 +220,7 @@ export function StoragePage() {
             value={`${(vmProvisionedTiB - vmInUseTiB).toFixed(1)} TiB`}
             detail="Provisioned - In Use"
             variant="success"
+            tooltip="Storage saved through thin provisioning (difference between allocated and used)."
           />
         </Column>
 
@@ -217,6 +230,8 @@ export function StoragePage() {
             value={`${vmStorageEfficiency.toFixed(0)}%`}
             detail="In Use / Provisioned"
             variant="info"
+            tooltip="Percentage of provisioned storage that is actually in use."
+            docSection="dashboard"
           />
         </Column>
 

@@ -8,6 +8,7 @@ import { StoragePage } from '@/pages/StoragePage';
 import { NetworkPage } from '@/pages/NetworkPage';
 import { ClusterPage } from '@/pages/ClusterPage';
 import { HostsPage } from '@/pages/HostsPage';
+import { ResourcePoolPage } from '@/pages/ResourcePoolPage';
 import { ConfigPage } from '@/pages/ConfigPage';
 import { ROKSMigrationPage } from '@/pages/ROKSMigrationPage';
 import { VSIMigrationPage } from '@/pages/VSIMigrationPage';
@@ -15,6 +16,7 @@ import { PreFlightReportPage } from '@/pages/PreFlightReportPage';
 import { DiscoveryPage } from '@/pages/DiscoveryPage';
 import { TablesPage } from '@/pages/TablesPage';
 import { InfoPage } from '@/pages/InfoPage';
+import { DocumentationPage } from '@/pages/DocumentationPage';
 import { ROUTES } from '@/utils/constants';
 
 export const router = createBrowserRouter([
@@ -51,6 +53,10 @@ export const router = createBrowserRouter([
         element: <HostsPage />,
       },
       {
+        path: ROUTES.resourcePools.slice(1),
+        element: <ResourcePoolPage />,
+      },
+      {
         path: ROUTES.config.slice(1),
         element: <ConfigPage />,
       },
@@ -77,6 +83,10 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.info.slice(1),
         element: <InfoPage />,
+      },
+      {
+        path: ROUTES.documentation.slice(1),
+        element: <DocumentationPage />,
       },
       {
         path: '*',

@@ -1,23 +1,10 @@
-Use the following from vClusters to generate per clusters stats on the cluster tab: NumHosts	numEffectiveHosts	TotalCpu	NumCpuCores	NumCpuThreads	Effective Cpu	TotalMemory	Effective Memory
+Cluster Details table in Clusters: Datacenter is blank, VMS says 0, Effective CPU says 0.0 and Status says Unknown, recheck 
 
-Use the vRP info on a separate page called Resource
+Add all the metric cards, graphs etc on the Configuration Analysis page to Dashboard and remove the Configuration Analysis page
 
-Use info on the vSource tab of RVTools on the dashboard
+On the Network Page, it says 1,035 Disconnected NICs, Legacy Adapters (E1000) = 0 and VMXNET3 Adapters = 0. Recheck as the RVTools has a number of VMs with E1000 and VMXNET3 adapters
 
-Fix the column sort on the tables so that it works
+Ensure there are tool tips on every metric card on every page
 
-Detailed documentation available from the left hand navigation. This is where the tooltips urls navigate to. The documentation should be organised on a page basis e.g. dashboard, compute, storage etc and describe every aspect of the info described on that page, including the logic, formulas and definitions used
 
-Tool tips on all metric cards with brief description and a link to detailed documentation that opens in another browser window
-
-Fix wave planning, all the waves are 1 VM 
-
-Transfer all the info displayed in Configuration Analysis to Dashboard
-
-Rename Infrastructure Discovery to Workload Discovery
-
-In the network topology diagram, the VMs are not all shown and their names are not shown, also make the diagram as wide as the page
-
-On the Network Page, is there really 1,035 Disconnected NICs, Legacy Adapters (E1000) = 0 and VMXNET3 Adapters = 0
-
-Move Provisioned Storage next to In Use Storage on the Dashboard page
+Resource Pool Details table the following colums are blank: datacenter, cluster, 

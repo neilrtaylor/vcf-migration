@@ -6,6 +6,9 @@ import { ROUTES } from '@/utils/constants';
 import { formatNumber, formatMiB } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
 import { MetricCard, RedHatDocLinksGroup } from '@/components/common';
+import { EnhancedDataTable } from '@/components/tables';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { VClusterInfo } from '@/types';
 import './ClusterPage.scss';
 
 export function ClusterPage() {
@@ -139,6 +142,118 @@ export function ClusterPage() {
 
   // Cluster HA Risk - clusters with fewer than 3 hosts
   const clustersUnder3Hosts = clusters.filter(c => c.hostCount < 3);
+
+  // Cluster details table columns
+  const clusterColumns: ColumnDef<VClusterInfo, unknown>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Cluster Name',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'datacenter',
+      header: 'Datacenter',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'hostCount',
+      header: 'Hosts',
+      enableSorting: true,
+      cell: (info) => formatNumber(info.getValue() as number),
+    },
+    {
+      accessorKey: 'numEffectiveHosts',
+      header: 'Effective Hosts',
+      enableSorting: true,
+      cell: (info) => formatNumber(info.getValue() as number),
+    },
+    {
+      accessorKey: 'vmCount',
+      header: 'VMs',
+      enableSorting: true,
+      cell: (info) => formatNumber(info.getValue() as number),
+    },
+    {
+      accessorKey: 'numCpuCores',
+      header: 'CPU Cores',
+      enableSorting: true,
+      cell: (info) => formatNumber(info.getValue() as number),
+    },
+    {
+      accessorKey: 'numCpuThreads',
+      header: 'CPU Threads',
+      enableSorting: true,
+      cell: (info) => formatNumber(info.getValue() as number),
+    },
+    {
+      accessorKey: 'totalCpuMHz',
+      header: 'Total CPU (GHz)',
+      enableSorting: true,
+      cell: (info) => `${((info.getValue() as number) / 1000).toFixed(1)}`,
+    },
+    {
+      accessorKey: 'effectiveCpuMHz',
+      header: 'Effective CPU (GHz)',
+      enableSorting: true,
+      cell: (info) => `${((info.getValue() as number) / 1000).toFixed(1)}`,
+    },
+    {
+      accessorKey: 'totalMemoryMiB',
+      header: 'Total Memory',
+      enableSorting: true,
+      cell: (info) => formatMiB(info.getValue() as number, 0),
+    },
+    {
+      accessorKey: 'effectiveMemoryMiB',
+      header: 'Effective Memory',
+      enableSorting: true,
+      cell: (info) => formatMiB(info.getValue() as number, 0),
+    },
+    {
+      accessorKey: 'haEnabled',
+      header: 'HA',
+      enableSorting: true,
+      cell: (info) => (
+        <Tag type={info.getValue() ? 'green' : 'gray'} size="sm">
+          {info.getValue() ? 'Enabled' : 'Disabled'}
+        </Tag>
+      ),
+    },
+    {
+      accessorKey: 'drsEnabled',
+      header: 'DRS',
+      enableSorting: true,
+      cell: (info) => (
+        <Tag type={info.getValue() ? 'blue' : 'gray'} size="sm">
+          {info.getValue() ? 'Enabled' : 'Disabled'}
+        </Tag>
+      ),
+    },
+    {
+      accessorKey: 'evcMode',
+      header: 'EVC Mode',
+      enableSorting: true,
+      cell: (info) => info.getValue() || 'Disabled',
+    },
+    {
+      accessorKey: 'overallStatus',
+      header: 'Status',
+      enableSorting: true,
+      cell: (info) => {
+        const status = info.getValue() as string;
+        const statusColors: Record<string, 'green' | 'red' | 'gray' | 'high-contrast'> = {
+          'green': 'green',
+          'yellow': 'high-contrast',
+          'red': 'red',
+        };
+        return (
+          <Tag type={statusColors[status] || 'gray'} size="sm">
+            {status || 'Unknown'}
+          </Tag>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="cluster-page">
@@ -357,6 +472,25 @@ export function ClusterPage() {
             </Tile>
           </Column>
         )}
+
+        {/* Cluster Details Table */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="cluster-page__table-tile">
+            <EnhancedDataTable
+              data={clusters}
+              columns={clusterColumns}
+              title="Cluster Details"
+              description="Per-cluster resource statistics including hosts, CPU, memory, and configuration"
+              enableSearch
+              enablePagination
+              enableSorting
+              enableExport
+              enableColumnVisibility
+              defaultPageSize={25}
+              exportFilename="cluster-details"
+            />
+          </Tile>
+        </Column>
 
         {/* Documentation Links */}
         <Column lg={16} md={8} sm={4}>

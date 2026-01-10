@@ -156,20 +156,26 @@ export function NetworkTopology({
         }
       });
 
-    // Add labels for larger nodes
+    // Add labels for all nodes (including VMs)
+    // Filter to show labels for: switches, port groups, and VMs with value > 1 (multiple NICs)
+    const nodesWithLabels = nodesCopy.filter(n =>
+      n.type !== 'vm' || (n.value !== undefined && n.value > 1)
+    );
+
     const labels = g.append('g')
       .attr('class', 'labels')
       .selectAll('text')
-      .data(nodesCopy.filter(n => n.type !== 'vm'))
+      .data(nodesWithLabels)
       .enter()
       .append('text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .attr('dy', d => nodeSizes[d.type] + 12)
-      .attr('fill', '#525252')
-      .style('font-size', '10px')
+      .attr('fill', d => d.type === 'vm' ? '#0f62fe' : '#525252')
+      .style('font-size', d => d.type === 'vm' ? '9px' : '10px')
+      .style('font-weight', d => d.type === 'vm' ? '500' : 'normal')
       .style('pointer-events', 'none')
-      .text(d => d.name.length > 15 ? d.name.substring(0, 12) + '...' : d.name);
+      .text(d => d.name.length > 20 ? d.name.substring(0, 17) + '...' : d.name);
 
     // Update positions on each tick
     simulation.on('tick', () => {

@@ -173,6 +173,8 @@ export function ComputePage() {
             value={formatNumber(totalVCPUs)}
             detail={`${formatNumber(poweredOnVCPUs)} powered on`}
             variant="primary"
+            tooltip="Sum of all virtual CPU cores allocated across all VMs."
+            docSection="compute"
           />
         </Column>
 
@@ -182,6 +184,8 @@ export function ComputePage() {
             value={`${totalMemoryGiB.toFixed(0)} GiB`}
             detail={`${poweredOnMemoryGiB.toFixed(0)} GiB powered on`}
             variant="teal"
+            tooltip="Total memory allocated to all VMs."
+            docSection="compute"
           />
         </Column>
 
@@ -190,6 +194,8 @@ export function ComputePage() {
             label="Avg vCPUs/VM"
             value={(totalVCPUs / vms.length).toFixed(1)}
             variant="info"
+            tooltip="Mean number of vCPUs allocated across all VMs."
+            docSection="compute"
           />
         </Column>
 
@@ -198,6 +204,8 @@ export function ComputePage() {
             label="Avg Memory/VM"
             value={`${(totalMemoryGiB / vms.length).toFixed(1)} GiB`}
             variant="info"
+            tooltip="Mean memory allocated per VM."
+            docSection="compute"
           />
         </Column>
 

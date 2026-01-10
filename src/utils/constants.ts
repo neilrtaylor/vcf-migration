@@ -122,6 +122,8 @@ export const RECOMMENDED_SHEETS = [
   'vCluster',
   'vHost',
   'vDatastore',
+  'vRP',
+  'vSource',
 ] as const;
 
 // Navigation routes
@@ -133,6 +135,7 @@ export const ROUTES = {
   network: '/network',
   cluster: '/cluster',
   hosts: '/hosts',
+  resourcePools: '/resource-pools',
   config: '/config',
   roksMigration: '/roks-migration',
   vsiMigration: '/vsi-migration',
@@ -140,6 +143,7 @@ export const ROUTES = {
   discovery: '/discovery',
   tables: '/tables',
   info: '/info',
+  documentation: '/documentation',
 } as const;
 
 // Local storage keys

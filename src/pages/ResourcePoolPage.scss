@@ -1,0 +1,56 @@
+// Resource Pool page styles
+@use '@carbon/styles/scss/spacing';
+
+.resource-pool-page {
+  &__title {
+    font-size: 2rem;
+    font-weight: 400;
+    margin-bottom: spacing.$spacing-03;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__subtitle {
+    font-size: 1rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__chart-tile {
+    margin-bottom: spacing.$spacing-05;
+    min-height: 320px;
+  }
+
+  &__table-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__empty-tile {
+    padding: spacing.$spacing-06;
+    text-align: center;
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-04;
+      color: var(--cds-text-primary, #161616);
+    }
+
+    p {
+      color: var(--cds-text-secondary, #525252);
+      margin-bottom: spacing.$spacing-04;
+    }
+
+    ul {
+      text-align: left;
+      max-width: 600px;
+      margin: 0 auto spacing.$spacing-04;
+      padding-left: spacing.$spacing-05;
+
+      li {
+        margin-bottom: spacing.$spacing-02;
+        color: var(--cds-text-secondary, #525252);
+      }
+    }
+  }
+}

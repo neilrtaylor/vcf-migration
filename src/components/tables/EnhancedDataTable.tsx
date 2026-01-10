@@ -32,10 +32,11 @@ import {
 import { Download, ArrowUp, ArrowDown, ArrowsVertical, Column as ColumnIcon } from '@carbon/icons-react';
 import './EnhancedDataTable.scss';
 
-// Generic row type - use Record for flexibility
-export type TableRow = Record<string, unknown>;
+// Generic row type - use object for flexibility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TableRow = Record<string, any>;
 
-interface EnhancedDataTableProps<T extends TableRow> {
+interface EnhancedDataTableProps<T extends object> {
   data: T[];
   columns: ColumnDef<T, unknown>[];
   title?: string;
@@ -50,7 +51,7 @@ interface EnhancedDataTableProps<T extends TableRow> {
   exportFilename?: string;
 }
 
-export function EnhancedDataTable<T extends TableRow>({
+export function EnhancedDataTable<T extends object>({
   data,
   columns,
   title,
@@ -182,28 +183,37 @@ export function EnhancedDataTable<T extends TableRow>({
           <TableHead>
             {table.getHeaderGroups().map(headerGroup => (
               <CarbonTableRow key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <TableHeader
-                    key={header.id}
-                    onClick={enableSorting && header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
-                    className={enableSorting && header.column.getCanSort() ? 'enhanced-data-table__sortable-header' : ''}
-                  >
-                    <div className="enhanced-data-table__header-content">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {enableSorting && header.column.getCanSort() && (
-                        <span className="enhanced-data-table__sort-icon">
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ArrowUp size={16} />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ArrowDown size={16} />
-                          ) : (
-                            <ArrowsVertical size={16} />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </TableHeader>
-                ))}
+                {headerGroup.headers.map(header => {
+                  const canSort = enableSorting && header.column.getCanSort();
+                  const sortHandler = canSort ? header.column.getToggleSortingHandler() : undefined;
+                  const isSorted = header.column.getIsSorted();
+
+                  return (
+                    <TableHeader
+                      key={header.id}
+                      onClick={(e) => sortHandler && sortHandler(e)}
+                      className={`${canSort ? 'enhanced-data-table__sortable-header' : ''} ${isSorted ? 'enhanced-data-table__sorted' : ''}`}
+                      isSortable={canSort}
+                      isSortHeader={!!isSorted}
+                      sortDirection={isSorted === 'asc' ? 'ASC' : isSorted === 'desc' ? 'DESC' : 'NONE'}
+                    >
+                      <div className="enhanced-data-table__header-content">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {canSort && (
+                          <span className="enhanced-data-table__sort-icon">
+                            {isSorted === 'asc' ? (
+                              <ArrowUp size={16} />
+                            ) : isSorted === 'desc' ? (
+                              <ArrowDown size={16} />
+                            ) : (
+                              <ArrowsVertical size={16} />
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </TableHeader>
+                  );
+                })}
               </CarbonTableRow>
             ))}
           </TableHead>
@@ -259,7 +269,7 @@ export function EnhancedDataTable<T extends TableRow>({
 }
 
 // Helper to create column definitions
-export function createColumnHelper<T extends TableRow>() {
+export function createColumnHelper<T extends object>() {
   return {
     accessor: <K extends keyof T>(
       key: K,

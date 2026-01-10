@@ -21,10 +21,20 @@
     display: inline-flex;
     align-items: center;
     opacity: 0.5;
+    margin-left: $spacing-02;
 
     .enhanced-data-table__sortable-header:hover & {
       opacity: 1;
     }
+
+    .enhanced-data-table__sorted & {
+      opacity: 1;
+      color: var(--cds-link-primary);
+    }
+  }
+
+  &__sorted {
+    background-color: var(--cds-layer-selected-01);
   }
 
   &__empty {
