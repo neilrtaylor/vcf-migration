@@ -12,9 +12,11 @@ import {
   DataVolume,
   Network_3,
   SoftwareResourceCluster,
+  Chip,
   Settings,
   Kubernetes,
   VirtualMachine,
+  TaskComplete,
   Search,
   Table,
   Upload,
@@ -109,6 +111,16 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
         </SideNavLink>
 
         <SideNavLink
+          renderIcon={Chip}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.hosts, true)}
+          isActive={isActive(ROUTES.hosts)}
+          className={!hasData ? 'sidenav-link--disabled' : ''}
+        >
+          Hosts
+        </SideNavLink>
+
+        <SideNavLink
           renderIcon={Settings}
           href="#"
           onClick={(e) => handleNavClick(e, ROUTES.config, true)}
@@ -136,6 +148,16 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           className={!hasData ? 'sidenav-link--disabled' : ''}
         >
           VSI Migration
+        </SideNavLink>
+
+        <SideNavLink
+          renderIcon={TaskComplete}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.preflightReport, true)}
+          isActive={isActive(ROUTES.preflightReport)}
+          className={!hasData ? 'sidenav-link--disabled' : ''}
+        >
+          Pre-Flight Report
         </SideNavLink>
 
         <SideNavLink

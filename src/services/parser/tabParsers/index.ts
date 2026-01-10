@@ -11,4 +11,6 @@ export { parseVTools } from './vToolsParser';
 export { parseVCluster } from './vClusterParser';
 export { parseVHost } from './vHostParser';
 export { parseVLicense } from './vLicenseParser';
+export { parseVRP } from './vRPParser';
+export { parseVSource } from './vSourceParser';
 export * from './utils';

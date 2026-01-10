@@ -1,9 +1,9 @@
-// Cluster and Host analysis page
-import { Grid, Column, Tile } from '@carbon/react';
+// Cluster analysis page
+import { Grid, Column, Tile, Tag } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
-import { formatNumber, formatMiB, mibToGiB } from '@/utils/formatters';
+import { formatNumber, formatMiB } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart } from '@/components/charts';
 import { MetricCard, RedHatDocLinksGroup } from '@/components/common';
 import './ClusterPage.scss';
@@ -22,8 +22,12 @@ export function ClusterPage() {
   // Summary metrics
   const totalClusters = clusters.length;
   const totalHosts = hosts.length;
-  const totalCpuCores = hosts.reduce((sum, h) => sum + h.totalCpuCores, 0);
-  const totalMemoryMiB = hosts.reduce((sum, h) => sum + h.memoryMiB, 0);
+
+  // Cluster resource totals from vCluster data
+  const totalClusterCpuMHz = clusters.reduce((sum, c) => sum + c.totalCpuMHz, 0);
+  const effectiveClusterCpuMHz = clusters.reduce((sum, c) => sum + c.effectiveCpuMHz, 0);
+  const totalClusterMemoryMiB = clusters.reduce((sum, c) => sum + c.totalMemoryMiB, 0);
+  const effectiveClusterMemoryMiB = clusters.reduce((sum, c) => sum + c.effectiveMemoryMiB, 0);
 
   // HA/DRS Status
   const haEnabledClusters = clusters.filter(c => c.haEnabled).length;
@@ -39,43 +43,6 @@ export function ClusterPage() {
     { label: 'DRS Enabled', value: drsEnabledClusters },
     { label: 'DRS Disabled', value: totalClusters - drsEnabledClusters },
   ].filter(d => d.value > 0);
-
-  // ESXi version distribution
-  const esxiVersions = hosts.reduce((acc, host) => {
-    const version = host.esxiVersion || 'Unknown';
-    acc[version] = (acc[version] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const esxiVersionChartData = Object.entries(esxiVersions)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
-
-  // Host CPU model distribution
-  const cpuModels = hosts.reduce((acc, host) => {
-    // Simplify CPU model name for display
-    const model = host.cpuModel
-      ? host.cpuModel.replace(/\(R\)|\(TM\)|CPU|@.*/gi, '').trim().substring(0, 40)
-      : 'Unknown';
-    acc[model] = (acc[model] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const cpuModelChartData = Object.entries(cpuModels)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-
-  // Host vendor distribution
-  const hostVendors = hosts.reduce((acc, host) => {
-    const vendor = host.vendor || 'Unknown';
-    acc[vendor] = (acc[vendor] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const vendorChartData = Object.entries(hostVendors)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
 
   // Clusters by VM count
   const clustersByVmCount = clusters
@@ -135,120 +102,51 @@ export function ClusterPage() {
     }))
     .sort((a, b) => b.value - a.value);
 
-  // Top hosts by VM count
-  const topHostsByVmCount = hosts
-    .map(h => ({
-      label: `${h.name} (${h.cluster})`,
-      value: h.vmCount,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 15);
-
-  // Top hosts by memory
-  const topHostsByMemory = hosts
-    .map(h => ({
-      label: `${h.name}`,
-      value: Math.round(mibToGiB(h.memoryMiB)),
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 15);
-
-  // Top hosts by CPU cores
-  const topHostsByCores = hosts
-    .map(h => ({
-      label: `${h.name}`,
-      value: h.totalCpuCores,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 15);
-
-  // Host CPU utilization distribution
-  const cpuUtilBuckets = hosts.reduce((acc, host) => {
-    const utilPercent = host.cpuMHz > 0 ? (host.cpuUsageMHz / (host.cpuMHz * host.totalCpuCores)) * 100 : 0;
-    const bucket = utilPercent < 20 ? '0-20%' :
-                   utilPercent < 40 ? '20-40%' :
-                   utilPercent < 60 ? '40-60%' :
-                   utilPercent < 80 ? '60-80%' : '80-100%';
-    acc[bucket] = (acc[bucket] || 0) + 1;
+  // EVC Mode distribution
+  const evcModes = clusters.reduce((acc, cluster) => {
+    const mode = cluster.evcMode || 'Disabled';
+    acc[mode] = (acc[mode] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const cpuUtilChartData = ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
-    .map(bucket => ({
-      label: bucket,
-      value: cpuUtilBuckets[bucket] || 0,
-    }))
-    .filter(d => d.value > 0);
-
-  // Host memory utilization distribution
-  const memUtilBuckets = hosts.reduce((acc, host) => {
-    const utilPercent = host.memoryMiB > 0 ? (host.memoryUsageMiB / host.memoryMiB) * 100 : 0;
-    const bucket = utilPercent < 20 ? '0-20%' :
-                   utilPercent < 40 ? '20-40%' :
-                   utilPercent < 60 ? '40-60%' :
-                   utilPercent < 80 ? '60-80%' : '80-100%';
-    acc[bucket] = (acc[bucket] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const memUtilChartData = ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
-    .map(bucket => ({
-      label: bucket,
-      value: memUtilBuckets[bucket] || 0,
-    }))
-    .filter(d => d.value > 0);
-
-  // Sockets per host distribution
-  const socketsDistribution = hosts.reduce((acc, host) => {
-    const sockets = `${host.cpuSockets} socket${host.cpuSockets !== 1 ? 's' : ''}`;
-    acc[sockets] = (acc[sockets] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const socketsChartData = Object.entries(socketsDistribution)
+  const evcModeChartData = Object.entries(evcModes)
     .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => {
-      const aNum = parseInt(a.label);
-      const bNum = parseInt(b.label);
-      return aNum - bNum;
-    });
+    .sort((a, b) => b.value - a.value);
+
+  // DRS Behavior distribution
+  const drsBehaviors = clusters.filter(c => c.drsEnabled).reduce((acc, cluster) => {
+    const behavior = cluster.drsBehavior || 'Unknown';
+    acc[behavior] = (acc[behavior] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const drsBehaviorChartData = Object.entries(drsBehaviors)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
 
   // VM density metrics
-  const avgVmsPerHost = hosts.length > 0
-    ? (vms.length / hosts.length).toFixed(1)
-    : '0';
   const avgVmsPerCluster = clusters.length > 0
     ? (vms.length / clusters.length).toFixed(1)
     : '0';
+  const avgHostsPerCluster = clusters.length > 0
+    ? (totalHosts / clusters.length).toFixed(1)
+    : '0';
 
-  // Resource ratios
-  const totalVmCpus = vms.reduce((sum, vm) => sum + vm.cpus, 0);
-  const totalVmMemoryMiB = vms.reduce((sum, vm) => sum + vm.memory, 0);
-  const cpuOvercommitRatio = totalCpuCores > 0
-    ? (totalVmCpus / totalCpuCores).toFixed(2)
-    : 'N/A';
-  const memoryOvercommitRatio = totalMemoryMiB > 0
-    ? (totalVmMemoryMiB / totalMemoryMiB).toFixed(2)
-    : 'N/A';
+  // Cluster status summary
+  const clustersGreen = clusters.filter(c => c.overallStatus === 'green').length;
+  const clustersYellow = clusters.filter(c => c.overallStatus === 'yellow').length;
+  const clustersRed = clusters.filter(c => c.overallStatus === 'red').length;
 
-  // Health indicators
-  const hostsNotConnected = hosts.filter(h => h.connectionState !== 'connected').length;
-  const hostsHighCpuUtil = hosts.filter(h => {
-    const util = h.cpuMHz > 0 ? (h.cpuUsageMHz / (h.cpuMHz * h.totalCpuCores)) * 100 : 0;
-    return util > 80;
-  }).length;
-  const hostsHighMemUtil = hosts.filter(h => {
-    const util = h.memoryMiB > 0 ? (h.memoryUsageMiB / h.memoryMiB) * 100 : 0;
-    return util > 80;
-  }).length;
+  // Cluster HA Risk - clusters with fewer than 3 hosts
+  const clustersUnder3Hosts = clusters.filter(c => c.hostCount < 3);
 
   return (
     <div className="cluster-page">
       <Grid>
         <Column lg={16} md={8} sm={4}>
-          <h1 className="cluster-page__title">Cluster & Host Analysis</h1>
+          <h1 className="cluster-page__title">Cluster Analysis</h1>
           <p className="cluster-page__subtitle">
-            Physical infrastructure and cluster configuration analysis
+            Cluster configuration, HA/DRS status, and resource distribution
           </p>
         </Column>
 
@@ -266,25 +164,25 @@ export function ClusterPage() {
           <MetricCard
             label="Total Hosts"
             value={formatNumber(totalHosts)}
-            detail={`${avgVmsPerHost} VMs/host avg`}
+            detail={`${avgHostsPerCluster} hosts/cluster avg`}
             variant="info"
           />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="Total CPU Cores"
-            value={formatNumber(totalCpuCores)}
-            detail={`${cpuOvercommitRatio}:1 vCPU ratio`}
+            label="Total Cluster CPU"
+            value={`${Math.round(totalClusterCpuMHz / 1000)} GHz`}
+            detail={`${Math.round(effectiveClusterCpuMHz / 1000)} GHz effective`}
             variant="teal"
           />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="Total Memory"
-            value={formatMiB(totalMemoryMiB, 0)}
-            detail={`${memoryOvercommitRatio}:1 memory ratio`}
+            label="Total Cluster Memory"
+            value={formatMiB(totalClusterMemoryMiB, 0)}
+            detail={`${formatMiB(effectiveClusterMemoryMiB, 0)} effective`}
             variant="purple"
           />
         </Column>
@@ -317,84 +215,30 @@ export function ClusterPage() {
           </Tile>
         </Column>
 
-        {/* ESXi Version Distribution */}
-        <Column lg={8} md={8} sm={4}>
+        {/* DRS Behavior Distribution */}
+        {drsBehaviorChartData.length > 0 && (
+          <Column lg={8} md={8} sm={4}>
+            <Tile className="cluster-page__chart-tile">
+              <DoughnutChart
+                title="DRS Behavior"
+                subtitle="DRS automation level for enabled clusters"
+                data={drsBehaviorChartData}
+                height={280}
+                formatValue={(v) => `${v} cluster${v !== 1 ? 's' : ''}`}
+              />
+            </Tile>
+          </Column>
+        )}
+
+        {/* EVC Mode Distribution */}
+        <Column lg={drsBehaviorChartData.length > 0 ? 8 : 16} md={8} sm={4}>
           <Tile className="cluster-page__chart-tile">
             <DoughnutChart
-              title="ESXi Version Distribution"
-              subtitle="Host operating system versions"
-              data={esxiVersionChartData}
+              title="EVC Mode"
+              subtitle="Enhanced vMotion Compatibility mode"
+              data={evcModeChartData}
               height={280}
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Host Vendor Distribution */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <DoughnutChart
-              title="Host Hardware Vendors"
-              subtitle="Server manufacturer distribution"
-              data={vendorChartData}
-              height={280}
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* CPU Model Distribution */}
-        <Column lg={16} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <HorizontalBarChart
-              title="CPU Model Distribution"
-              subtitle="Processor types across hosts"
-              data={cpuModelChartData}
-              height={320}
-              valueLabel="Hosts"
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Socket Configuration */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <VerticalBarChart
-              title="Socket Configuration"
-              subtitle="CPU sockets per host"
-              data={socketsChartData}
-              height={280}
-              valueLabel="Hosts"
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* CPU Utilization Distribution */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <VerticalBarChart
-              title="Host CPU Utilization"
-              subtitle="Current CPU utilization distribution"
-              data={cpuUtilChartData}
-              height={280}
-              valueLabel="Hosts"
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Memory Utilization Distribution */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <VerticalBarChart
-              title="Host Memory Utilization"
-              subtitle="Current memory utilization distribution"
-              data={memUtilChartData}
-              height={280}
-              valueLabel="Hosts"
-              formatValue={(v) => `${v} host${v !== 1 ? 's' : ''}`}
+              formatValue={(v) => `${v} cluster${v !== 1 ? 's' : ''}`}
             />
           </Tile>
         </Column>
@@ -455,80 +299,64 @@ export function ClusterPage() {
           </Tile>
         </Column>
 
-        {/* Top Hosts by VM Count */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <HorizontalBarChart
-              title="Top 15 Hosts by VM Count"
-              subtitle="VM density per host"
-              data={topHostsByVmCount}
-              height={320}
-              valueLabel="VMs"
-              formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Top Hosts by Memory */}
-        <Column lg={8} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <HorizontalBarChart
-              title="Top 15 Hosts by Memory"
-              subtitle="Physical memory capacity"
-              data={topHostsByMemory}
-              height={320}
-              valueLabel="GiB"
-              formatValue={(v) => `${v} GiB`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Top Hosts by CPU Cores */}
-        <Column lg={16} md={8} sm={4}>
-          <Tile className="cluster-page__chart-tile">
-            <HorizontalBarChart
-              title="Top 15 Hosts by CPU Cores"
-              subtitle="Physical CPU core count"
-              data={topHostsByCores}
-              height={380}
-              valueLabel="Cores"
-              formatValue={(v) => `${v} core${v !== 1 ? 's' : ''}`}
-            />
-          </Tile>
-        </Column>
-
-        {/* Health indicators */}
+        {/* Cluster Health Status */}
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="Disconnected Hosts"
-            value={formatNumber(hostsNotConnected)}
-            variant={hostsNotConnected > 0 ? 'error' : 'success'}
+            label="Healthy Clusters"
+            value={formatNumber(clustersGreen)}
+            variant="success"
           />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="High CPU (>80%)"
-            value={formatNumber(hostsHighCpuUtil)}
-            variant={hostsHighCpuUtil > 0 ? 'warning' : 'success'}
+            label="Warning Status"
+            value={formatNumber(clustersYellow)}
+            variant={clustersYellow > 0 ? 'warning' : 'success'}
           />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="High Memory (>80%)"
-            value={formatNumber(hostsHighMemUtil)}
-            variant={hostsHighMemUtil > 0 ? 'warning' : 'success'}
+            label="Critical Status"
+            value={formatNumber(clustersRed)}
+            variant={clustersRed > 0 ? 'error' : 'success'}
           />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
           <MetricCard
-            label="Hyperthreading Enabled"
-            value={formatNumber(hosts.filter(h => h.hyperthreading).length)}
+            label="HA Failover Level"
+            value={clusters.length > 0 ? Math.max(...clusters.map(c => c.haFailoverLevel)).toString() : 'N/A'}
+            detail="Maximum configured"
             variant="info"
           />
         </Column>
+
+        {/* Cluster HA Risk - Clusters with fewer than 3 hosts */}
+        {clustersUnder3Hosts.length > 0 && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="cluster-page__risk-tile">
+              <h4>Cluster HA Risk</h4>
+              <p className="cluster-page__risk-description">
+                Clusters with fewer than 3 hosts may not provide adequate failover capacity for high availability.
+                Consider consolidating workloads or adding hosts before migration.
+              </p>
+              <div className="cluster-page__risk-list">
+                {clustersUnder3Hosts.map((cluster) => (
+                  <div key={cluster.name} className="cluster-page__risk-item">
+                    <span className="cluster-page__risk-name">{cluster.name}</span>
+                    <div className="cluster-page__risk-tags">
+                      <Tag type="red" size="sm">{cluster.hostCount} host{cluster.hostCount !== 1 ? 's' : ''}</Tag>
+                      <Tag type="gray" size="sm">{cluster.vmCount} VMs</Tag>
+                      {!cluster.haEnabled && <Tag type="magenta" size="sm">HA Disabled</Tag>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Tile>
+          </Column>
+        )}
 
         {/* Documentation Links */}
         <Column lg={16} md={8} sm={4}>

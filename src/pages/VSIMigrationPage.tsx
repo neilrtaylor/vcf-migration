@@ -58,6 +58,19 @@ export function VSIMigrationPage() {
   const disks = rawData.vDisk;
   const networks = rawData.vNetwork;
 
+  // Create case-insensitive network lookup map for reliable VM matching
+  const networksByVMName = useMemo(() => {
+    const map = new Map<string, typeof networks>();
+    networks.forEach(n => {
+      const key = n.vmName.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(n);
+    });
+    return map;
+  }, [networks]);
+
   // ===== PRE-FLIGHT CHECKS =====
   // VPC VSI Limits (from IBM Cloud documentation)
   const VPC_BOOT_DISK_MAX_GB = 250;
@@ -236,7 +249,7 @@ export function VSIMigrationPage() {
     if (compat.status === 'unsupported') score += 40;
     else if (compat.status === 'community') score += 15;
 
-    const vmNics = networks.filter(n => n.vmName === vm.vmName).length;
+    const vmNics = (networksByVMName.get(vm.vmName.toLowerCase()) || []).length;
     if (vmNics > 3) score += 25;
     else if (vmNics > 1) score += 10;
 
@@ -315,8 +328,8 @@ export function VSIMigrationPage() {
     const toolStatus = toolsMap.get(vm.vmName);
     const noTools = !toolStatus || toolStatus.toolsStatus === 'toolsNotInstalled';
 
-    // Get primary network info for network-based wave planning
-    const vmNetworks = networks.filter(n => n.vmName === vm.vmName);
+    // Get primary network info for network-based wave planning (case-insensitive lookup)
+    const vmNetworks = networksByVMName.get(vm.vmName.toLowerCase()) || [];
     const primaryNetwork = vmNetworks[0];
     const networkName = primaryNetwork?.networkName || 'No Network';
     const ipAddress = primaryNetwork?.ipv4Address || '';

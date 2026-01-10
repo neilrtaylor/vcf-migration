@@ -1,0 +1,167 @@
+// Pre-Flight Report page styles
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.preflight-report-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: theme.$text-primary;
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-06;
+  }
+
+  &__controls {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    background-color: theme.$layer-accent-01;
+  }
+
+  &__controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: spacing.$spacing-05;
+  }
+
+  &__mode-switcher {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-04;
+    flex: 1;
+    min-width: 300px;
+  }
+
+  &__filters {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-04;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    margin-left: auto;
+  }
+
+  &__label {
+    @include type.type-style('label-01');
+    color: theme.$text-secondary;
+    white-space: nowrap;
+  }
+
+  &__legend {
+    padding: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-05;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: spacing.$spacing-05;
+  }
+
+  &__legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: spacing.$spacing-05;
+  }
+
+  &__legend-item {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-02;
+
+    span:last-child {
+      @include type.type-style('body-compact-01');
+      color: theme.$text-primary;
+    }
+  }
+
+  &__legend-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+
+    &--pass {
+      background-color: rgba(36, 161, 72, 0.15);
+      border: 2px solid #24a148;
+    }
+
+    &--fail {
+      background-color: rgba(218, 30, 40, 0.15);
+      border: 2px solid #da1e28;
+    }
+
+    &--warn {
+      background-color: rgba(241, 194, 27, 0.15);
+      border: 2px solid #f1c21b;
+    }
+
+    &--na {
+      background-color: var(--cds-layer-02, #f4f4f4);
+      border: 2px solid var(--cds-text-secondary, #525252);
+    }
+  }
+
+  &__legend-hint {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+    margin-left: auto;
+    font-style: italic;
+  }
+
+  &__table {
+    margin-bottom: spacing.$spacing-07;
+
+    // Make table horizontally scrollable for many columns
+    :global(.cds--data-table-content) {
+      overflow-x: auto;
+    }
+
+    // Compact cell styling for check columns
+    :global(.cds--data-table) {
+      td {
+        padding: spacing.$spacing-03;
+        vertical-align: middle;
+      }
+
+      // Make check columns narrower
+      th:not(:nth-child(-n + 4)),
+      td:not(:nth-child(-n + 4)) {
+        min-width: 70px;
+        max-width: 80px;
+        text-align: center;
+      }
+
+      // Keep VM name column wider
+      th:first-child,
+      td:first-child {
+        min-width: 200px;
+        max-width: 250px;
+      }
+
+      // Cluster and Guest OS columns
+      th:nth-child(2),
+      td:nth-child(2),
+      th:nth-child(3),
+      td:nth-child(3) {
+        min-width: 100px;
+        max-width: 150px;
+      }
+
+      // Status column
+      th:nth-child(4),
+      td:nth-child(4) {
+        min-width: 100px;
+        max-width: 120px;
+      }
+    }
+  }
+}

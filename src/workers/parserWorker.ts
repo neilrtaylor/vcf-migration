@@ -143,6 +143,7 @@ async function parseFile(arrayBuffer: ArrayBuffer, fileName: string): Promise<vo
       vResourcePool: [],
       vLicense: [],
       vHealth: [],
+      vSource: [],
     };
 
     postProgress({

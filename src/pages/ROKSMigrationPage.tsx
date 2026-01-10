@@ -54,6 +54,19 @@ export function ROKSMigrationPage() {
   const vMemory = rawData.vMemory;
   const networks = rawData.vNetwork;
 
+  // Create case-insensitive network lookup map for reliable VM matching
+  const networksByVMName = useMemo(() => {
+    const map = new Map<string, typeof networks>();
+    networks.forEach(n => {
+      const key = n.vmName.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(n);
+    });
+    return map;
+  }, [networks]);
+
   // ===== PRE-FLIGHT CHECKS =====
 
   // VMware Tools checks
@@ -267,8 +280,8 @@ export function ROKSMigrationPage() {
     const toolStatus = toolsMap.get(vm.vmName);
     const noTools = !toolStatus || toolStatus.toolsStatus === 'toolsNotInstalled';
 
-    // Get network info for this VM
-    const vmNetworks = networks.filter(n => n.vmName === vm.vmName);
+    // Get network info for this VM (case-insensitive lookup)
+    const vmNetworks = networksByVMName.get(vm.vmName.toLowerCase()) || [];
     const primaryNetwork = vmNetworks[0];
     const networkName = primaryNetwork?.networkName || 'No Network';
     const ipAddress = primaryNetwork?.ipv4Address || '';

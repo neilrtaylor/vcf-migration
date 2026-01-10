@@ -14,6 +14,8 @@ import {
   parseVCluster,
   parseVHost,
   parseVLicense,
+  parseVRP,
+  parseVSource,
 } from './tabParsers';
 import { REQUIRED_SHEETS, RECOMMENDED_SHEETS } from '@/utils/constants';
 
@@ -158,6 +160,16 @@ export async function parseRVToolsFile(
       ? parseVLicense(workbook.Sheets['vLicense'])
       : [];
 
+    reportProgress('vRP');
+    const vResourcePool = sheetNames.includes('vRP')
+      ? parseVRP(workbook.Sheets['vRP'])
+      : [];
+
+    reportProgress('vSource');
+    const vSource = sheetNames.includes('vSource')
+      ? parseVSource(workbook.Sheets['vSource'])
+      : [];
+
     // Phase 3: Validate data
     onProgress?.({
       phase: 'validating',
@@ -187,9 +199,10 @@ export async function parseRVToolsFile(
       vCluster,
       vHost,
       vDatastore,
-      vResourcePool: [], // TODO: Add parser if needed
+      vResourcePool,
       vLicense,
       vHealth: [], // TODO: Add parser if needed
+      vSource,
     };
 
     // Phase 4: Complete

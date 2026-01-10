@@ -1,4 +1,5 @@
 // Export common components
+export { CheckResultCell } from './CheckResultCell';
 export { ErrorBoundary } from './ErrorBoundary';
 export { FilterBadge } from './FilterBadge';
 export { LoadingSkeleton } from './LoadingSkeleton';

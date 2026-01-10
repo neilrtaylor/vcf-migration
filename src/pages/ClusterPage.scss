@@ -84,4 +84,48 @@
     margin-bottom: spacing.$spacing-05;
     background-color: var(--cds-layer-accent-01);
   }
+
+  &__risk-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+    border-left: 4px solid #da1e28;
+
+    h4 {
+      margin-bottom: spacing.$spacing-03;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+  }
+
+  &__risk-description {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__risk-list {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-03;
+  }
+
+  &__risk-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: spacing.$spacing-03;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+  }
+
+  &__risk-name {
+    font-size: 0.875rem;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__risk-tags {
+    display: flex;
+    gap: spacing.$spacing-02;
+    flex-wrap: wrap;
+  }
 }

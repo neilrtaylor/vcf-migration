@@ -5,6 +5,8 @@ import { mibToGiB, formatHardwareVersion, getHardwareVersionNumber } from '@/uti
 import { HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import osCompatibilityData from '@/data/redhatOSCompatibility.json';
 import ibmCloudProfiles from '@/data/ibmCloudProfiles.json';
+import type { VMCheckResults, CheckMode } from '@/services/preflightChecks';
+import { getChecksForMode } from '@/services/preflightChecks';
 
 // OS Compatibility lookup
 function getOSCompatibility(guestOS: string) {
@@ -286,5 +288,144 @@ export function generateExcelReport(rawData: RVToolsData): XLSX.WorkBook {
 
 export function downloadExcel(rawData: RVToolsData, filename = 'rvtools-analysis.xlsx'): void {
   const workbook = generateExcelReport(rawData);
+  XLSX.writeFile(workbook, filename);
+}
+
+// Pre-flight check Excel export
+export function exportPreFlightExcel(
+  results: VMCheckResults[],
+  mode: CheckMode
+): void {
+  const checksForMode = getChecksForMode(mode);
+  const workbook = XLSX.utils.book_new();
+
+  // ===== Main Results Sheet =====
+  const headers = [
+    'VM Name',
+    'Cluster',
+    'Host',
+    'Guest OS',
+    'Blockers',
+    'Warnings',
+    'Status',
+    ...checksForMode.map((c) => c.name),
+  ];
+
+  const rows = results.map((r) => [
+    r.vmName,
+    r.cluster,
+    r.host,
+    r.guestOS,
+    r.blockerCount,
+    r.warningCount,
+    r.blockerCount > 0 ? 'Blocked' : r.warningCount > 0 ? 'Warnings' : 'Ready',
+    ...checksForMode.map((c) => {
+      const result = r.checks[c.id];
+      if (!result) return 'N/A';
+      if (result.status === 'pass') return 'PASS';
+      if (result.status === 'fail') {
+        const details = result.message || (result.value !== undefined ? `Value: ${result.value}` : '');
+        return details ? `FAIL - ${details}` : 'FAIL';
+      }
+      if (result.status === 'warn') {
+        const details = result.message || (result.value !== undefined ? `Value: ${result.value}` : '');
+        return details ? `WARN - ${details}` : 'WARN';
+      }
+      return 'N/A';
+    }),
+  ]);
+
+  const mainSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Set column widths
+  mainSheet['!cols'] = [
+    { wch: 40 }, // VM Name
+    { wch: 20 }, // Cluster
+    { wch: 20 }, // Host
+    { wch: 35 }, // Guest OS
+    { wch: 10 }, // Blockers
+    { wch: 10 }, // Warnings
+    { wch: 12 }, // Status
+    ...checksForMode.map(() => ({ wch: 30 })),
+  ];
+
+  XLSX.utils.book_append_sheet(workbook, mainSheet, `${mode.toUpperCase()} Pre-Flight`);
+
+  // ===== Summary Sheet =====
+  const vmsWithBlockers = results.filter((r) => r.blockerCount > 0).length;
+  const vmsWithWarningsOnly = results.filter((r) => r.warningCount > 0 && r.blockerCount === 0).length;
+  const vmsReady = results.filter((r) => r.blockerCount === 0 && r.warningCount === 0).length;
+
+  const summaryData = [
+    ['Pre-Flight Check Summary', ''],
+    [''],
+    ['Report Details', ''],
+    ['Generated', new Date().toLocaleString()],
+    ['Target Platform', mode.toUpperCase()],
+    ['Total Checks per VM', checksForMode.length],
+    [''],
+    ['VM Summary', ''],
+    ['Total VMs Analyzed', results.length],
+    ['VMs with Blockers', vmsWithBlockers],
+    ['VMs with Warnings Only', vmsWithWarningsOnly],
+    ['VMs Ready to Migrate', vmsReady],
+    ['Readiness Percentage', `${((vmsReady / results.length) * 100).toFixed(1)}%`],
+    [''],
+    ['Check Failure Summary', ''],
+    ['Check Name', 'Failures', 'Severity'],
+    ...checksForMode.map((c) => [
+      c.name,
+      results.filter((r) => r.checks[c.id]?.status === 'fail' || r.checks[c.id]?.status === 'warn').length,
+      c.severity.charAt(0).toUpperCase() + c.severity.slice(1),
+    ]),
+  ];
+
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+  summarySheet['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 15 }];
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+  // ===== Blockers Only Sheet =====
+  const blockedVMs = results.filter((r) => r.blockerCount > 0);
+  if (blockedVMs.length > 0) {
+    const blockerHeaders = ['VM Name', 'Cluster', 'Guest OS', 'Blocker Count', 'Blocking Checks'];
+    const blockerRows = blockedVMs.map((r) => {
+      const blockingChecks = checksForMode
+        .filter((c) => c.severity === 'blocker' && r.checks[c.id]?.status === 'fail')
+        .map((c) => c.name)
+        .join(', ');
+      return [r.vmName, r.cluster, r.guestOS, r.blockerCount, blockingChecks];
+    });
+
+    const blockerSheet = XLSX.utils.aoa_to_sheet([blockerHeaders, ...blockerRows]);
+    blockerSheet['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 60 }];
+    XLSX.utils.book_append_sheet(workbook, blockerSheet, 'Blocked VMs');
+  }
+
+  // ===== Check Definitions Sheet =====
+  const checkDefHeaders = ['Check ID', 'Check Name', 'Short Name', 'Category', 'Severity', 'Description', 'Applies To'];
+  const checkDefRows = checksForMode.map((c) => [
+    c.id,
+    c.name,
+    c.shortName,
+    c.category.charAt(0).toUpperCase() + c.category.slice(1),
+    c.severity.charAt(0).toUpperCase() + c.severity.slice(1),
+    c.description,
+    c.modes.map((m) => m.toUpperCase()).join(', '),
+  ]);
+
+  const checkDefSheet = XLSX.utils.aoa_to_sheet([checkDefHeaders, ...checkDefRows]);
+  checkDefSheet['!cols'] = [
+    { wch: 20 },
+    { wch: 30 },
+    { wch: 15 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 60 },
+    { wch: 15 },
+  ];
+  XLSX.utils.book_append_sheet(workbook, checkDefSheet, 'Check Definitions');
+
+  // Download the file
+  const filename = `preflight-report-${mode}-${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, filename);
 }

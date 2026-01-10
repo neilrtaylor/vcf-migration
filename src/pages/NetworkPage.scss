@@ -84,4 +84,22 @@
     margin-bottom: spacing.$spacing-05;
     background-color: var(--cds-layer-accent-01);
   }
+
+  &__table-tile {
+    padding: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__table-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__table-subtitle {
+    font-size: 0.875rem;
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-04;
+  }
 }

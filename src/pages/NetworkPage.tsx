@@ -1,4 +1,5 @@
 // Network analysis page
+import { useMemo } from 'react';
 import { Grid, Column, Tile } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData } from '@/hooks';
@@ -7,6 +8,8 @@ import { formatNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, VerticalBarChart, Sunburst, NetworkTopology } from '@/components/charts';
 import type { HierarchyNode, TopologyNode, TopologyLink } from '@/components/charts';
 import { MetricCard, RedHatDocLinksGroup } from '@/components/common';
+import { EnhancedDataTable } from '@/components/tables';
+import type { ColumnDef } from '@tanstack/react-table';
 import './NetworkPage.scss';
 
 export function NetworkPage() {
@@ -22,15 +25,25 @@ export function NetworkPage() {
   // Calculate network metrics
   const uniqueNetworks = new Set(networks.map(n => n.networkName)).size;
   const uniqueSwitches = new Set(networks.map(n => n.switchName).filter(Boolean)).size;
-  const connectedNICs = networks.filter(n => n.connected).length;
-  const disconnectedNICs = networks.filter(n => !n.connected).length;
 
-  // NIC adapter type distribution
+  // Check if we have meaningful connected data (at least some NICs have connected=true)
+  // If no NICs are connected, the Connected column might be missing from the RVTools export
+  const hasConnectedData = networks.some(n => n.connected === true);
+  const connectedNICs = networks.filter(n => n.connected).length;
+  const disconnectedNICs = hasConnectedData ? networks.filter(n => !n.connected).length : 0;
+
+  // NIC adapter type distribution (normalize to handle case variations)
   const adapterTypes = networks.reduce((acc, nic) => {
     const type = nic.adapterType || 'Unknown';
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  // Case-insensitive adapter type counts for display
+  const vmxnet3Count = networks.filter(n =>
+    n.adapterType?.toLowerCase().includes('vmxnet3') ||
+    n.adapterType?.toLowerCase().includes('vmxnet 3')
+  ).length;
 
   const adapterChartData = Object.entries(adapterTypes)
     .map(([label, value]) => ({ label, value }))
@@ -81,11 +94,140 @@ export function NetworkPage() {
       value: vm.nicCount,
     }));
 
-  // Connection status
-  const connectionStatus = [
-    { label: 'Connected', value: connectedNICs },
-    { label: 'Disconnected', value: disconnectedNICs },
-  ].filter(d => d.value > 0);
+  // Network Summary Table: Port groups with VM counts and IP subnet guessing
+  interface NetworkSummaryRow {
+    [key: string]: unknown;
+    portGroup: string;
+    vSwitch: string;
+    vmCount: number;
+    nicCount: number;
+    guessedSubnet: string;
+    sampleIPs: string;
+  }
+
+  const networkSummaryData = useMemo(() => {
+    // Group NICs by port group
+    const portGroupMap = new Map<string, {
+      vSwitch: string;
+      vmNames: Set<string>;
+      nicCount: number;
+      ips: string[];
+    }>();
+
+    networks.forEach(nic => {
+      const pg = nic.networkName || 'Unknown';
+      if (!portGroupMap.has(pg)) {
+        portGroupMap.set(pg, {
+          vSwitch: nic.switchName || 'Unknown',
+          vmNames: new Set(),
+          nicCount: 0,
+          ips: [],
+        });
+      }
+      const data = portGroupMap.get(pg)!;
+      data.vmNames.add(nic.vmName);
+      data.nicCount++;
+      if (nic.ipv4Address) {
+        data.ips.push(nic.ipv4Address);
+      }
+    });
+
+    // Convert to array and guess subnets
+    const result: NetworkSummaryRow[] = [];
+    portGroupMap.forEach((data, portGroup) => {
+      // Simple subnet guessing: find most common first 3 octets
+      let guessedSubnet = 'N/A';
+      if (data.ips.length > 0) {
+        const prefixCounts = new Map<string, number>();
+        data.ips.forEach(ip => {
+          const parts = ip.split('.');
+          if (parts.length >= 3) {
+            const prefix = `${parts[0]}.${parts[1]}.${parts[2]}`;
+            prefixCounts.set(prefix, (prefixCounts.get(prefix) || 0) + 1);
+          }
+        });
+        // Find most common prefix
+        let maxCount = 0;
+        let mostCommonPrefix = '';
+        prefixCounts.forEach((count, prefix) => {
+          if (count > maxCount) {
+            maxCount = count;
+            mostCommonPrefix = prefix;
+          }
+        });
+        if (mostCommonPrefix) {
+          guessedSubnet = `${mostCommonPrefix}.0/24`;
+        }
+      }
+
+      result.push({
+        portGroup,
+        vSwitch: data.vSwitch,
+        vmCount: data.vmNames.size,
+        nicCount: data.nicCount,
+        guessedSubnet,
+        sampleIPs: data.ips.slice(0, 3).join(', ') || 'N/A',
+      });
+    });
+
+    return result.sort((a, b) => b.vmCount - a.vmCount);
+  }, [networks]);
+
+  const networkSummaryColumns: ColumnDef<NetworkSummaryRow>[] = useMemo(() => [
+    { accessorKey: 'portGroup', header: 'Port Group' },
+    { accessorKey: 'vSwitch', header: 'vSwitch' },
+    { accessorKey: 'vmCount', header: 'VMs' },
+    { accessorKey: 'nicCount', header: 'NICs' },
+    { accessorKey: 'guessedSubnet', header: 'Subnet (Guess)' },
+    { accessorKey: 'sampleIPs', header: 'Sample IPs' },
+  ], []);
+
+  // Multi-NIC VMs Table: VMs with more than 1 NIC
+  interface MultiNicVMRow {
+    [key: string]: unknown;
+    vmName: string;
+    nicCount: number;
+    networks: string;
+    powerState: string;
+    cluster: string;
+  }
+
+  const multiNicVMData = useMemo(() => {
+    const result: MultiNicVMRow[] = [];
+    const multiNicVMs = vmNicCounts.filter(vm => vm.nicCount > 1);
+
+    multiNicVMs.forEach(({ vmName, nicCount }) => {
+      const vmInfo = vms.find(v => v.vmName === vmName);
+      const vmNetworks = networks.filter(n => n.vmName.toLowerCase() === vmName.toLowerCase());
+      const uniqueNetworkNames = [...new Set(vmNetworks.map(n => n.networkName))];
+
+      result.push({
+        vmName,
+        nicCount,
+        networks: uniqueNetworkNames.join(', '),
+        powerState: vmInfo?.powerState || 'Unknown',
+        cluster: vmInfo?.cluster || 'Unknown',
+      });
+    });
+
+    return result.sort((a, b) => b.nicCount - a.nicCount);
+  }, [vmNicCounts, vms, networks]);
+
+  const multiNicVMColumns: ColumnDef<MultiNicVMRow>[] = useMemo(() => [
+    { accessorKey: 'vmName', header: 'VM Name' },
+    { accessorKey: 'nicCount', header: 'NIC Count' },
+    { accessorKey: 'networks', header: 'Connected Networks' },
+    { accessorKey: 'powerState', header: 'Power State' },
+    { accessorKey: 'cluster', header: 'Cluster' },
+  ], []);
+
+  // Connection status - only show if we have meaningful connected data
+  const connectionStatus = hasConnectedData
+    ? [
+        { label: 'Connected', value: connectedNICs },
+        { label: 'Disconnected', value: disconnectedNICs },
+      ].filter(d => d.value > 0)
+    : [{ label: 'No connection data', value: networks.length }];
 
   // Legacy adapter detection (E1000 on modern systems)
   const legacyAdapters = networks.filter(n =>
@@ -218,7 +360,7 @@ export function NetworkPage() {
           <MetricCard
             label="Total NICs"
             value={formatNumber(networks.length)}
-            detail={`${formatNumber(connectedNICs)} connected`}
+            detail={hasConnectedData ? `${formatNumber(connectedNICs)} connected` : undefined}
             variant="primary"
           />
         </Column>
@@ -343,9 +485,11 @@ export function NetworkPage() {
 
         {/* Health indicators */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`network-page__secondary-tile ${disconnectedNICs > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
+          <Tile className={`network-page__secondary-tile ${hasConnectedData && disconnectedNICs > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
             <span className="network-page__metric-label">Disconnected NICs</span>
-            <span className="network-page__secondary-value">{formatNumber(disconnectedNICs)}</span>
+            <span className="network-page__secondary-value">
+              {hasConnectedData ? formatNumber(disconnectedNICs) : 'No data'}
+            </span>
           </Tile>
         </Column>
 
@@ -367,10 +511,40 @@ export function NetworkPage() {
           <Tile className="network-page__secondary-tile">
             <span className="network-page__metric-label">VMXNET3 Adapters</span>
             <span className="network-page__secondary-value">
-              {formatNumber(adapterTypes['Vmxnet3'] || adapterTypes['VMXNET3'] || 0)}
+              {formatNumber(vmxnet3Count)}
             </span>
           </Tile>
         </Column>
+
+        {/* Network Summary Table */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="network-page__table-tile">
+            <h4 className="network-page__table-title">Network Summary</h4>
+            <p className="network-page__table-subtitle">Port groups with VM counts and estimated IP subnets</p>
+            <EnhancedDataTable
+              data={networkSummaryData}
+              columns={networkSummaryColumns}
+              defaultPageSize={10}
+            />
+          </Tile>
+        </Column>
+
+        {/* Multi-NIC VMs Table */}
+        {multiNicVMData.length > 0 && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="network-page__table-tile">
+              <h4 className="network-page__table-title">VMs with Multiple NICs</h4>
+              <p className="network-page__table-subtitle">
+                {formatNumber(multiNicVMData.length)} VMs with 2 or more network adapters
+              </p>
+              <EnhancedDataTable
+                data={multiNicVMData}
+                columns={multiNicVMColumns}
+                defaultPageSize={10}
+              />
+            </Tile>
+          </Column>
+        )}
 
         {/* Documentation Links */}
         <Column lg={16} md={8} sm={4}>

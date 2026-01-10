@@ -293,6 +293,18 @@ export interface VHealthInfo {
   timestamp: Date;
 }
 
+export interface VSourceInfo {
+  server: string;
+  ipAddress: string | null;
+  version: string | null;
+  build: string | null;
+  osType: string | null;
+  apiVersion: string | null;
+  instanceUuid: string | null;
+  serverTime: Date | null;
+  fullName: string | null;
+}
+
 // Main data container
 export interface RVToolsData {
   metadata: RVToolsMetadata;
@@ -311,6 +323,7 @@ export interface RVToolsData {
   vResourcePool: VResourcePoolInfo[];
   vLicense: VLicenseInfo[];
   vHealth: VHealthInfo[];
+  vSource: VSourceInfo[];
 }
 
 // Power state helper type

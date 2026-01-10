@@ -1,0 +1,83 @@
+// Check result cell styles
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.check-result-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+
+  &--pass {
+    color: var(--cds-support-success, #24a148);
+    background: rgba(36, 161, 72, 0.15);
+  }
+
+  &--fail {
+    color: var(--cds-support-error, #da1e28);
+    background: rgba(218, 30, 40, 0.15);
+  }
+
+  &--warn {
+    color: var(--cds-support-warning, #f1c21b);
+    background: rgba(241, 194, 27, 0.15);
+  }
+
+  &--na {
+    color: var(--cds-text-secondary, #525252);
+    background: var(--cds-layer-02, #f4f4f4);
+  }
+
+  &__tooltip {
+    max-width: 300px;
+  }
+}
+
+// Tooltip content - uses light text on dark Carbon tooltip background
+.check-result-tooltip {
+  text-align: left;
+
+  strong {
+    @include type.type-style('heading-compact-01');
+    display: block;
+    margin-bottom: spacing.$spacing-02;
+    color: #ffffff;
+  }
+
+  &__description {
+    @include type.type-style('body-compact-01');
+    color: #c6c6c6; // Light gray for readability on dark bg
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-02;
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__severity,
+  &__value,
+  &__threshold {
+    @include type.type-style('label-01');
+    color: #e0e0e0; // Light gray for labels
+  }
+
+  &__message {
+    @include type.type-style('helper-text-01');
+    color: #ffffff;
+    margin-top: spacing.$spacing-02;
+    padding-top: spacing.$spacing-02;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    font-style: italic;
+  }
+}

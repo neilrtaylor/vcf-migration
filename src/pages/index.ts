@@ -5,6 +5,7 @@ export { ComputePage } from './ComputePage';
 export { StoragePage } from './StoragePage';
 export { NetworkPage } from './NetworkPage';
 export { ClusterPage } from './ClusterPage';
+export { HostsPage } from './HostsPage';
 export { ConfigPage } from './ConfigPage';
 export { ROKSMigrationPage } from './ROKSMigrationPage';
 export { VSIMigrationPage } from './VSIMigrationPage';

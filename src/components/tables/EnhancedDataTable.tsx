@@ -102,7 +102,7 @@ export function EnhancedDataTable<T extends TableRow>({
       return typeof header === 'string' ? header : String(col.id || '');
     });
 
-    const rows = table.getFilteredRowModel().rows.map(row => {
+    const rows = table.getSortedRowModel().rows.map(row => {
       return visibleColumns.map(col => {
         const value = row.getValue(col.id);
         // Handle different value types
