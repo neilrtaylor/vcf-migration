@@ -17,7 +17,7 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'Overall Status': 'overallStatus',
   'Overall status': 'overallStatus',
   'OverallStatus': 'overallStatus',
-  // VM Count
+  // VM Count - note: may not be present in all RVTools exports
   '# VMs': 'vmCount',
   '# VMs total': 'vmCount',
   'VMs': 'vmCount',
@@ -40,6 +40,7 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'Total CPU': 'totalCpuMHz',
   'Total CPU MHz': 'totalCpuMHz',
   'TotalCpu': 'totalCpuMHz',
+  'TotalCPU': 'totalCpuMHz',
   'Total CPU (MHz)': 'totalCpuMHz',
   // CPU Cores
   '# CPU Cores': 'numCpuCores',
@@ -53,8 +54,9 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'NumCpuThreads': 'numCpuThreads',
   'Num CPU Threads': 'numCpuThreads',
   '# Threads': 'numCpuThreads',
-  // Effective CPU
+  // Effective CPU - RVTools uses "Effective Cpu" with space
   'Effective CPU': 'effectiveCpuMHz',
+  'Effective Cpu': 'effectiveCpuMHz',
   'Effective CPU MHz': 'effectiveCpuMHz',
   'EffectiveCpu': 'effectiveCpuMHz',
   'Effective CPU (MHz)': 'effectiveCpuMHz',
@@ -65,7 +67,7 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'TotalMemory': 'totalMemoryMiB',
   'Total Mem': 'totalMemoryMiB',
   'Total Memory (MB)': 'totalMemoryMiB',
-  // Effective Memory
+  // Effective Memory - RVTools uses "Effective Memory" with space
   'Effective Memory': 'effectiveMemoryMiB',
   'Effective Memory MiB': 'effectiveMemoryMiB',
   'Effective Memory MB': 'effectiveMemoryMiB',
@@ -80,6 +82,7 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'HA Failover Level': 'haFailoverLevel',
   'HA failover level': 'haFailoverLevel',
   'HAFailoverLevel': 'haFailoverLevel',
+  'Failover Level': 'haFailoverLevel',
   // DRS Settings
   'DRS Enabled': 'drsEnabled',
   'DRS enabled': 'drsEnabled',
@@ -89,12 +92,13 @@ const COLUMN_MAP: Record<string, keyof VClusterInfo | null> = {
   'DRS behaviour': 'drsBehavior',
   'DRS behavior': 'drsBehavior',
   'DRSBehavior': 'drsBehavior',
+  'DRS default VM behavior': 'drsBehavior',
   // EVC Mode
   'EVC Mode': 'evcMode',
   'EVC mode': 'evcMode',
   'EVC': 'evcMode',
   'EVCMode': 'evcMode',
-  // Datacenter
+  // Datacenter - note: may not be present in all RVTools exports
   'Datacenter': 'datacenter',
   'DataCenter': 'datacenter',
   'Data Center': 'datacenter',

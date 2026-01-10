@@ -18,9 +18,32 @@ export function ClusterPage() {
     return <Navigate to={ROUTES.home} replace />;
   }
 
-  const clusters = rawData.vCluster;
+  const clustersRaw = rawData.vCluster;
   const hosts = rawData.vHost;
   const vms = rawData.vInfo.filter(vm => !vm.template);
+
+  // Derive VM counts per cluster from vInfo (since vCluster may not have this column)
+  const vmCountsByCluster = vms.reduce((acc, vm) => {
+    const cluster = vm.cluster || 'No Cluster';
+    acc[cluster] = (acc[cluster] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Derive datacenter per cluster from vHost (since vCluster may not have this column)
+  const datacenterByCluster = hosts.reduce((acc, host) => {
+    const cluster = host.cluster || 'No Cluster';
+    if (!acc[cluster] && host.datacenter) {
+      acc[cluster] = host.datacenter;
+    }
+    return acc;
+  }, {} as Record<string, string>);
+
+  // Augment cluster data with derived values
+  const clusters = clustersRaw.map(c => ({
+    ...c,
+    vmCount: c.vmCount || vmCountsByCluster[c.name] || 0,
+    datacenter: c.datacenter || datacenterByCluster[c.name] || '',
+  }));
 
   // Summary metrics
   const totalClusters = clusters.length;

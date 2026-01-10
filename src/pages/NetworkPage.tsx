@@ -494,35 +494,39 @@ export function NetworkPage() {
 
         {/* Health indicators */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`network-page__secondary-tile ${disconnectedNICs > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
-            <span className="network-page__metric-label">Disconnected NICs</span>
-            <span className="network-page__secondary-value">
-              {formatNumber(disconnectedNICs)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="Disconnected NICs"
+            value={formatNumber(disconnectedNICs)}
+            variant={disconnectedNICs > 0 ? 'warning' : 'success'}
+            tooltip="Network adapters not currently connected. May indicate VM configuration issues or intentional disconnection."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`network-page__secondary-tile ${legacyAdapters > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
-            <span className="network-page__metric-label">Legacy Adapters (E1000)</span>
-            <span className="network-page__secondary-value">{formatNumber(legacyAdapters)}</span>
-          </Tile>
+          <MetricCard
+            label="Legacy Adapters (E1000)"
+            value={formatNumber(legacyAdapters)}
+            variant={legacyAdapters > 0 ? 'warning' : 'success'}
+            tooltip="E1000/E1000E adapters are legacy types with lower performance. Consider upgrading to VMXNET3 before migration."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className={`network-page__secondary-tile ${vmsWithoutNIC > 0 ? 'network-page__secondary-tile--warning' : ''}`}>
-            <span className="network-page__metric-label">VMs Without NIC</span>
-            <span className="network-page__secondary-value">{formatNumber(vmsWithoutNIC)}</span>
-          </Tile>
+          <MetricCard
+            label="VMs Without NIC"
+            value={formatNumber(vmsWithoutNIC)}
+            variant={vmsWithoutNIC > 0 ? 'warning' : 'success'}
+            tooltip="VMs with no network adapters configured. Verify if this is intentional."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="network-page__secondary-tile">
-            <span className="network-page__metric-label">VMXNET3 Adapters</span>
-            <span className="network-page__secondary-value">
-              {formatNumber(vmxnet3Count)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="VMXNET3 Adapters"
+            value={formatNumber(vmxnet3Count)}
+            variant="success"
+            tooltip="VMXNET3 is the recommended high-performance paravirtualized adapter type for migration."
+          />
         </Column>
 
         {/* Network Summary Table */}

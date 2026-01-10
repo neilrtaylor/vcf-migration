@@ -293,35 +293,39 @@ export function StoragePage() {
 
         {/* Additional metrics */}
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__secondary-tile">
-            <span className="storage-page__metric-label">Datastores</span>
-            <span className="storage-page__secondary-value">{formatNumber(datastores.length)}</span>
-          </Tile>
+          <MetricCard
+            label="Datastores"
+            value={formatNumber(datastores.length)}
+            variant="default"
+            tooltip="Total number of datastores (VMFS, NFS, vSAN) in the environment."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__secondary-tile">
-            <span className="storage-page__metric-label">High Util (&gt;80%)</span>
-            <span className="storage-page__secondary-value">{formatNumber(highUtilDatastores.length)}</span>
-          </Tile>
+          <MetricCard
+            label="High Util (>80%)"
+            value={formatNumber(highUtilDatastores.length)}
+            variant={highUtilDatastores.length > 0 ? 'warning' : 'success'}
+            tooltip="Datastores with utilization above 80%. Consider freeing space before migration."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__secondary-tile">
-            <span className="storage-page__metric-label">VMFS Datastores</span>
-            <span className="storage-page__secondary-value">
-              {formatNumber(datastores.filter(ds => ds.type === 'VMFS').length)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="VMFS Datastores"
+            value={formatNumber(datastores.filter(ds => ds.type === 'VMFS').length)}
+            variant="default"
+            tooltip="VMware File System datastores - traditional block-based storage."
+          />
         </Column>
 
         <Column lg={4} md={4} sm={2}>
-          <Tile className="storage-page__secondary-tile">
-            <span className="storage-page__metric-label">NFS Datastores</span>
-            <span className="storage-page__secondary-value">
-              {formatNumber(datastores.filter(ds => ds.type === 'NFS').length)}
-            </span>
-          </Tile>
+          <MetricCard
+            label="NFS Datastores"
+            value={formatNumber(datastores.filter(ds => ds.type === 'NFS').length)}
+            variant="default"
+            tooltip="Network File System datastores - file-based network storage."
+          />
         </Column>
 
         {/* Datastore Utilization Heatmap */}

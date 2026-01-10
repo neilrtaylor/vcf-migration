@@ -1,9 +1,10 @@
 // Dashboard page - Executive summary
-import { Grid, Column, Tile, Tag } from '@carbon/react';
+import { Grid, Column, Tile, Tag, Tooltip } from '@carbon/react';
+import { Information } from '@carbon/icons-react';
 import { useData, useVMs, useChartFilter } from '@/hooks';
 import { Navigate } from 'react-router-dom';
 import { ROUTES, HW_VERSION_MINIMUM, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
-import { formatNumber, mibToGiB, mibToTiB, getHardwareVersionNumber } from '@/utils/formatters';
+import { formatNumber, mibToGiB, mibToTiB, getHardwareVersionNumber, formatHardwareVersion } from '@/utils/formatters';
 import { DoughnutChart, HorizontalBarChart, VerticalBarChart } from '@/components/charts';
 import { FilterBadge, MetricCard } from '@/components/common';
 import { POWER_STATE_CHART_COLORS } from '@/utils/chartConfig';
@@ -188,6 +189,48 @@ export function DashboardPage() {
 
   // Count of issues (for summary)
   const configIssuesCount = toolsNotInstalled + snapshotsBlockers + vmsWithCdConnected + outdatedHWCount;
+
+  // Hardware version distribution for chart
+  const hwVersions = vms.reduce((acc, vm) => {
+    const version = formatHardwareVersion(vm.hardwareVersion);
+    acc[version] = (acc[version] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const hwVersionChartData = Object.entries(hwVersions)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => {
+      const aNum = parseInt(a.label.replace('v', ''));
+      const bNum = parseInt(b.label.replace('v', ''));
+      return bNum - aNum;
+    });
+
+  // VMware Tools status distribution for chart
+  const toolsStatusMap = tools.reduce((acc, t) => {
+    const status = t.toolsStatus || 'unknown';
+    const normalizedStatus = status.toLowerCase().includes('ok') ? 'Current' :
+                            status.toLowerCase().includes('old') ? 'Outdated' :
+                            status.toLowerCase().includes('notrunning') ? 'Not Running' :
+                            status.toLowerCase().includes('notinstalled') ? 'Not Installed' : 'Unknown';
+    acc[normalizedStatus] = (acc[normalizedStatus] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const toolsChartData = Object.entries(toolsStatusMap)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  // Firmware type distribution for chart
+  const firmwareDistribution = vms.reduce((acc, vm) => {
+    const firmware = vm.firmwareType || 'BIOS';
+    const normalizedFirmware = firmware.toLowerCase().includes('efi') ? 'UEFI' : 'BIOS';
+    acc[normalizedFirmware] = (acc[normalizedFirmware] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const firmwareChartData = Object.entries(firmwareDistribution)
+    .map(([label, value]) => ({ label, value }))
+    .filter(d => d.value > 0);
 
   return (
     <div className="dashboard-page">
@@ -458,7 +501,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${configIssuesCount > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">Configuration Issues</span>
+              <span className="dashboard-page__config-label">
+                Configuration Issues
+                <Tooltip label="Sum of blocking and warning configuration issues that need attention before migration." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={configIssuesCount > 0 ? 'red' : 'green'} size="sm">
                 {configIssuesCount > 0 ? 'Action Needed' : 'OK'}
               </Tag>
@@ -473,7 +521,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${toolsNotInstalled > 0 ? 'dashboard-page__config-tile--error' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">Tools Not Installed</span>
+              <span className="dashboard-page__config-label">
+                Tools Not Installed
+                <Tooltip label="VMs without VMware Tools installed. Tools are required for proper guest OS interaction during migration." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={toolsNotInstalled > 0 ? 'red' : 'green'} size="sm">
                 {toolsNotInstalled > 0 ? 'Blocker' : 'OK'}
               </Tag>
@@ -488,7 +541,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${snapshotsBlockers > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">Old Snapshots</span>
+              <span className="dashboard-page__config-label">
+                Old Snapshots
+                <Tooltip label="Snapshots older than the threshold can cause disk chain issues. Delete or consolidate before migration." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={snapshotsBlockers > 0 ? 'red' : 'green'} size="sm">
                 {snapshotsBlockers > 0 ? 'Blocker' : 'OK'}
               </Tag>
@@ -503,7 +561,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${outdatedHWCount > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">Outdated HW Version</span>
+              <span className="dashboard-page__config-label">
+                Outdated HW Version
+                <Tooltip label="VMs with hardware version below minimum. Upgrade to ensure compatibility with target platform." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={outdatedHWCount > 0 ? 'magenta' : 'green'} size="sm">
                 {outdatedHWCount > 0 ? 'Upgrade' : 'OK'}
               </Tag>
@@ -518,7 +581,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${vmsWithCdConnected > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">CD-ROM Connected</span>
+              <span className="dashboard-page__config-label">
+                CD-ROM Connected
+                <Tooltip label="VMs with CD/DVD drives connected. Disconnect virtual media before migration to avoid issues." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={vmsWithCdConnected > 0 ? 'magenta' : 'green'} size="sm">
                 {vmsWithCdConnected > 0 ? 'Disconnect' : 'OK'}
               </Tag>
@@ -533,7 +601,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className={`dashboard-page__config-tile ${vmsNeedConsolidation > 0 ? 'dashboard-page__config-tile--warning' : 'dashboard-page__config-tile--success'}`}>
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">Need Consolidation</span>
+              <span className="dashboard-page__config-label">
+                Need Consolidation
+                <Tooltip label="VMs with disk chains needing consolidation. Run disk consolidation in vSphere before migration." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={vmsNeedConsolidation > 0 ? 'magenta' : 'green'} size="sm">
                 {vmsNeedConsolidation > 0 ? 'Warning' : 'OK'}
               </Tag>
@@ -548,7 +621,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className="dashboard-page__config-tile dashboard-page__config-tile--info">
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">VMware Tools Current</span>
+              <span className="dashboard-page__config-label">
+                VMware Tools Current
+                <Tooltip label="VMs with up-to-date VMware Tools installed. Current tools ensure best compatibility." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type="blue" size="sm">Info</Tag>
             </div>
             <span className="dashboard-page__config-value">{formatNumber(toolsCurrent)}</span>
@@ -561,7 +639,12 @@ export function DashboardPage() {
         <Column lg={4} md={4} sm={4}>
           <Tile className="dashboard-page__config-tile dashboard-page__config-tile--info">
             <div className="dashboard-page__config-header">
-              <span className="dashboard-page__config-label">VMs with Snapshots</span>
+              <span className="dashboard-page__config-label">
+                VMs with Snapshots
+                <Tooltip label="Total VMs that have one or more snapshots. Review and clean up unnecessary snapshots." align="top">
+                  <button type="button" className="dashboard-page__info-button"><Information size={14} /></button>
+                </Tooltip>
+              </span>
               <Tag type={vmsWithSnapshots > 0 ? 'high-contrast' : 'green'} size="sm">
                 {vmsWithSnapshots > 0 ? 'Review' : 'None'}
               </Tag>
@@ -570,6 +653,45 @@ export function DashboardPage() {
             <span className="dashboard-page__config-detail">
               {formatNumber(snapshots.length)} total snapshots
             </span>
+          </Tile>
+        </Column>
+
+        {/* Configuration Charts */}
+        <Column lg={8} md={8} sm={4}>
+          <Tile className="dashboard-page__chart-tile">
+            <DoughnutChart
+              title="Hardware Version Distribution"
+              subtitle="VM hardware compatibility versions"
+              data={hwVersionChartData}
+              height={280}
+              formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
+            />
+          </Tile>
+        </Column>
+
+        <Column lg={8} md={8} sm={4}>
+          <Tile className="dashboard-page__chart-tile">
+            <DoughnutChart
+              title="VMware Tools Status"
+              subtitle="Tools installation and running status"
+              data={toolsChartData}
+              height={280}
+              colors={['#24a148', '#f1c21b', '#ff832b', '#da1e28', '#6f6f6f']}
+              formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
+            />
+          </Tile>
+        </Column>
+
+        <Column lg={8} md={8} sm={4}>
+          <Tile className="dashboard-page__chart-tile">
+            <DoughnutChart
+              title="Firmware Type"
+              subtitle="BIOS vs UEFI boot firmware"
+              data={firmwareChartData}
+              height={280}
+              colors={['#0f62fe', '#8a3ffc']}
+              formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
+            />
           </Tile>
         </Column>
       </Grid>

@@ -19,16 +19,19 @@ const COLUMN_MAP: Record<string, keyof VNetworkInfo | null> = {
   // NIC Label
   'NIC': 'nicLabel',
   'NIC Label': 'nicLabel',
+  'NIC label': 'nicLabel',
   'Nic': 'nicLabel',
-  'Adapter': 'nicLabel',
+  'Nic Label': 'nicLabel',
+  'Nic label': 'nicLabel',
   'Adapter Label': 'nicLabel',
   'Network Adapter': 'nicLabel',
   'Network adapter': 'nicLabel',
   // Adapter Type - this is critical for E1000/VMXNET3 detection
+  // RVTools uses "Adapter" column for the adapter type (E1000, VMXNET3, etc.)
+  'Adapter': 'adapterType',
   'Adapter Type': 'adapterType',
   'Adapter type': 'adapterType',
   'AdapterType': 'adapterType',
-  'Type': 'adapterType',
   'NIC Type': 'adapterType',
   'Nic Type': 'adapterType',
   'Nic type': 'adapterType',
@@ -56,11 +59,14 @@ const COLUMN_MAP: Record<string, keyof VNetworkInfo | null> = {
   // MAC Address
   'MAC Address': 'macAddress',
   'MAC address': 'macAddress',
-  'MAC': 'macAddress',
   'Mac Address': 'macAddress',
-  // MAC Type
+  'Mac address': 'macAddress',
+  'MAC': 'macAddress',
+  // MAC Type - RVTools uses "Type" column for MAC type (assigned, manual, etc.)
+  'Type': 'macType',
   'MAC Type': 'macType',
   'MAC type': 'macType',
+  'Mac Type': 'macType',
   // IP Addresses
   'IP Address': 'ipv4Address',
   'IP address': 'ipv4Address',

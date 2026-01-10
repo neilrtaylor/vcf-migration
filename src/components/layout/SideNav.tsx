@@ -14,7 +14,6 @@ import {
   SoftwareResourceCluster,
   Chip,
   GroupResource,
-  Settings,
   Kubernetes,
   VirtualMachine,
   TaskComplete,
@@ -130,16 +129,6 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           className={!hasData ? 'sidenav-link--disabled' : ''}
         >
           Resource Pools
-        </SideNavLink>
-
-        <SideNavLink
-          renderIcon={Settings}
-          href="#"
-          onClick={(e) => handleNavClick(e, ROUTES.config, true)}
-          isActive={isActive(ROUTES.config)}
-          className={!hasData ? 'sidenav-link--disabled' : ''}
-        >
-          Configuration
         </SideNavLink>
 
         <SideNavLink

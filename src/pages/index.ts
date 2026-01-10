@@ -7,7 +7,6 @@ export { NetworkPage } from './NetworkPage';
 export { ClusterPage } from './ClusterPage';
 export { HostsPage } from './HostsPage';
 export { ResourcePoolPage } from './ResourcePoolPage';
-export { ConfigPage } from './ConfigPage';
 export { ROKSMigrationPage } from './ROKSMigrationPage';
 export { VSIMigrationPage } from './VSIMigrationPage';
 export { PreFlightReportPage } from './PreFlightReportPage';
