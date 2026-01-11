@@ -1,7 +1,12 @@
-Cluster Details table in Clusters: Datacenter is blank, VMS says 0, Effective CPU says 0.0 and Status says Unknown, recheck 
+Create a report mechanism that outputs a docx report. This report is to be a comprehensive and detailed report designed to be sent to a client that describes the following:
 
-Add all the metric cards, graphs etc on the Configuration Analysis page to Dashboard and remove the Configuration Analysis page
+- Current environment
+- Analysis of current environment
+- Migration options
+- Migration costs
+- Describes ROKS
+- Describes VPC VSI
 
-On the Network Page, it says 1,035 Disconnected NICs, Legacy Adapters (E1000) = 0 and VMXNET3 Adapters = 0. Recheck as the RVTools has a number of VMs with E1000 and VMXNET3 adapters
+The docx consumes pre-drafted text which is easily accessible so can be updated as needed, say a template, that then gets used to insert dynamic info on a per report basis.
 
-Ensure there are tool tips on every metric card on every page
+The report is to be very professional as it represents a proposal to the client.

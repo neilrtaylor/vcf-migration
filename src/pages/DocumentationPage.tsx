@@ -369,12 +369,6 @@ export function DocumentationPage() {
                     <ListItem>
                       <strong>Port Group</strong> - Groups VMs by network port group for network-aware migration
                     </ListItem>
-                    <ListItem>
-                      <strong>Port Group Prefix</strong> - Groups by first N characters of port group name
-                    </ListItem>
-                    <ListItem>
-                      <strong>IP Prefix</strong> - Groups VMs by IP subnet for network cutover planning
-                    </ListItem>
                   </UnorderedList>
                 </Tile>
 

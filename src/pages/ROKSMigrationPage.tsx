@@ -1,12 +1,14 @@
 // ROKS (OpenShift Virtualization) Migration page
 import { useState, useCallback, useMemo } from 'react';
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, UnorderedList, ListItem, Button, InlineNotification, RadioButtonGroup, RadioButton, Dropdown, NumberInput } from '@carbon/react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, UnorderedList, ListItem, Button, InlineNotification, RadioButtonGroup, RadioButton, Dropdown } from '@carbon/react';
 import { Download } from '@carbon/icons-react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB, getHardwareVersionNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart } from '@/components/charts';
+import { EnhancedDataTable } from '@/components/tables';
+import type { ColumnDef } from '@tanstack/react-table';
 import { MetricCard, RedHatDocLink, RemediationPanel } from '@/components/common';
 import { SizingCalculator } from '@/components/sizing';
 import type { SizingResult } from '@/components/sizing';
@@ -37,9 +39,8 @@ export function ROKSMigrationPage() {
   const [yamlExportSuccess, setYamlExportSuccess] = useState(false);
   const [calculatorSizing, setCalculatorSizing] = useState<SizingResult | null>(null);
   const [wavePlanningMode, setWavePlanningMode] = useState<'complexity' | 'network'>('network');
-  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'portGroupPrefix' | 'ipPrefix' | 'cluster'>('cluster');
-  const [ipPrefixLength, setIpPrefixLength] = useState<number>(24);
-  const [portGroupPrefixLength, setPortGroupPrefixLength] = useState<number>(10);
+  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'cluster'>('cluster');
+  const [complexityFilter, setComplexityFilter] = useState<string | null>(null);
 
   if (!rawData) {
     return <Navigate to={ROUTES.home} replace />;
@@ -226,24 +227,71 @@ export function ROKSMigrationPage() {
   // ===== COMPLEXITY DISTRIBUTION =====
   const complexityScores = poweredOnVMs.map(vm => {
     let score = 0;
+    const factors: string[] = [];
+
     const compat = getOSCompatibility(vm.guestOS);
-    score += (100 - compat.compatibilityScore) * 0.3;
+    const osScore = Math.round((100 - compat.compatibilityScore) * 0.3);
+    if (osScore > 0) {
+      score += osScore;
+      factors.push(`OS compatibility (+${osScore})`);
+    }
 
     const vmNics = networks.filter(n => n.vmName === vm.vmName).length;
-    if (vmNics > 3) score += 30;
-    else if (vmNics > 1) score += 15;
+    if (vmNics > 3) {
+      score += 30;
+      factors.push(`${vmNics} NICs (+30)`);
+    } else if (vmNics > 1) {
+      score += 15;
+      factors.push(`${vmNics} NICs (+15)`);
+    }
 
     const vmDisks = disks.filter(d => d.vmName === vm.vmName).length;
-    if (vmDisks > 5) score += 30;
-    else if (vmDisks > 2) score += 15;
+    if (vmDisks > 5) {
+      score += 30;
+      factors.push(`${vmDisks} disks (+30)`);
+    } else if (vmDisks > 2) {
+      score += 15;
+      factors.push(`${vmDisks} disks (+15)`);
+    }
 
     const hwVersion = getHardwareVersionNumber(vm.hardwareVersion);
-    if (hwVersion < HW_VERSION_MINIMUM) score += 25;
-    else if (hwVersion < HW_VERSION_RECOMMENDED) score += 10;
+    if (hwVersion < HW_VERSION_MINIMUM) {
+      score += 25;
+      factors.push(`HW v${hwVersion} < min (+25)`);
+    } else if (hwVersion < HW_VERSION_RECOMMENDED) {
+      score += 10;
+      factors.push(`HW v${hwVersion} < recommended (+10)`);
+    }
 
-    if (vm.cpus > 16 || mibToGiB(vm.memory) > 128) score += 20;
+    const memGiB = mibToGiB(vm.memory);
+    if (vm.cpus > 16 || memGiB > 128) {
+      score += 20;
+      if (vm.cpus > 16 && memGiB > 128) {
+        factors.push(`${vm.cpus} vCPUs & ${Math.round(memGiB)} GiB (+20)`);
+      } else if (vm.cpus > 16) {
+        factors.push(`${vm.cpus} vCPUs (+20)`);
+      } else {
+        factors.push(`${Math.round(memGiB)} GiB memory (+20)`);
+      }
+    }
 
-    return { vmName: vm.vmName, score: Math.min(100, score) };
+    const finalScore = Math.min(100, Math.round(score));
+    const category = finalScore <= 25 ? 'Simple' :
+                     finalScore <= 50 ? 'Moderate' :
+                     finalScore <= 75 ? 'Complex' : 'Blocker';
+
+    return {
+      vmName: vm.vmName,
+      score: finalScore,
+      factors: factors.length > 0 ? factors.join(', ') : 'No complexity factors',
+      category,
+      guestOS: vm.guestOS,
+      cpus: vm.cpus,
+      memoryGiB: Math.round(memGiB),
+      diskCount: vmDisks,
+      nicCount: vmNics,
+      hwVersion,
+    };
   });
 
   const complexityDistribution = complexityScores.reduce((acc, cs) => {
@@ -268,6 +316,74 @@ export function ROKSMigrationPage() {
       label: cs.vmName.substring(0, 40),
       value: Math.round(cs.score),
     }));
+
+  // Filtered complexity data for table
+  const filteredComplexityVMs = complexityFilter
+    ? complexityScores.filter(cs => cs.category === complexityFilter)
+    : complexityScores;
+
+  // Sort by complexity score descending
+  const sortedComplexityVMs = [...filteredComplexityVMs].sort((a, b) => b.score - a.score);
+
+  // Complexity table columns
+  type ComplexityVM = typeof complexityScores[0];
+  const complexityColumns: ColumnDef<ComplexityVM, unknown>[] = [
+    {
+      accessorKey: 'vmName',
+      header: 'VM Name',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'score',
+      header: 'Score',
+      enableSorting: true,
+      cell: ({ row }) => {
+        const score = row.original.score;
+        const color = score <= 25 ? '#24a148' : score <= 50 ? '#1192e8' : score <= 75 ? '#ff832b' : '#da1e28';
+        return <span style={{ color, fontWeight: 600 }}>{score}</span>;
+      },
+    },
+    {
+      accessorKey: 'category',
+      header: 'Category',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'factors',
+      header: 'Complexity Factors',
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'guestOS',
+      header: 'Guest OS',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'cpus',
+      header: 'vCPUs',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'memoryGiB',
+      header: 'Memory (GiB)',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'diskCount',
+      header: 'Disks',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'nicCount',
+      header: 'NICs',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'hwVersion',
+      header: 'HW Version',
+      enableSorting: true,
+    },
+  ];
 
   // ===== MIGRATION WAVE PLANNING =====
 
@@ -304,33 +420,7 @@ export function ROKSMigrationPage() {
     };
   });
 
-  // Helper function to calculate IP prefix based on CIDR length
-  const getIpPrefix = (ip: string, prefixLength: number): string => {
-    if (!ip) return 'Unknown';
-    const parts = ip.split('.');
-    if (parts.length !== 4) return 'Unknown';
-
-    // Calculate how many octets to keep based on prefix length
-    const octetsToKeep = Math.floor(prefixLength / 8);
-    const remainingBits = prefixLength % 8;
-
-    const prefix = parts.slice(0, octetsToKeep).map(Number);
-
-    if (remainingBits > 0 && octetsToKeep < 4) {
-      // Apply mask to partial octet
-      const mask = 256 - Math.pow(2, 8 - remainingBits);
-      prefix.push(Number(parts[octetsToKeep]) & mask);
-    }
-
-    // Pad with zeros
-    while (prefix.length < 4) {
-      prefix.push(0);
-    }
-
-    return `${prefix.join('.')}/${prefixLength}`;
-  };
-
-  // Network-based waves: Group by port group, port group prefix, IP prefix, or cluster
+  // Network-based waves: Group by cluster or port group
   const networkWaves = useMemo(() => {
     const groups = new Map<string, typeof vmWaveData>();
 
@@ -340,20 +430,9 @@ export function ROKSMigrationPage() {
       if (networkGroupBy === 'cluster') {
         // Group by VMware cluster
         key = vm.cluster;
-      } else if (networkGroupBy === 'portGroup') {
+      } else {
         // Group by full VMware port group name
         key = vm.networkName || 'No Network';
-      } else if (networkGroupBy === 'portGroupPrefix') {
-        // Group by first N characters of port group name
-        const name = vm.networkName || 'No Network';
-        key = name.length > portGroupPrefixLength ? name.substring(0, portGroupPrefixLength) + '...' : name;
-      } else {
-        // Group by IP prefix with configurable length
-        if (vm.ipAddress) {
-          key = getIpPrefix(vm.ipAddress, ipPrefixLength);
-        } else {
-          key = `No IP: ${vm.networkName}`;
-        }
       }
 
       if (!groups.has(key)) {
@@ -399,7 +478,7 @@ export function ROKSMigrationPage() {
         if (a.hasBlockers !== b.hasBlockers) return a.hasBlockers ? 1 : -1;
         return a.vmCount - b.vmCount;
       });
-  }, [vmWaveData, networkGroupBy, ipPrefixLength, portGroupPrefixLength]);
+  }, [vmWaveData, networkGroupBy]);
 
   // Complexity-based waves (original logic)
   const complexityWaves = useMemo(() => {
@@ -1061,7 +1140,7 @@ export function ROKSMigrationPage() {
                           <h3>Migration Wave Planning</h3>
                           <p>
                             {wavePlanningMode === 'network'
-                              ? `${networkWaves.length} ${networkGroupBy === 'ipPrefix' ? 'IP subnets' : 'port groups'} for network-based migration with cutover`
+                              ? `${networkWaves.length} ${networkGroupBy === 'cluster' ? 'clusters' : 'port groups'} for network-based migration with cutover`
                               : `VMs organized into ${waveResources.length} waves based on complexity and readiness`
                             }
                           </p>
@@ -1091,41 +1170,13 @@ export function ROKSMigrationPage() {
                             id="network-group-by"
                             titleText="Group VMs by"
                             label="Select grouping method"
-                            items={['cluster', 'portGroup', 'portGroupPrefix', 'ipPrefix']}
+                            items={['cluster', 'portGroup']}
                             itemToString={(item) => item === 'cluster' ? 'Cluster (VMware cluster)'
-                              : item === 'portGroup' ? 'Port Group (exact name match)'
-                              : item === 'portGroupPrefix' ? 'Port Group Prefix (first N characters)'
-                              : item === 'ipPrefix' ? 'IP Prefix (subnet based on IP address)' : ''}
+                              : item === 'portGroup' ? 'Port Group (exact name match)' : ''}
                             selectedItem={networkGroupBy}
-                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'portGroupPrefix' | 'ipPrefix' | 'cluster')}
+                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'cluster')}
                             style={{ minWidth: '300px' }}
                           />
-                          {networkGroupBy === 'portGroupPrefix' && (
-                            <NumberInput
-                              id="port-group-prefix-length"
-                              label="Prefix Characters"
-                              helperText="Match first N characters of port group name"
-                              min={5}
-                              max={50}
-                              step={1}
-                              value={portGroupPrefixLength}
-                              onChange={(_e, { value }) => value && setPortGroupPrefixLength(Number(value))}
-                              style={{ minWidth: '180px' }}
-                            />
-                          )}
-                          {networkGroupBy === 'ipPrefix' && (
-                            <NumberInput
-                              id="ip-prefix-length"
-                              label="CIDR Prefix Length"
-                              helperText="e.g., /24 = 256 IPs, /16 = 65,536 IPs"
-                              min={8}
-                              max={30}
-                              step={1}
-                              value={ipPrefixLength}
-                              onChange={(_e, { value }) => value && setIpPrefixLength(Number(value))}
-                              style={{ minWidth: '180px' }}
-                            />
-                          )}
                         </div>
                       )}
                     </Tile>
@@ -1135,10 +1186,10 @@ export function ROKSMigrationPage() {
                     <Tile className="migration-page__chart-tile">
                       <HorizontalBarChart
                         title={wavePlanningMode === 'network'
-                          ? (networkGroupBy === 'ipPrefix' ? 'VMs by IP Subnet' : 'VMs by Port Group')
+                          ? (networkGroupBy === 'cluster' ? 'VMs by Cluster' : 'VMs by Port Group')
                           : 'VMs by Wave'}
                         subtitle={wavePlanningMode === 'network'
-                          ? `Top ${Math.min(15, networkWaves.length)} of ${networkWaves.length} ${networkGroupBy === 'ipPrefix' ? 'subnets' : 'groups'}`
+                          ? `Top ${Math.min(15, networkWaves.length)} of ${networkWaves.length} ${networkGroupBy === 'cluster' ? 'clusters' : 'groups'}`
                           : 'Distribution across migration waves'
                         }
                         data={waveChartData}
@@ -1151,7 +1202,7 @@ export function ROKSMigrationPage() {
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__checks-tile">
-                      <h3>{wavePlanningMode === 'network' ? (networkGroupBy === 'ipPrefix' ? 'IP Subnets' : 'Port Groups') : 'Wave Descriptions'}</h3>
+                      <h3>{wavePlanningMode === 'network' ? (networkGroupBy === 'cluster' ? 'Clusters' : 'Port Groups') : 'Wave Descriptions'}</h3>
                       <div className="migration-page__check-items">
                         {waveResources.slice(0, 10).map((wave, idx) => (
                           <div key={idx} className="migration-page__check-item">
@@ -1249,11 +1300,15 @@ export function ROKSMigrationPage() {
                     <Tile className="migration-page__chart-tile">
                       <DoughnutChart
                         title="Migration Complexity"
-                        subtitle="Based on OS, network, storage, and hardware"
+                        subtitle={complexityFilter ? `Filtered: ${complexityFilter}` : 'Click segment to filter table below'}
                         data={complexityChartData}
                         height={280}
                         colors={['#24a148', '#1192e8', '#ff832b', '#da1e28']}
                         formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
+                        onSegmentClick={(label) => {
+                          const category = label.split(' ')[0]; // Extract 'Simple', 'Moderate', etc.
+                          setComplexityFilter(complexityFilter === category ? null : category);
+                        }}
                       />
                     </Tile>
                   </Column>
@@ -1267,6 +1322,53 @@ export function ROKSMigrationPage() {
                         height={280}
                         valueLabel="Score"
                         formatValue={(v) => `Score: ${v}`}
+                      />
+                    </Tile>
+                  </Column>
+
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__recommendation-tile">
+                      <h4>OpenShift Virtualization Complexity Factors</h4>
+                      <div className="migration-page__recommendation-grid">
+                        <div className="migration-page__recommendation-item">
+                          <span className="migration-page__recommendation-key">OS Compatibility</span>
+                          <span className="migration-page__recommendation-value">Score based on Red Hat OS compatibility matrix</span>
+                        </div>
+                        <div className="migration-page__recommendation-item">
+                          <span className="migration-page__recommendation-key">Network Interfaces</span>
+                          <span className="migration-page__recommendation-value">&gt;3 NICs adds +30, 2-3 NICs adds +15</span>
+                        </div>
+                        <div className="migration-page__recommendation-item">
+                          <span className="migration-page__recommendation-key">Disk Count</span>
+                          <span className="migration-page__recommendation-value">&gt;5 disks adds +30, 3-5 disks adds +15</span>
+                        </div>
+                        <div className="migration-page__recommendation-item">
+                          <span className="migration-page__recommendation-key">Hardware Version</span>
+                          <span className="migration-page__recommendation-value">Below min v{HW_VERSION_MINIMUM} adds +25, below recommended v{HW_VERSION_RECOMMENDED} adds +10</span>
+                        </div>
+                        <div className="migration-page__recommendation-item">
+                          <span className="migration-page__recommendation-key">Resource Size</span>
+                          <span className="migration-page__recommendation-value">&gt;16 vCPUs or &gt;128 GiB memory adds +20</span>
+                        </div>
+                      </div>
+                    </Tile>
+                  </Column>
+
+                  {/* Complexity Table */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__table-tile">
+                      <EnhancedDataTable
+                        data={sortedComplexityVMs}
+                        columns={complexityColumns}
+                        title={complexityFilter ? `${complexityFilter} VMs (${sortedComplexityVMs.length})` : `All VMs by Complexity (${sortedComplexityVMs.length})`}
+                        description={complexityFilter ? `Click chart segment again to clear filter` : 'Click a segment in the Migration Complexity chart to filter'}
+                        enableSearch
+                        enablePagination
+                        enableSorting
+                        enableExport
+                        enableColumnVisibility
+                        defaultPageSize={25}
+                        exportFilename="vm-complexity-analysis"
                       />
                     </Tile>
                   </Column>

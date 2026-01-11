@@ -328,6 +328,15 @@ export function StoragePage() {
           />
         </Column>
 
+        <Column lg={4} md={4} sm={2}>
+          <MetricCard
+            label="vSAN Datastores"
+            value={formatNumber(datastores.filter(ds => ds.type === 'vsan' || ds.type === 'VSAN').length)}
+            variant="default"
+            tooltip="VMware vSAN datastores - software-defined hyper-converged storage."
+          />
+        </Column>
+
         {/* Datastore Utilization Heatmap */}
         {datastoreUtilHeatmap.length > 0 && (
           <Column lg={16} md={8} sm={4}>

@@ -1,11 +1,13 @@
 // VSI (IBM Cloud VPC Virtual Server) Migration page
 import { useState, useMemo } from 'react';
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, RadioButtonGroup, RadioButton, Dropdown, NumberInput } from '@carbon/react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, RadioButtonGroup, RadioButton, Dropdown } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB, getHardwareVersionNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart } from '@/components/charts';
+import { EnhancedDataTable } from '@/components/tables';
+import type { ColumnDef } from '@tanstack/react-table';
 import { MetricCard, RedHatDocLink, RemediationPanel } from '@/components/common';
 import { CostEstimation } from '@/components/cost';
 import type { RemediationItem } from '@/components/common';
@@ -48,9 +50,8 @@ export function VSIMigrationPage() {
 
   // Wave planning mode: 'complexity' for traditional complexity-based waves, 'network' for subnet-based waves
   const [wavePlanningMode, setWavePlanningMode] = useState<'complexity' | 'network'>('network');
-  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'portGroupPrefix' | 'ipPrefix'>('portGroup');
-  const [ipPrefixLength, setIpPrefixLength] = useState<number>(24);
-  const [portGroupPrefixLength, setPortGroupPrefixLength] = useState<number>(20);
+  const [networkGroupBy, setNetworkGroupBy] = useState<'portGroup' | 'cluster'>('cluster');
+  const [complexityFilter, setComplexityFilter] = useState<string | null>(null);
 
   const poweredOnVMs = vms.filter(vm => vm.powerState === 'poweredOn');
   const snapshots = rawData.vSnapshot;
@@ -245,28 +246,73 @@ export function VSIMigrationPage() {
   // ===== COMPLEXITY DISTRIBUTION =====
   const complexityScores = poweredOnVMs.map(vm => {
     let score = 0;
+    const factors: string[] = [];
+
     const compat = getIBMCloudOSSupport(vm.guestOS);
-    if (compat.status === 'unsupported') score += 40;
-    else if (compat.status === 'community') score += 15;
+    if (compat.status === 'unsupported') {
+      score += 40;
+      factors.push('Unsupported OS (+40)');
+    } else if (compat.status === 'community') {
+      score += 15;
+      factors.push('Community OS (+15)');
+    }
 
     const vmNics = (networksByVMName.get(vm.vmName.toLowerCase()) || []).length;
-    if (vmNics > 3) score += 25;
-    else if (vmNics > 1) score += 10;
+    if (vmNics > 3) {
+      score += 25;
+      factors.push(`${vmNics} NICs (+25)`);
+    } else if (vmNics > 1) {
+      score += 10;
+      factors.push(`${vmNics} NICs (+10)`);
+    }
 
     const vmDisks = disks.filter(d => d.vmName === vm.vmName);
     const largeDisks = vmDisks.filter(d => mibToGiB(d.capacityMiB) > 2000).length;
-    if (largeDisks > 0) score += 30;
-    if (vmDisks.length > 5) score += 20;
-    else if (vmDisks.length > 2) score += 10;
+    if (largeDisks > 0) {
+      score += 30;
+      factors.push(`${largeDisks} large disk${largeDisks > 1 ? 's' : ''} >2TB (+30)`);
+    }
+    if (vmDisks.length > 5) {
+      score += 20;
+      factors.push(`${vmDisks.length} disks (+20)`);
+    } else if (vmDisks.length > 2) {
+      score += 10;
+      factors.push(`${vmDisks.length} disks (+10)`);
+    }
 
     const memGiB = mibToGiB(vm.memory);
-    if (memGiB > 1024) score += 40;
-    else if (memGiB > 512) score += 20;
+    if (memGiB > 1024) {
+      score += 40;
+      factors.push(`${Math.round(memGiB)} GiB memory (+40)`);
+    } else if (memGiB > 512) {
+      score += 20;
+      factors.push(`${Math.round(memGiB)} GiB memory (+20)`);
+    }
 
-    if (vm.cpus > 64) score += 30;
-    else if (vm.cpus > 32) score += 15;
+    if (vm.cpus > 64) {
+      score += 30;
+      factors.push(`${vm.cpus} vCPUs (+30)`);
+    } else if (vm.cpus > 32) {
+      score += 15;
+      factors.push(`${vm.cpus} vCPUs (+15)`);
+    }
 
-    return { vmName: vm.vmName, score: Math.min(100, score) };
+    const finalScore = Math.min(100, score);
+    const category = finalScore <= 25 ? 'Simple' :
+                     finalScore <= 50 ? 'Moderate' :
+                     finalScore <= 75 ? 'Complex' : 'Blocker';
+
+    return {
+      vmName: vm.vmName,
+      score: finalScore,
+      factors: factors.length > 0 ? factors.join(', ') : 'No complexity factors',
+      category,
+      guestOS: vm.guestOS,
+      cpus: vm.cpus,
+      memoryGiB: Math.round(memGiB),
+      diskCount: vmDisks.length,
+      nicCount: vmNics,
+    };
   });
 
   const complexityDistribution = complexityScores.reduce((acc, cs) => {
@@ -291,6 +337,69 @@ export function VSIMigrationPage() {
       label: cs.vmName.substring(0, 40),
       value: Math.round(cs.score),
     }));
+
+  // Filtered complexity data for table
+  const filteredComplexityVMs = complexityFilter
+    ? complexityScores.filter(cs => cs.category === complexityFilter)
+    : complexityScores;
+
+  // Sort by complexity score descending
+  const sortedComplexityVMs = [...filteredComplexityVMs].sort((a, b) => b.score - a.score);
+
+  // Complexity table columns
+  type ComplexityVM = typeof complexityScores[0];
+  const complexityColumns: ColumnDef<ComplexityVM, unknown>[] = [
+    {
+      accessorKey: 'vmName',
+      header: 'VM Name',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'score',
+      header: 'Score',
+      enableSorting: true,
+      cell: ({ row }) => {
+        const score = row.original.score;
+        const color = score <= 25 ? '#24a148' : score <= 50 ? '#1192e8' : score <= 75 ? '#ff832b' : '#da1e28';
+        return <span style={{ color, fontWeight: 600 }}>{score}</span>;
+      },
+    },
+    {
+      accessorKey: 'category',
+      header: 'Category',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'factors',
+      header: 'Complexity Factors',
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'guestOS',
+      header: 'Guest OS',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'cpus',
+      header: 'vCPUs',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'memoryGiB',
+      header: 'Memory (GiB)',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'diskCount',
+      header: 'Disks',
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'nicCount',
+      header: 'NICs',
+      enableSorting: true,
+    },
+  ];
 
   // ===== VSI SIZING FOR COST ESTIMATION =====
   const vsiSizing = useMemo<VSISizingInput>(() => {
@@ -346,6 +455,7 @@ export function VSIMigrationPage() {
       networkName,
       ipAddress,
       subnet,
+      cluster: vm.cluster || 'No Cluster',
     };
   });
 
@@ -376,50 +486,19 @@ export function VSIMigrationPage() {
     return waveList.filter(w => w.vms.length > 0);
   }, [vmWaveData]);
 
-  // Helper function to calculate IP prefix based on CIDR length
-  const getIpPrefix = (ip: string, prefixLength: number): string => {
-    if (!ip) return 'Unknown';
-    const parts = ip.split('.');
-    if (parts.length !== 4) return 'Unknown';
-
-    const octetsToKeep = Math.floor(prefixLength / 8);
-    const remainingBits = prefixLength % 8;
-
-    const prefix = parts.slice(0, octetsToKeep).map(Number);
-
-    if (remainingBits > 0 && octetsToKeep < 4) {
-      const mask = 256 - Math.pow(2, 8 - remainingBits);
-      prefix.push(Number(parts[octetsToKeep]) & mask);
-    }
-
-    while (prefix.length < 4) {
-      prefix.push(0);
-    }
-
-    return `${prefix.join('.')}/${prefixLength}`;
-  };
-
-  // Network-based waves: Group by port group, port group prefix, or IP prefix
+  // Network-based waves: Group by cluster or port group
   const networkWaves = useMemo(() => {
     const groups = new Map<string, typeof vmWaveData>();
 
     vmWaveData.forEach(vm => {
       let key: string;
 
-      if (networkGroupBy === 'portGroup') {
+      if (networkGroupBy === 'cluster') {
+        // Group by VMware cluster
+        key = vm.cluster;
+      } else {
         // Group by full VMware port group name
         key = vm.networkName || 'No Network';
-      } else if (networkGroupBy === 'portGroupPrefix') {
-        // Group by first N characters of port group name
-        const name = vm.networkName || 'No Network';
-        key = name.length > portGroupPrefixLength ? name.substring(0, portGroupPrefixLength) + '...' : name;
-      } else {
-        // Group by IP prefix with configurable length
-        if (vm.ipAddress) {
-          key = getIpPrefix(vm.ipAddress, ipPrefixLength);
-        } else {
-          key = `No IP: ${vm.networkName}`;
-        }
       }
 
       if (!groups.has(key)) {
@@ -430,21 +509,13 @@ export function VSIMigrationPage() {
 
     // Convert to wave format
     const waves = Array.from(groups.entries()).map(([groupName, vms]) => {
-      const portGroups = [...new Set(vms.map(v => v.networkName).filter(n => n && n !== 'No Network'))];
       const ipRanges = [...new Set(vms.map(v => v.ipAddress).filter(Boolean))];
       const hasBlockers = vms.some(vm => vm.hasBlocker);
       const avgComplexity = vms.reduce((sum, vm) => sum + vm.complexity, 0) / vms.length;
 
-      let description: string;
-      if (networkGroupBy === 'portGroup') {
-        description = ipRanges.length > 0
-          ? `IPs: ${ipRanges.slice(0, 3).join(', ')}${ipRanges.length > 3 ? ` +${ipRanges.length - 3} more` : ''}`
-          : 'No IP addresses detected';
-      } else {
-        description = portGroups.length > 0
-          ? `Port Group: ${portGroups.slice(0, 3).join(', ')}${portGroups.length > 3 ? ` +${portGroups.length - 3} more` : ''}`
-          : 'No port group info';
-      }
+      const description = ipRanges.length > 0
+        ? `IPs: ${ipRanges.slice(0, 3).join(', ')}${ipRanges.length > 3 ? ` +${ipRanges.length - 3} more` : ''}`
+        : 'No IP addresses detected';
 
       return {
         name: groupName,
@@ -464,7 +535,7 @@ export function VSIMigrationPage() {
       if (a.hasBlockers !== b.hasBlockers) return a.hasBlockers ? 1 : -1;
       return a.vmCount - b.vmCount;
     });
-  }, [vmWaveData, networkGroupBy, ipPrefixLength, portGroupPrefixLength]);
+  }, [vmWaveData, networkGroupBy]);
 
   const waveChartData = wavePlanningMode === 'network'
     ? networkWaves.map((wave) => ({
@@ -962,7 +1033,7 @@ export function VSIMigrationPage() {
                           <h3>Migration Wave Planning</h3>
                           <p>
                             {wavePlanningMode === 'network'
-                              ? `${networkWaves.length} ${networkGroupBy === 'ipPrefix' ? 'IP subnets' : 'port groups'} for network-based migration with cutover`
+                              ? `${networkWaves.length} ${networkGroupBy === 'cluster' ? 'clusters' : 'port groups'} for network-based migration with cutover`
                               : `VMs organized into ${waveResources.length} waves based on complexity and readiness`}
                           </p>
                         </div>
@@ -983,40 +1054,13 @@ export function VSIMigrationPage() {
                             id="network-group-by-vsi"
                             titleText="Group VMs by"
                             label="Select grouping method"
-                            items={['portGroup', 'portGroupPrefix', 'ipPrefix']}
-                            itemToString={(item) => item === 'portGroup' ? 'Port Group (exact name match)'
-                              : item === 'portGroupPrefix' ? 'Port Group Prefix (first N characters)'
-                              : item === 'ipPrefix' ? 'IP Prefix (subnet based on IP address)' : ''}
+                            items={['cluster', 'portGroup']}
+                            itemToString={(item) => item === 'cluster' ? 'Cluster (VMware cluster)'
+                              : item === 'portGroup' ? 'Port Group (exact name match)' : ''}
                             selectedItem={networkGroupBy}
-                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'portGroupPrefix' | 'ipPrefix')}
+                            onChange={({ selectedItem }) => selectedItem && setNetworkGroupBy(selectedItem as 'portGroup' | 'cluster')}
                             style={{ minWidth: '300px' }}
                           />
-                          {networkGroupBy === 'portGroupPrefix' && (
-                            <NumberInput
-                              id="port-group-prefix-length-vsi"
-                              label="Prefix Characters"
-                              helperText="Match first N characters of port group name"
-                              min={5}
-                              max={50}
-                              step={1}
-                              value={portGroupPrefixLength}
-                              onChange={(_e, { value }) => value && setPortGroupPrefixLength(Number(value))}
-                              style={{ minWidth: '180px' }}
-                            />
-                          )}
-                          {networkGroupBy === 'ipPrefix' && (
-                            <NumberInput
-                              id="ip-prefix-length-vsi"
-                              label="CIDR Prefix Length"
-                              helperText="e.g., /24 = 256 IPs, /16 = 65,536 IPs"
-                              min={8}
-                              max={30}
-                              step={1}
-                              value={ipPrefixLength}
-                              onChange={(_e, { value }) => value && setIpPrefixLength(Number(value))}
-                              style={{ minWidth: '180px' }}
-                            />
-                          )}
                         </div>
                       )}
                     </Tile>
@@ -1026,10 +1070,10 @@ export function VSIMigrationPage() {
                     <Tile className="migration-page__chart-tile">
                       <HorizontalBarChart
                         title={wavePlanningMode === 'network'
-                          ? (networkGroupBy === 'ipPrefix' ? 'VMs by IP Subnet' : 'VMs by Port Group')
+                          ? (networkGroupBy === 'cluster' ? 'VMs by Cluster' : 'VMs by Port Group')
                           : 'VMs by Wave'}
                         subtitle={wavePlanningMode === 'network'
-                          ? `Distribution across ${networkGroupBy === 'ipPrefix' ? 'subnets' : 'groups'}`
+                          ? `Distribution across ${networkGroupBy === 'cluster' ? 'clusters' : 'port groups'}`
                           : 'Distribution across migration waves'}
                         data={waveChartData}
                         height={280}
@@ -1044,7 +1088,7 @@ export function VSIMigrationPage() {
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="migration-page__checks-tile">
-                      <h3>{wavePlanningMode === 'network' ? (networkGroupBy === 'ipPrefix' ? 'IP Subnets' : 'Port Groups') : 'Wave Descriptions'}</h3>
+                      <h3>{wavePlanningMode === 'network' ? (networkGroupBy === 'cluster' ? 'Clusters' : 'Port Groups') : 'Wave Descriptions'}</h3>
                       <div className="migration-page__check-items">
                         {waveResources.slice(0, 8).map((wave, idx) => (
                           <div key={idx} className="migration-page__check-item">
@@ -1056,7 +1100,7 @@ export function VSIMigrationPage() {
                         ))}
                         {waveResources.length > 8 && (
                           <div className="migration-page__check-item">
-                            <span>+ {waveResources.length - 8} more {wavePlanningMode === 'network' ? (networkGroupBy === 'ipPrefix' ? 'subnets' : 'groups') : 'waves'}</span>
+                            <span>+ {waveResources.length - 8} more {wavePlanningMode === 'network' ? 'groups' : 'waves'}</span>
                             <Tag type="gray">{formatNumber(waveResources.slice(8).reduce((sum, w) => sum + w.vmCount, 0))}</Tag>
                           </div>
                         )}
@@ -1217,11 +1261,15 @@ export function VSIMigrationPage() {
                     <Tile className="migration-page__chart-tile">
                       <DoughnutChart
                         title="Migration Complexity"
-                        subtitle="Based on OS, resources, and storage"
+                        subtitle={complexityFilter ? `Filtered: ${complexityFilter}` : 'Click segment to filter table below'}
                         data={complexityChartData}
                         height={280}
                         colors={['#24a148', '#1192e8', '#ff832b', '#da1e28']}
                         formatValue={(v) => `${v} VM${v !== 1 ? 's' : ''}`}
+                        onSegmentClick={(label) => {
+                          const category = label.split(' ')[0]; // Extract 'Simple', 'Moderate', etc.
+                          setComplexityFilter(complexityFilter === category ? null : category);
+                        }}
                       />
                     </Tile>
                   </Column>
@@ -1260,6 +1308,25 @@ export function VSIMigrationPage() {
                           <span className="migration-page__recommendation-value">Multiple NICs require VPC network planning</span>
                         </div>
                       </div>
+                    </Tile>
+                  </Column>
+
+                  {/* Complexity Table */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="migration-page__table-tile">
+                      <EnhancedDataTable
+                        data={sortedComplexityVMs}
+                        columns={complexityColumns}
+                        title={complexityFilter ? `${complexityFilter} VMs (${sortedComplexityVMs.length})` : `All VMs by Complexity (${sortedComplexityVMs.length})`}
+                        description={complexityFilter ? `Click chart segment again to clear filter` : 'Click a segment in the Migration Complexity chart to filter'}
+                        enableSearch
+                        enablePagination
+                        enableSorting
+                        enableExport
+                        enableColumnVisibility
+                        defaultPageSize={25}
+                        exportFilename="vm-complexity-analysis"
+                      />
                     </Tile>
                   </Column>
                 </Grid>
