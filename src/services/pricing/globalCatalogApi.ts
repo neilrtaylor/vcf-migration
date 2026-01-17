@@ -3,6 +3,7 @@
 
 import { withRetry, isRetryableError } from '@/utils/retry';
 import { createLogger, parseApiError, isCorsError, getUserFriendlyMessage } from '@/utils/logger';
+import { deduplicate } from '@/utils/requestDeduplication';
 
 const logger = createLogger('Pricing API');
 
@@ -575,3 +576,24 @@ export async function testProxyConnection(): Promise<{ success: boolean; error?:
     return { success: false, error: message };
   }
 }
+
+// ===== DEDUPLICATED EXPORTS =====
+// These prevent duplicate concurrent API calls
+
+/**
+ * Deduplicated version of fetchAllCatalogPricing.
+ * If called multiple times concurrently with the same config, only one API request is made.
+ */
+export const fetchAllCatalogPricingDeduped = deduplicate(
+  fetchAllCatalogPricing,
+  'fetchAllCatalogPricing'
+);
+
+/**
+ * Deduplicated version of fetchFromProxy.
+ * If called multiple times concurrently with the same options, only one API request is made.
+ */
+export const fetchFromProxyDeduped = deduplicate(
+  fetchFromProxy,
+  'fetchFromProxy'
+);

@@ -1,4 +1,5 @@
 // Dashboard page - Executive summary
+import { useMemo, useCallback } from 'react';
 import { Grid, Column, Tile, Tag, Tooltip } from '@carbon/react';
 import { Information } from '@carbon/icons-react';
 import { useData, useVMs, useChartFilter } from '@/hooks';
@@ -47,57 +48,70 @@ export function DashboardPage() {
   const uniqueClusters = new Set(vms.map(vm => vm.cluster).filter(Boolean)).size;
   const uniqueDatacenters = new Set(vms.map(vm => vm.datacenter).filter(Boolean)).size;
 
-  // Cluster metrics from vHost data
+  // Cluster metrics from vHost data (memoized)
   const hosts = rawData.vHost || [];
-  const clusterData = new Map<string, { vmCount: number; totalCores: number; vmCpus: number; hostMemoryMiB: number; vmMemoryMiB: number }>();
+  const clusterData = useMemo(() => {
+    const data = new Map<string, { vmCount: number; totalCores: number; vmCpus: number; hostMemoryMiB: number; vmMemoryMiB: number }>();
 
-  // Aggregate host data by cluster
-  hosts.forEach(host => {
-    const cluster = host.cluster || 'No Cluster';
-    if (!clusterData.has(cluster)) {
-      clusterData.set(cluster, { vmCount: 0, totalCores: 0, vmCpus: 0, hostMemoryMiB: 0, vmMemoryMiB: 0 });
-    }
-    const data = clusterData.get(cluster)!;
-    data.totalCores += host.totalCpuCores || 0;
-    data.vmCpus += host.vmCpuCount || 0;
-    data.hostMemoryMiB += host.memoryMiB || 0;
-    data.vmMemoryMiB += host.vmMemoryMiB || 0;
-  });
+    // Aggregate host data by cluster
+    hosts.forEach(host => {
+      const cluster = host.cluster || 'No Cluster';
+      if (!data.has(cluster)) {
+        data.set(cluster, { vmCount: 0, totalCores: 0, vmCpus: 0, hostMemoryMiB: 0, vmMemoryMiB: 0 });
+      }
+      const entry = data.get(cluster)!;
+      entry.totalCores += host.totalCpuCores || 0;
+      entry.vmCpus += host.vmCpuCount || 0;
+      entry.hostMemoryMiB += host.memoryMiB || 0;
+      entry.vmMemoryMiB += host.vmMemoryMiB || 0;
+    });
 
-  // Count VMs per cluster
-  vms.forEach(vm => {
-    const cluster = vm.cluster || 'No Cluster';
-    if (clusterData.has(cluster)) {
-      clusterData.get(cluster)!.vmCount++;
-    } else {
-      clusterData.set(cluster, { vmCount: 1, totalCores: 0, vmCpus: 0, hostMemoryMiB: 0, vmMemoryMiB: 0 });
-    }
-  });
+    // Count VMs per cluster
+    vms.forEach(vm => {
+      const cluster = vm.cluster || 'No Cluster';
+      if (data.has(cluster)) {
+        data.get(cluster)!.vmCount++;
+      } else {
+        data.set(cluster, { vmCount: 1, totalCores: 0, vmCpus: 0, hostMemoryMiB: 0, vmMemoryMiB: 0 });
+      }
+    });
 
-  // VM distribution by cluster
-  const vmsByClusterData = Array.from(clusterData.entries())
-    .map(([cluster, data]) => ({ label: cluster, value: data.vmCount }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
+    return data;
+  }, [hosts, vms]);
 
-  // CPU overcommitment by cluster
-  const cpuOvercommitData = Array.from(clusterData.entries())
-    .filter(([, data]) => data.totalCores > 0)
-    .map(([cluster, data]) => ({
-      label: cluster,
-      value: parseFloat((data.vmCpus / data.totalCores).toFixed(2)),
-    }))
-    .sort((a, b) => b.value - a.value);
+  // VM distribution by cluster (memoized)
+  const vmsByClusterData = useMemo(() =>
+    Array.from(clusterData.entries())
+      .map(([cluster, data]) => ({ label: cluster, value: data.vmCount }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10),
+    [clusterData]
+  );
 
-  // Memory overcommitment by cluster
-  const memOvercommitData = Array.from(clusterData.entries())
-    .filter(([, data]) => data.hostMemoryMiB > 0)
-    .map(([cluster, data]) => ({
-      label: cluster,
-      value: parseFloat((data.vmMemoryMiB / data.hostMemoryMiB).toFixed(2)),
-    }))
-    .sort((a, b) => b.value - a.value);
+  // CPU overcommitment by cluster (memoized)
+  const cpuOvercommitData = useMemo(() =>
+    Array.from(clusterData.entries())
+      .filter(([, data]) => data.totalCores > 0)
+      .map(([cluster, data]) => ({
+        label: cluster,
+        value: parseFloat((data.vmCpus / data.totalCores).toFixed(2)),
+      }))
+      .sort((a, b) => b.value - a.value),
+    [clusterData]
+  );
+
+  // Memory overcommitment by cluster (memoized)
+  const memOvercommitData = useMemo(() =>
+    Array.from(clusterData.entries())
+      .filter(([, data]) => data.hostMemoryMiB > 0)
+      .map(([cluster, data]) => ({
+        label: cluster,
+        value: parseFloat((data.vmMemoryMiB / data.hostMemoryMiB).toFixed(2)),
+      }))
+      .sort((a, b) => b.value - a.value),
+    [clusterData]
+  );
 
   // Power state chart data
   const powerStateData = [
@@ -112,48 +126,53 @@ export function DashboardPage() {
     POWER_STATE_CHART_COLORS.suspended,
   ];
 
-  // Filter VMs based on active chart filter
-  const filteredVMs = chartFilter && chartFilter.dimension === 'powerState'
-    ? vms.filter(vm => vm.powerState === labelToPowerState[chartFilter.value])
-    : vms;
+  // Filter VMs based on active chart filter (memoized)
+  const filteredVMs = useMemo(() =>
+    chartFilter && chartFilter.dimension === 'powerState'
+      ? vms.filter(vm => vm.powerState === labelToPowerState[chartFilter.value])
+      : vms,
+    [chartFilter, vms]
+  );
 
-  // OS distribution data (from filtered VMs)
-  const osDistribution = filteredVMs.reduce((acc, vm) => {
-    const os = vm.guestOS || 'Unknown';
-    // Simplify OS names
-    let category = os;
-    if (os.toLowerCase().includes('windows server 2019')) category = 'Windows Server 2019';
-    else if (os.toLowerCase().includes('windows server 2016')) category = 'Windows Server 2016';
-    else if (os.toLowerCase().includes('windows server 2022')) category = 'Windows Server 2022';
-    else if (os.toLowerCase().includes('windows server')) category = 'Windows Server (Other)';
-    else if (os.toLowerCase().includes('windows 10')) category = 'Windows 10';
-    else if (os.toLowerCase().includes('windows 11')) category = 'Windows 11';
-    else if (os.toLowerCase().includes('rhel') || os.toLowerCase().includes('red hat')) category = 'RHEL';
-    else if (os.toLowerCase().includes('centos')) category = 'CentOS';
-    else if (os.toLowerCase().includes('ubuntu')) category = 'Ubuntu';
-    else if (os.toLowerCase().includes('debian')) category = 'Debian';
-    else if (os.toLowerCase().includes('sles') || os.toLowerCase().includes('suse')) category = 'SLES';
-    else if (os.toLowerCase().includes('linux')) category = 'Linux (Other)';
-    else if (os.toLowerCase().includes('freebsd')) category = 'FreeBSD';
-    else if (!os || os === 'Unknown') category = 'Unknown';
+  // OS distribution data (from filtered VMs) - memoized
+  const osChartData = useMemo(() => {
+    const osDistribution = filteredVMs.reduce((acc, vm) => {
+      const os = vm.guestOS || 'Unknown';
+      // Simplify OS names
+      let category = os;
+      if (os.toLowerCase().includes('windows server 2019')) category = 'Windows Server 2019';
+      else if (os.toLowerCase().includes('windows server 2016')) category = 'Windows Server 2016';
+      else if (os.toLowerCase().includes('windows server 2022')) category = 'Windows Server 2022';
+      else if (os.toLowerCase().includes('windows server')) category = 'Windows Server (Other)';
+      else if (os.toLowerCase().includes('windows 10')) category = 'Windows 10';
+      else if (os.toLowerCase().includes('windows 11')) category = 'Windows 11';
+      else if (os.toLowerCase().includes('rhel') || os.toLowerCase().includes('red hat')) category = 'RHEL';
+      else if (os.toLowerCase().includes('centos')) category = 'CentOS';
+      else if (os.toLowerCase().includes('ubuntu')) category = 'Ubuntu';
+      else if (os.toLowerCase().includes('debian')) category = 'Debian';
+      else if (os.toLowerCase().includes('sles') || os.toLowerCase().includes('suse')) category = 'SLES';
+      else if (os.toLowerCase().includes('linux')) category = 'Linux (Other)';
+      else if (os.toLowerCase().includes('freebsd')) category = 'FreeBSD';
+      else if (!os || os === 'Unknown') category = 'Unknown';
 
-    acc[category] = (acc[category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-  const osChartData = Object.entries(osDistribution)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([label, value]) => ({ label, value }));
+    return Object.entries(osDistribution)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([label, value]) => ({ label, value }));
+  }, [filteredVMs]);
 
-  // Click handler for power state chart
-  const handlePowerStateClick = (label: string) => {
+  // Click handler for power state chart (memoized with useCallback)
+  const handlePowerStateClick = useCallback((label: string) => {
     if (chartFilter?.value === label && chartFilter?.dimension === 'powerState') {
       clearFilter();
     } else {
       setFilter('powerState', label, 'powerStateChart');
     }
-  };
+  }, [chartFilter, clearFilter, setFilter]);
 
   // vCenter source info
   const vSources = rawData.vSource || [];
@@ -163,74 +182,96 @@ export function DashboardPage() {
   const snapshots = rawData.vSnapshot || [];
   const cdDrives = rawData.vCD || [];
 
-  // VMware Tools status
-  const toolsNotInstalled = tools.filter(t =>
-    t.toolsStatus?.toLowerCase().includes('notinstalled')
-  ).length;
-  const toolsCurrent = tools.filter(t =>
-    t.toolsStatus?.toLowerCase().includes('ok') ||
-    t.toolsStatus?.toLowerCase() === 'toolsok'
-  ).length;
+  // Configuration analysis metrics (memoized)
+  const configAnalysis = useMemo(() => {
+    // VMware Tools status
+    const toolsNotInstalled = tools.filter(t =>
+      t.toolsStatus?.toLowerCase().includes('notinstalled')
+    ).length;
+    const toolsCurrent = tools.filter(t =>
+      t.toolsStatus?.toLowerCase().includes('ok') ||
+      t.toolsStatus?.toLowerCase() === 'toolsok'
+    ).length;
 
-  // Hardware version compliance
-  const outdatedHWCount = vms.filter(vm =>
-    getHardwareVersionNumber(vm.hardwareVersion) < HW_VERSION_MINIMUM
-  ).length;
+    // Hardware version compliance
+    const outdatedHWCount = vms.filter(vm =>
+      getHardwareVersionNumber(vm.hardwareVersion) < HW_VERSION_MINIMUM
+    ).length;
 
-  // Snapshot issues
-  const snapshotsBlockers = snapshots.filter(s => s.ageInDays > SNAPSHOT_BLOCKER_AGE_DAYS).length;
-  const vmsWithSnapshots = new Set(snapshots.map(s => s.vmName)).size;
+    // Snapshot issues
+    const snapshotsBlockers = snapshots.filter(s => s.ageInDays > SNAPSHOT_BLOCKER_AGE_DAYS).length;
+    const vmsWithSnapshots = new Set(snapshots.map(s => s.vmName)).size;
 
-  // CD-ROM connected
-  const vmsWithCdConnected = new Set(cdDrives.filter(cd => cd.connected).map(cd => cd.vmName)).size;
+    // CD-ROM connected
+    const vmsWithCdConnected = new Set(cdDrives.filter(cd => cd.connected).map(cd => cd.vmName)).size;
 
-  // Consolidation needed
-  const vmsNeedConsolidation = vms.filter(vm => vm.consolidationNeeded).length;
+    // Consolidation needed
+    const vmsNeedConsolidation = vms.filter(vm => vm.consolidationNeeded).length;
 
-  // Count of issues (for summary)
-  const configIssuesCount = toolsNotInstalled + snapshotsBlockers + vmsWithCdConnected + outdatedHWCount;
+    // Count of issues (for summary)
+    const configIssuesCount = toolsNotInstalled + snapshotsBlockers + vmsWithCdConnected + outdatedHWCount;
 
-  // Hardware version distribution for chart
-  const hwVersions = vms.reduce((acc, vm) => {
-    const version = formatHardwareVersion(vm.hardwareVersion);
-    acc[version] = (acc[version] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+    return {
+      toolsNotInstalled,
+      toolsCurrent,
+      outdatedHWCount,
+      snapshotsBlockers,
+      vmsWithSnapshots,
+      vmsWithCdConnected,
+      vmsNeedConsolidation,
+      configIssuesCount,
+    };
+  }, [tools, vms, snapshots, cdDrives]);
 
-  const hwVersionChartData = Object.entries(hwVersions)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => {
-      const aNum = parseInt(a.label.replace('v', ''));
-      const bNum = parseInt(b.label.replace('v', ''));
-      return bNum - aNum;
-    });
+  const { toolsNotInstalled, toolsCurrent, outdatedHWCount, snapshotsBlockers, vmsWithSnapshots, vmsWithCdConnected, vmsNeedConsolidation, configIssuesCount } = configAnalysis;
 
-  // VMware Tools status distribution for chart
-  const toolsStatusMap = tools.reduce((acc, t) => {
-    const status = t.toolsStatus || 'unknown';
-    const normalizedStatus = status.toLowerCase().includes('ok') ? 'Current' :
-                            status.toLowerCase().includes('old') ? 'Outdated' :
-                            status.toLowerCase().includes('notrunning') ? 'Not Running' :
-                            status.toLowerCase().includes('notinstalled') ? 'Not Installed' : 'Unknown';
-    acc[normalizedStatus] = (acc[normalizedStatus] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Hardware version distribution for chart (memoized)
+  const hwVersionChartData = useMemo(() => {
+    const hwVersions = vms.reduce((acc, vm) => {
+      const version = formatHardwareVersion(vm.hardwareVersion);
+      acc[version] = (acc[version] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-  const toolsChartData = Object.entries(toolsStatusMap)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
+    return Object.entries(hwVersions)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => {
+        const aNum = parseInt(a.label.replace('v', ''));
+        const bNum = parseInt(b.label.replace('v', ''));
+        return bNum - aNum;
+      });
+  }, [vms]);
 
-  // Firmware type distribution for chart
-  const firmwareDistribution = vms.reduce((acc, vm) => {
-    const firmware = vm.firmwareType || 'BIOS';
-    const normalizedFirmware = firmware.toLowerCase().includes('efi') ? 'UEFI' : 'BIOS';
-    acc[normalizedFirmware] = (acc[normalizedFirmware] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // VMware Tools status distribution for chart (memoized)
+  const toolsChartData = useMemo(() => {
+    const toolsStatusMap = tools.reduce((acc, t) => {
+      const status = t.toolsStatus || 'unknown';
+      const normalizedStatus = status.toLowerCase().includes('ok') ? 'Current' :
+                              status.toLowerCase().includes('old') ? 'Outdated' :
+                              status.toLowerCase().includes('notrunning') ? 'Not Running' :
+                              status.toLowerCase().includes('notinstalled') ? 'Not Installed' : 'Unknown';
+      acc[normalizedStatus] = (acc[normalizedStatus] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-  const firmwareChartData = Object.entries(firmwareDistribution)
-    .map(([label, value]) => ({ label, value }))
-    .filter(d => d.value > 0);
+    return Object.entries(toolsStatusMap)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [tools]);
+
+  // Firmware type distribution for chart (memoized)
+  const firmwareChartData = useMemo(() => {
+    const firmwareDistribution = vms.reduce((acc, vm) => {
+      const firmware = vm.firmwareType || 'BIOS';
+      const normalizedFirmware = firmware.toLowerCase().includes('efi') ? 'UEFI' : 'BIOS';
+      acc[normalizedFirmware] = (acc[normalizedFirmware] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(firmwareDistribution)
+      .map(([label, value]) => ({ label, value }))
+      .filter(d => d.value > 0);
+  }, [vms]);
 
   return (
     <div className="dashboard-page">

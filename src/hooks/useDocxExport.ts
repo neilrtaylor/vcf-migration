@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { downloadDocx, type DocxExportOptions } from '@/services/export/docxGenerator';
 import type { RVToolsData } from '@/types/rvtools';
 
-interface UseDocxExportReturn {
+export interface UseDocxExportReturn {
   isExporting: boolean;
   error: string | null;
   exportDocx: (data: RVToolsData, options?: DocxExportOptions, filename?: string) => Promise<void>;

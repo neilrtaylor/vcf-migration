@@ -200,9 +200,10 @@ export function CustomProfileEditor({
       onSecondarySubmit={showForm ? handleCancel : undefined}
       size="lg"
       className="custom-profile-editor"
+      aria-describedby="custom-profile-description"
     >
       <div className="custom-profile-editor__content">
-        <p className="custom-profile-editor__description">
+        <p id="custom-profile-description" className="custom-profile-editor__description">
           Define custom VSI profiles with your own specifications and pricing.
           Custom profiles can be used to override auto-mapped profiles for specific VMs.
         </p>
@@ -212,7 +213,7 @@ export function CustomProfileEditor({
           <div className="custom-profile-editor__table">
             <DataTable rows={tableRows} headers={tableHeaders} size="sm">
               {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
-                <Table {...getTableProps()}>
+                <Table {...getTableProps()} aria-label="Custom VSI profiles">
                   <TableHead>
                     <TableRow>
                       {headers.map(header => (

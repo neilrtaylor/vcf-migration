@@ -26,21 +26,21 @@
 
   &__icon {
     &--api {
-      color: $green-50;
+      color: var(--cds-support-success, $green-50);
     }
 
     &--static {
-      color: $yellow-30;
+      color: var(--cds-support-warning, $yellow-30);
     }
 
     &--offline {
-      color: $gray-50;
+      color: var(--cds-text-helper, $gray-50);
     }
   }
 
   &__updated {
     @include type-style('helper-text-01');
-    color: $gray-60;
+    color: var(--cds-text-secondary, $gray-60);
   }
 
   &__button {

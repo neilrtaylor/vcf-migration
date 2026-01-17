@@ -5,6 +5,7 @@
 
 import { withRetry, isRetryableError } from '@/utils/retry';
 import { createLogger, parseApiError, getUserFriendlyMessage } from '@/utils/logger';
+import { deduplicateWithKey } from '@/utils/requestDeduplication';
 
 const logger = createLogger('IBM Cloud API');
 
@@ -712,3 +713,31 @@ export async function testProfilesApiConnection(
     return { success: false, error: message };
   }
 }
+
+// ===== DEDUPLICATED EXPORTS =====
+// These prevent duplicate concurrent API calls
+
+/**
+ * Deduplicated version of fetchAllProfiles.
+ * If called multiple times concurrently with the same region/zone/apiKey, only one API request is made.
+ */
+export const fetchAllProfilesDeduped = deduplicateWithKey(
+  fetchAllProfiles,
+  (region, zone, apiKey) => `fetchAllProfiles:${region}:${zone || ''}:${apiKey ? 'withKey' : 'noKey'}`
+);
+
+/**
+ * Deduplicated version of fetchVPCInstanceProfiles.
+ */
+export const fetchVPCInstanceProfilesDeduped = deduplicateWithKey(
+  fetchVPCInstanceProfiles,
+  (region, apiKey) => `fetchVPCInstanceProfiles:${region}:${apiKey ? 'withKey' : 'noKey'}`
+);
+
+/**
+ * Deduplicated version of fetchVPCBareMetalProfiles.
+ */
+export const fetchVPCBareMetalProfilesDeduped = deduplicateWithKey(
+  fetchVPCBareMetalProfiles,
+  (region, apiKey) => `fetchVPCBareMetalProfiles:${region}:${apiKey ? 'withKey' : 'noKey'}`
+);

@@ -154,4 +154,101 @@
   &__links {
     margin-top: spacing.$spacing-04;
   }
+
+  // Network equipment type list
+  &__network-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-03;
+  }
+
+  &__network-type-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: spacing.$spacing-03;
+    background-color: var(--cds-layer-01, #f4f4f4);
+    border-radius: 4px;
+  }
+
+  &__network-type {
+    @include type.type-style('body-01');
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+
+  // Patterns display
+  &__patterns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: spacing.$spacing-05;
+  }
+
+  &__pattern-category {
+    h5 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-03;
+      color: var(--cds-text-primary, #161616);
+    }
+  }
+
+  &__pattern-section {
+    h5 {
+      @include type.type-style('label-01');
+      margin-bottom: spacing.$spacing-02;
+      margin-top: spacing.$spacing-04;
+      color: var(--cds-text-secondary, #525252);
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+  }
+
+  &__pattern-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-02;
+  }
+
+  // VM tables in accordions
+  &__vm-table {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  &__simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    @include type.type-style('body-compact-01');
+
+    th, td {
+      padding: spacing.$spacing-03;
+      text-align: left;
+      border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+    }
+
+    th {
+      @include type.type-style('label-01');
+      color: var(--cds-text-secondary, #525252);
+      background-color: var(--cds-layer-02, #e0e0e0);
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      color: var(--cds-text-primary, #161616);
+    }
+
+    code {
+      background-color: var(--cds-layer-02, #e0e0e0);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    tr:hover td {
+      background-color: var(--cds-layer-hover-01, #e8e8e8);
+    }
+  }
 }

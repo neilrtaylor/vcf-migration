@@ -1,5 +1,5 @@
 // Discovery page - Workload detection and appliance identification
-import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel } from '@carbon/react';
+import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData, useVMs } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
@@ -22,6 +22,15 @@ interface ApplianceMatch {
   vmName: string;
   matchedPattern: string;
   source: 'name' | 'annotation';
+}
+
+interface NetworkMatch {
+  vmName: string;
+  matchedPattern: string;
+  source: 'name' | 'annotation';
+  guestOS?: string;
+  cpus?: number;
+  memory?: number;
 }
 
 // Detect workloads from VM names and annotations
@@ -101,6 +110,45 @@ function detectAppliances(vms: { vmName: string; annotation: string | null }[]):
   return matches;
 }
 
+// Detect network equipment from VM names and annotations
+function detectNetworkEquipment(
+  vms: { vmName: string; annotation: string | null; guestOS?: string; cpus?: number; memory?: number }[]
+): NetworkMatch[] {
+  const matches: NetworkMatch[] = [];
+  const networkCategory = (workloadPatterns.categories as Record<string, { name: string; patterns: string[] }>).network;
+
+  for (const vm of vms) {
+    const vmNameLower = vm.vmName.toLowerCase();
+    const annotationLower = (vm.annotation || '').toLowerCase();
+
+    for (const pattern of networkCategory.patterns) {
+      if (vmNameLower.includes(pattern)) {
+        matches.push({
+          vmName: vm.vmName,
+          matchedPattern: pattern,
+          source: 'name',
+          guestOS: vm.guestOS,
+          cpus: vm.cpus,
+          memory: vm.memory,
+        });
+        break;
+      } else if (annotationLower.includes(pattern)) {
+        matches.push({
+          vmName: vm.vmName,
+          matchedPattern: pattern,
+          source: 'annotation',
+          guestOS: vm.guestOS,
+          cpus: vm.cpus,
+          memory: vm.memory,
+        });
+        break;
+      }
+    }
+  }
+
+  return matches;
+}
+
 export function DiscoveryPage() {
   const { rawData } = useData();
   const vms = useVMs();
@@ -151,15 +199,29 @@ export function DiscoveryPage() {
   }, {} as Record<string, string[]>);
 
   // ===== NETWORK EQUIPMENT DETECTION =====
-  const networkCategory = (workloadPatterns.categories as Record<string, { name: string; patterns: string[] }>).network;
-  const networkEquipment = poweredOnVMs.filter(vm => {
-    const vmNameLower = vm.vmName.toLowerCase();
-    return networkCategory.patterns.some(p => vmNameLower.includes(p));
-  });
+  const networkMatches = detectNetworkEquipment(poweredOnVMs.map(vm => ({
+    vmName: vm.vmName,
+    annotation: vm.annotation,
+    guestOS: vm.guestOS,
+    cpus: vm.cpus,
+    memory: vm.memory,
+  })));
+
+  // Group network equipment by matched pattern
+  const networkByType = networkMatches.reduce((acc, match) => {
+    const type = match.matchedPattern;
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(match);
+    return acc;
+  }, {} as Record<string, NetworkMatch[]>);
 
   // ===== SUMMARY METRICS =====
   const totalWorkloadVMs = new Set(workloadMatches.map(m => m.vmName)).size;
   const workloadCategories = Object.keys(workloadsByCategory).length;
+
+  // Get patterns for display
+  const categories = workloadPatterns.categories as Record<string, { name: string; patterns: string[] }>;
+  const applianceConfig = workloadPatterns.appliances;
 
   return (
     <div className="discovery-page">
@@ -193,8 +255,8 @@ export function DiscoveryPage() {
         <Column lg={4} md={4} sm={2}>
           <MetricCard
             label="Network Equipment"
-            value={formatNumber(networkEquipment.length)}
-            detail="Cisco, F5, NSX, etc."
+            value={formatNumber(networkMatches.length)}
+            detail={`${Object.keys(networkByType).length} types detected`}
             variant="teal"
             tooltip="Virtual network appliances (routers, load balancers, firewalls) that may need platform-specific alternatives."
           />
@@ -213,8 +275,9 @@ export function DiscoveryPage() {
         <Column lg={16} md={8} sm={4}>
           <Tabs>
             <TabList aria-label="Discovery tabs">
-              <Tab>Workloads</Tab>
-              <Tab>Appliances</Tab>
+              <Tab>Workloads ({totalWorkloadVMs})</Tab>
+              <Tab>Appliances ({uniqueAppliances})</Tab>
+              <Tab>Network Equipment ({networkMatches.length})</Tab>
             </TabList>
             <TabPanels>
               {/* Workloads Panel */}
@@ -252,6 +315,65 @@ export function DiscoveryPage() {
                     </Tile>
                   </Column>
 
+                  {/* Detection Patterns Info */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Accordion>
+                      <AccordionItem title="Detection Patterns Used">
+                        <div className="discovery-page__patterns-grid">
+                          {Object.entries(categories)
+                            .filter(([key]) => key !== 'network') // Network has its own tab
+                            .map(([key, cat]) => (
+                              <div key={key} className="discovery-page__pattern-category">
+                                <h5>{cat.name}</h5>
+                                <div className="discovery-page__pattern-tags">
+                                  {cat.patterns.map(p => (
+                                    <Tag key={p} type="gray" size="sm">{p}</Tag>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </AccordionItem>
+                    </Accordion>
+                  </Column>
+
+                  {/* Detected VMs List */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Accordion>
+                      <AccordionItem title={`Identified Workload VMs (${totalWorkloadVMs})`}>
+                        <div className="discovery-page__vm-table">
+                          {workloadMatches.length > 0 ? (
+                            <table className="discovery-page__simple-table">
+                              <thead>
+                                <tr>
+                                  <th>VM Name</th>
+                                  <th>Category</th>
+                                  <th>Matched Pattern</th>
+                                  <th>Source</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {workloadMatches.slice(0, 100).map((match, idx) => (
+                                  <tr key={`${match.vmName}-${match.category}-${idx}`}>
+                                    <td>{match.vmName}</td>
+                                    <td><Tag type="blue" size="sm">{match.categoryName}</Tag></td>
+                                    <td><code>{match.matchedPattern}</code></td>
+                                    <td>{match.source === 'name' ? 'VM Name' : 'Annotation'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="discovery-page__empty">No workload VMs detected</p>
+                          )}
+                          {workloadMatches.length > 100 && (
+                            <p className="discovery-page__more">Showing first 100 of {workloadMatches.length} matches</p>
+                          )}
+                        </div>
+                      </AccordionItem>
+                    </Accordion>
+                  </Column>
+
                   <Column lg={16} md={8} sm={4}>
                     <Tile className="discovery-page__info-tile">
                       <h4>Workload Detection Method</h4>
@@ -271,14 +393,14 @@ export function DiscoveryPage() {
                 <Grid className="discovery-page__tab-content">
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="discovery-page__list-tile">
-                      <h3>Detected Appliances</h3>
+                      <h3>Detected Appliances by Type</h3>
                       <div className="discovery-page__appliance-list">
                         {Object.entries(appliancesByType)
                           .sort((a, b) => b[1].length - a[1].length)
-                          .map(([type, vms]) => (
+                          .map(([type, vmList]) => (
                             <div key={type} className="discovery-page__appliance-item">
                               <span className="discovery-page__appliance-type">{type}</span>
-                              <Tag type="purple">{vms.length}</Tag>
+                              <Tag type="purple">{vmList.length}</Tag>
                             </div>
                           ))}
                         {Object.keys(appliancesByType).length === 0 && (
@@ -290,24 +412,57 @@ export function DiscoveryPage() {
 
                   <Column lg={8} md={8} sm={4}>
                     <Tile className="discovery-page__list-tile">
-                      <h3>Network Equipment VMs</h3>
-                      <div className="discovery-page__network-list">
-                        {networkEquipment.slice(0, 20).map(vm => (
-                          <div key={vm.vmName} className="discovery-page__network-item">
-                            <span>{vm.vmName}</span>
-                            <Tag type="teal">{vm.powerState === 'poweredOn' ? 'On' : 'Off'}</Tag>
-                          </div>
-                        ))}
-                        {networkEquipment.length > 20 && (
-                          <p className="discovery-page__more">
-                            ... and {networkEquipment.length - 20} more
-                          </p>
-                        )}
-                        {networkEquipment.length === 0 && (
-                          <p className="discovery-page__empty">No network equipment detected</p>
-                        )}
+                      <h3>Detection Patterns</h3>
+                      <div className="discovery-page__pattern-section">
+                        <h5>Name Patterns</h5>
+                        <div className="discovery-page__pattern-tags">
+                          {applianceConfig.patterns.map(p => (
+                            <Tag key={p} type="gray" size="sm">{p}</Tag>
+                          ))}
+                        </div>
+                        <h5>Annotation Patterns</h5>
+                        <div className="discovery-page__pattern-tags">
+                          {applianceConfig.annotationPatterns.map(p => (
+                            <Tag key={p} type="outline" size="sm">{p}</Tag>
+                          ))}
+                        </div>
                       </div>
                     </Tile>
+                  </Column>
+
+                  {/* Detected Appliances List */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Accordion>
+                      <AccordionItem title={`Identified Appliance VMs (${uniqueAppliances})`}>
+                        <div className="discovery-page__vm-table">
+                          {applianceMatches.length > 0 ? (
+                            <table className="discovery-page__simple-table">
+                              <thead>
+                                <tr>
+                                  <th>VM Name</th>
+                                  <th>Matched Pattern</th>
+                                  <th>Source</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {applianceMatches.slice(0, 100).map((match, idx) => (
+                                  <tr key={`${match.vmName}-${idx}`}>
+                                    <td>{match.vmName}</td>
+                                    <td><code>{match.matchedPattern}</code></td>
+                                    <td>{match.source === 'name' ? 'VM Name' : 'Annotation'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="discovery-page__empty">No appliance VMs detected</p>
+                          )}
+                          {applianceMatches.length > 100 && (
+                            <p className="discovery-page__more">Showing first 100 of {applianceMatches.length} matches</p>
+                          )}
+                        </div>
+                      </AccordionItem>
+                    </Accordion>
                   </Column>
 
                   <Column lg={16} md={8} sm={4}>
@@ -318,6 +473,99 @@ export function DiscoveryPage() {
                         VMware infrastructure appliances (vCenter, NSX) typically need to be rebuilt
                         rather than migrated. Third-party appliances may have licensing or support
                         implications when moved to a new platform.
+                      </p>
+                    </Tile>
+                  </Column>
+                </Grid>
+              </TabPanel>
+
+              {/* Network Equipment Panel */}
+              <TabPanel>
+                <Grid className="discovery-page__tab-content">
+                  <Column lg={8} md={8} sm={4}>
+                    <Tile className="discovery-page__list-tile">
+                      <h3>Network Equipment by Type</h3>
+                      <div className="discovery-page__network-type-list">
+                        {Object.entries(networkByType)
+                          .sort((a, b) => b[1].length - a[1].length)
+                          .map(([type, matches]) => (
+                            <div key={type} className="discovery-page__network-type-item">
+                              <span className="discovery-page__network-type">{type}</span>
+                              <Tag type="teal">{matches.length}</Tag>
+                            </div>
+                          ))}
+                        {Object.keys(networkByType).length === 0 && (
+                          <p className="discovery-page__empty">No network equipment detected</p>
+                        )}
+                      </div>
+                    </Tile>
+                  </Column>
+
+                  <Column lg={8} md={8} sm={4}>
+                    <Tile className="discovery-page__list-tile">
+                      <h3>Detection Patterns</h3>
+                      <div className="discovery-page__pattern-section">
+                        <h5>Network Equipment Patterns</h5>
+                        <div className="discovery-page__pattern-tags">
+                          {categories.network.patterns.map(p => (
+                            <Tag key={p} type="gray" size="sm">{p}</Tag>
+                          ))}
+                        </div>
+                      </div>
+                    </Tile>
+                  </Column>
+
+                  {/* Detected Network Equipment List */}
+                  <Column lg={16} md={8} sm={4}>
+                    <Accordion>
+                      <AccordionItem title={`Identified Network Equipment VMs (${networkMatches.length})`}>
+                        <div className="discovery-page__vm-table">
+                          {networkMatches.length > 0 ? (
+                            <table className="discovery-page__simple-table">
+                              <thead>
+                                <tr>
+                                  <th>VM Name</th>
+                                  <th>Matched Pattern</th>
+                                  <th>Guest OS</th>
+                                  <th>vCPUs</th>
+                                  <th>Memory (MiB)</th>
+                                  <th>Source</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {networkMatches.slice(0, 100).map((match, idx) => (
+                                  <tr key={`${match.vmName}-${idx}`}>
+                                    <td>{match.vmName}</td>
+                                    <td><Tag type="teal" size="sm">{match.matchedPattern}</Tag></td>
+                                    <td>{match.guestOS || 'Unknown'}</td>
+                                    <td>{match.cpus || '-'}</td>
+                                    <td>{match.memory ? formatNumber(match.memory) : '-'}</td>
+                                    <td>{match.source === 'name' ? 'VM Name' : 'Annotation'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="discovery-page__empty">No network equipment VMs detected</p>
+                          )}
+                          {networkMatches.length > 100 && (
+                            <p className="discovery-page__more">Showing first 100 of {networkMatches.length} matches</p>
+                          )}
+                        </div>
+                      </AccordionItem>
+                    </Accordion>
+                  </Column>
+
+                  <Column lg={16} md={8} sm={4}>
+                    <Tile className="discovery-page__info-tile">
+                      <h4>Network Equipment Migration Considerations</h4>
+                      <p>
+                        Virtual network appliances (Cisco, F5, NSX, firewalls, load balancers) often require
+                        platform-specific alternatives in the target environment. Consider IBM Cloud VPC
+                        native services like Load Balancer for VPC, Security Groups, and Network ACLs as
+                        potential replacements. Physical or dedicated appliances may be needed for complex
+                        networking requirements. Vendor licensing and support should be verified for any
+                        migrated virtual network appliances.
                       </p>
                     </Tile>
                   </Column>

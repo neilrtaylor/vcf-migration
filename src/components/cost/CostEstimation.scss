@@ -20,7 +20,7 @@
     flex-direction: column;
     align-items: center;
     gap: $spacing-04;
-    color: $gray-60;
+    color: var(--cds-text-secondary, $gray-60);
 
     p {
       @include type-style('body-01');
@@ -86,10 +86,10 @@
   }
 
   &__subtotal-row {
-    background-color: $gray-10 !important;
+    background-color: var(--cds-layer-02, $gray-10) !important;
 
     td {
-      border-top: 1px solid $gray-30;
+      border-top: 1px solid var(--cds-border-subtle-01, $gray-30);
     }
   }
 
@@ -119,15 +119,15 @@
     gap: $spacing-05;
     flex-wrap: wrap;
     @include type-style('helper-text-01');
-    color: $gray-60;
+    color: var(--cds-text-secondary, $gray-60);
     padding-top: $spacing-03;
-    border-top: 1px solid $gray-20;
+    border-top: 1px solid var(--cds-border-subtle-00, $gray-20);
 
     span {
       &::after {
         content: '•';
         margin-left: $spacing-05;
-        color: $gray-40;
+        color: var(--cds-text-helper, $gray-40);
       }
 
       &:last-child::after {
@@ -167,7 +167,7 @@
 
   &__networking-hint {
     @include type-style('helper-text-01');
-    color: $gray-60;
+    color: var(--cds-text-secondary, $gray-60);
     flex: 1;
     min-width: 200px;
   }

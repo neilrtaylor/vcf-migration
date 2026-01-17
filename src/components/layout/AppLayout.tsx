@@ -110,9 +110,11 @@ export function AppLayout() {
         onRequestSubmit={handleExport}
         primaryButtonDisabled={isExporting}
         size="sm"
+        selectorPrimaryFocus="#opt-executive"
+        aria-describedby="export-modal-description"
       >
         <div className="pdf-export-modal">
-          <p className="pdf-export-modal__description">
+          <p id="export-modal-description" className="pdf-export-modal__description">
             Select the sections to include in your PDF report.
           </p>
 

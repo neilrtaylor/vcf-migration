@@ -355,7 +355,7 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
         <Tile className="cost-estimation__details">
           <DataTable rows={tableRows} headers={tableHeaders} size="md">
             {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
-              <Table {...getTableProps()}>
+              <Table {...getTableProps()} aria-label="Cost estimation line items">
                 <TableHead>
                   <TableRow>
                     {headers.map((header) => (

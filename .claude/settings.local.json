@@ -34,7 +34,10 @@
       "Bash(fi)",
       "Bash(bash:*)",
       "Bash(wc:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(done)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

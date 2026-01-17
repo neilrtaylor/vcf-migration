@@ -1,6 +1,6 @@
 // Reusable metric card component with colored left border
 import { Tile, Tooltip } from '@carbon/react';
-import { Information } from '@carbon/icons-react';
+import { Information, CheckmarkFilled, WarningFilled, ErrorFilled } from '@carbon/icons-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/utils/constants';
 import './MetricCard.scss';
@@ -26,6 +26,32 @@ interface MetricCardProps {
   docSection?: string; // Optional anchor for documentation page
 }
 
+// Map variant to screen reader status text
+const variantStatusText: Record<MetricCardVariant, string | null> = {
+  default: null,
+  primary: null,
+  success: 'Status: OK',
+  warning: 'Status: Warning',
+  error: 'Status: Critical',
+  info: null,
+  purple: null,
+  teal: null,
+};
+
+// Map variant to status icon
+function getStatusIcon(variant: MetricCardVariant) {
+  switch (variant) {
+    case 'success':
+      return <CheckmarkFilled size={16} className="metric-card__status-icon metric-card__status-icon--success" aria-hidden="true" />;
+    case 'warning':
+      return <WarningFilled size={16} className="metric-card__status-icon metric-card__status-icon--warning" aria-hidden="true" />;
+    case 'error':
+      return <ErrorFilled size={16} className="metric-card__status-icon metric-card__status-icon--error" aria-hidden="true" />;
+    default:
+      return null;
+  }
+}
+
 export function MetricCard({
   label,
   value,
@@ -37,6 +63,8 @@ export function MetricCard({
   docSection,
 }: MetricCardProps) {
   const hasTooltip = tooltip || docSection;
+  const statusText = variantStatusText[variant];
+  const statusIcon = getStatusIcon(variant);
 
   return (
     <Tile
@@ -61,13 +89,17 @@ export function MetricCard({
             }
             align="top"
           >
-            <button type="button" className="metric-card__info-button">
-              <Information size={16} />
+            <button type="button" className="metric-card__info-button" aria-label={`More information about ${label}`}>
+              <Information size={16} aria-hidden="true" />
             </button>
           </Tooltip>
         )}
       </div>
-      <span className="metric-card__value">{value}</span>
+      <div className="metric-card__value-container">
+        {statusIcon}
+        <span className="metric-card__value">{value}</span>
+        {statusText && <span className="visually-hidden">{statusText}</span>}
+      </div>
       {detail && <span className="metric-card__detail">{detail}</span>}
     </Tile>
   );

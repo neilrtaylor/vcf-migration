@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { downloadExcel } from '@/services/export';
 import type { RVToolsData } from '@/types/rvtools';
 
-interface UseExcelExportReturn {
+export interface UseExcelExportReturn {
   isExporting: boolean;
   error: string | null;
   exportExcel: (data: RVToolsData, filename?: string) => void;

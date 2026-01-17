@@ -90,39 +90,41 @@ export function PDFExport({ variant = 'primary', size = 'md' }: PDFExportProps) 
         onRequestSubmit={handleExport}
         primaryButtonDisabled={isExporting}
         size="sm"
+        selectorPrimaryFocus="#pdf-opt-executive"
+        aria-describedby="pdf-export-description"
       >
         <div className="pdf-export-modal">
-          <p className="pdf-export-modal__description">
+          <p id="pdf-export-description" className="pdf-export-modal__description">
             Select the sections to include in your PDF report.
           </p>
 
           <div className="pdf-export-modal__options">
             <Checkbox
-              id="opt-executive"
+              id="pdf-opt-executive"
               labelText="Executive Summary"
               checked={options.includeExecutiveSummary}
               onChange={() => handleOptionChange('includeExecutiveSummary')}
             />
             <Checkbox
-              id="opt-compute"
+              id="pdf-opt-compute"
               labelText="Compute Analysis"
               checked={options.includeComputeAnalysis}
               onChange={() => handleOptionChange('includeComputeAnalysis')}
             />
             <Checkbox
-              id="opt-storage"
+              id="pdf-opt-storage"
               labelText="Storage Analysis"
               checked={options.includeStorageAnalysis}
               onChange={() => handleOptionChange('includeStorageAnalysis')}
             />
             <Checkbox
-              id="opt-mtv"
+              id="pdf-opt-mtv"
               labelText="Migration Readiness (MTV)"
               checked={options.includeMTVReadiness}
               onChange={() => handleOptionChange('includeMTVReadiness')}
             />
             <Checkbox
-              id="opt-vmlist"
+              id="pdf-opt-vmlist"
               labelText="VM Inventory List (first 50)"
               checked={options.includeVMList}
               onChange={() => handleOptionChange('includeVMList')}

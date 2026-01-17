@@ -41,6 +41,7 @@ interface EnhancedDataTableProps<T extends object> {
   columns: ColumnDef<T, unknown>[];
   title?: string;
   description?: string;
+  ariaLabel?: string;
   enableSearch?: boolean;
   enablePagination?: boolean;
   enableSorting?: boolean;
@@ -56,6 +57,7 @@ export function EnhancedDataTable<T extends object>({
   columns,
   title,
   description,
+  ariaLabel,
   enableSearch = true,
   enablePagination = true,
   enableSorting = true,
@@ -179,7 +181,7 @@ export function EnhancedDataTable<T extends object>({
           </TableToolbarContent>
         </TableToolbar>
 
-        <Table>
+        <Table aria-label={ariaLabel || title || 'Data table'}>
           <TableHead>
             {table.getHeaderGroups().map(headerGroup => (
               <CarbonTableRow key={headerGroup.id}>

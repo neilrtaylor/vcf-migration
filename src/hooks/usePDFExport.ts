@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { generatePDF, downloadPDF } from '@/services/export';
 import type { RVToolsData } from '@/types/rvtools';
 
-interface PDFExportOptions {
+export interface PDFExportOptions {
   includeExecutiveSummary?: boolean;
   includeComputeAnalysis?: boolean;
   includeStorageAnalysis?: boolean;
@@ -11,7 +11,7 @@ interface PDFExportOptions {
   includeVMList?: boolean;
 }
 
-interface UsePDFExportReturn {
+export interface UsePDFExportReturn {
   isExporting: boolean;
   progress: number;
   error: string | null;

@@ -96,7 +96,9 @@
       "patterns": [
         "cisco", "ucs", "nexus", "aci", "f5", "bigip", "ltm", "gtm",
         "infoblox", "bluecat", "dns", "dhcp", "loadbalancer", "lb",
-        "firewall", "fw", "router", "switch", "vpn", "proxy"
+        "firewall", "fw", "router", "switch", "vpn", "proxy",
+        "fortigate", "fgt", "fortinet",
+        "paloalto", "palo-alto", "pan-", "juniper", "srx", "junos"
       ]
     },
     "cloud": {
