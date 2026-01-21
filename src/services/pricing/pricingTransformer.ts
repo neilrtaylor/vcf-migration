@@ -289,6 +289,7 @@ export function transformBlockStorageProfiles(
 /**
  * Merge API-fetched pricing with static fallback data
  * This ensures we have complete data even if API returns partial results
+ * Preserves roksSupported from static data since API doesn't provide it
  */
 export function mergeWithStaticPricing(
   apiData: Partial<{
@@ -299,6 +300,23 @@ export function mergeWithStaticPricing(
 ): IBMCloudPricing {
   const staticPricing = getStaticPricing();
 
+  // Merge bare metal profiles, preserving roksSupported from static data
+  const mergedBareMetal: Record<string, BareMetalProfile> = { ...staticPricing.bareMetal };
+  if (apiData.bareMetal) {
+    for (const [name, apiProfile] of Object.entries(apiData.bareMetal)) {
+      const staticProfile = staticPricing.bareMetal[name];
+      mergedBareMetal[name] = {
+        ...apiProfile,
+        // Preserve roksSupported from static data (API doesn't provide this)
+        roksSupported: staticProfile?.roksSupported ?? apiProfile.roksSupported,
+        // Also preserve NVMe details from static if API doesn't have them
+        nvmeDisks: apiProfile.nvmeDisks ?? staticProfile?.nvmeDisks,
+        nvmeSizeGB: apiProfile.nvmeSizeGB ?? staticProfile?.nvmeSizeGB,
+        totalNvmeGB: apiProfile.totalNvmeGB ?? staticProfile?.totalNvmeGB,
+      };
+    }
+  }
+
   return {
     ...staticPricing,
     // Update version to indicate API data
@@ -308,11 +326,8 @@ export function mergeWithStaticPricing(
       ...staticPricing.vsi,
       ...(apiData.vsi || {}),
     },
-    // Merge bare metal profiles
-    bareMetal: {
-      ...staticPricing.bareMetal,
-      ...(apiData.bareMetal || {}),
-    },
+    // Merge bare metal profiles with preserved roksSupported
+    bareMetal: mergedBareMetal,
     // Merge block storage tiers
     blockStorage: {
       ...staticPricing.blockStorage,
@@ -372,11 +387,12 @@ export function transformProxyToAppPricing(proxyData: ProxyPricingResponse): IBM
     };
   }
 
-  // Transform bare metal profiles from proxy format
+  // Transform bare metal profiles from proxy format, preserving roksSupported from static data
   const bareMetalProfiles: Record<string, BareMetalProfile> = {};
   for (const [profileName, profile] of Object.entries(proxyData.bareMetal || {})) {
     const family = detectFamily(profileName);
     const hasNvme = profileName.includes('d-metal') || profileName.includes('d.metal');
+    const staticProfile = staticPricing.bareMetal[profileName];
     bareMetalProfiles[profileName] = {
       profile: profileName,
       family,
@@ -384,14 +400,16 @@ export function transformProxyToAppPricing(proxyData: ProxyPricingResponse): IBM
       physicalCores: Math.floor(profile.vcpus / 2),
       memoryGiB: profile.memoryGiB,
       hasNvme,
+      // Preserve roksSupported from static data (proxy doesn't provide this)
+      roksSupported: staticProfile?.roksSupported,
       hourlyRate: profile.monthlyRate / HOURS_PER_MONTH,
       monthlyRate: profile.monthlyRate,
       description: `${family.charAt(0).toUpperCase() + family.slice(1)} bare metal - ${profile.vcpus} vCPUs, ${profile.memoryGiB} GiB RAM`,
     };
     if (hasNvme && profile.storageGiB) {
-      bareMetalProfiles[profileName].nvmeDisks = 8;
-      bareMetalProfiles[profileName].nvmeSizeGB = Math.round(profile.storageGiB / 8);
-      bareMetalProfiles[profileName].totalNvmeGB = profile.storageGiB;
+      bareMetalProfiles[profileName].nvmeDisks = staticProfile?.nvmeDisks ?? 8;
+      bareMetalProfiles[profileName].nvmeSizeGB = staticProfile?.nvmeSizeGB ?? Math.round(profile.storageGiB / 8);
+      bareMetalProfiles[profileName].totalNvmeGB = staticProfile?.totalNvmeGB ?? profile.storageGiB;
     }
   }
 

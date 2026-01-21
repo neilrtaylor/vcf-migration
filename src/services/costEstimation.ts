@@ -1,7 +1,7 @@
 // IBM Cloud Cost Estimation Service
 import ibmCloudConfig from '@/data/ibmCloudConfig.json';
 import type { IBMCloudPricing } from '@/services/pricing/pricingCache';
-import { getCurrentPricing } from '@/services/pricing/pricingCache';
+import { getCurrentPricing, getStaticPricing } from '@/services/pricing/pricingCache';
 
 // ===== TYPES =====
 
@@ -190,9 +190,25 @@ export function validateDiscountType(discountType: string, pricing?: IBMCloudPri
 // Helper to get active pricing data (dynamic or static fallback)
 function getActivePricing(): IBMCloudPricing {
   try {
-    return getCurrentPricing().data;
+    const current = getCurrentPricing();
+    // Ensure all required properties exist by merging with static pricing
+    const staticData = getStaticPricing();
+    return {
+      ...staticData,
+      ...current.data,
+      // Ensure nested objects exist
+      bareMetal: current.data.bareMetal || staticData.bareMetal,
+      vsi: current.data.vsi || staticData.vsi,
+      regions: current.data.regions || staticData.regions,
+      discounts: current.data.discounts || staticData.discounts,
+      blockStorage: current.data.blockStorage || staticData.blockStorage,
+      networking: current.data.networking || staticData.networking,
+      roks: current.data.roks || staticData.roks,
+      storageAddons: current.data.storageAddons || staticData.storageAddons,
+      odfWorkloadProfiles: current.data.odfWorkloadProfiles || staticData.odfWorkloadProfiles,
+    };
   } catch {
-    return ibmCloudConfig as unknown as IBMCloudPricing;
+    return getStaticPricing();
   }
 }
 
@@ -235,6 +251,10 @@ export type DiscountType = keyof typeof ibmCloudConfig.discounts;
  */
 export function getRegions(pricing?: IBMCloudPricing): { code: string; name: string; multiplier: number }[] {
   const data = pricing || getActivePricing();
+  if (!data.regions) {
+    console.warn('[getRegions] regions is undefined, returning defaults');
+    return [{ code: 'us-south', name: 'Dallas', multiplier: 1.0 }];
+  }
   return Object.entries(data.regions).map(([code, region]) => ({
     code,
     name: region.name,
@@ -247,6 +267,10 @@ export function getRegions(pricing?: IBMCloudPricing): { code: string; name: str
  */
 export function getDiscountOptions(pricing?: IBMCloudPricing): { id: string; name: string; discountPct: number; description: string }[] {
   const data = pricing || getActivePricing();
+  if (!data.discounts) {
+    console.warn('[getDiscountOptions] discounts is undefined, returning defaults');
+    return [{ id: 'onDemand', name: 'On-Demand', discountPct: 0, description: 'Pay-as-you-go' }];
+  }
   return Object.entries(data.discounts).map(([id, discount]) => ({
     id,
     name: discount.name,
@@ -260,6 +284,10 @@ export function getDiscountOptions(pricing?: IBMCloudPricing): { id: string; nam
  */
 export function getBareMetalProfiles(pricing?: IBMCloudPricing) {
   const data = pricing || getActivePricing();
+  if (!data.bareMetal) {
+    console.warn('[getBareMetalProfiles] bareMetal is undefined, returning empty array');
+    return [];
+  }
   return Object.entries(data.bareMetal).map(([id, profile]) => ({
     id,
     ...profile,
@@ -271,6 +299,10 @@ export function getBareMetalProfiles(pricing?: IBMCloudPricing) {
  */
 export function getVSIProfiles(pricing?: IBMCloudPricing) {
   const data = pricing || getActivePricing();
+  if (!data.vsi) {
+    console.warn('[getVSIProfiles] vsi is undefined, returning empty array');
+    return [];
+  }
   return Object.entries(data.vsi).map(([id, profile]) => ({
     id,
     ...profile,
@@ -282,6 +314,10 @@ export function getVSIProfiles(pricing?: IBMCloudPricing) {
  */
 export function getODFProfiles(pricing?: IBMCloudPricing) {
   const data = pricing || getActivePricing();
+  if (!data.odfWorkloadProfiles) {
+    console.warn('[getODFProfiles] odfWorkloadProfiles is undefined, returning empty array');
+    return [];
+  }
   return Object.entries(data.odfWorkloadProfiles).map(([id, profile]) => ({
     id,
     ...profile,
@@ -299,8 +335,10 @@ export function calculateROKSCost(
 ): CostEstimate {
   const pricingToUse = pricing || getActivePricing();
   const lineItems: CostLineItem[] = [];
-  const regionData = pricingToUse.regions[region];
-  const discountData = pricingToUse.discounts[discountType];
+
+  // Defensive checks for required pricing data
+  const regionData = pricingToUse.regions?.[region] || { name: 'Dallas', multiplier: 1.0, availabilityZones: 3 };
+  const discountData = pricingToUse.discounts?.[discountType] || { name: 'On-Demand', discountPct: 0, description: 'Pay-as-you-go' };
   const multiplier = regionData.multiplier;
 
   // Compute nodes (bare metal)
@@ -357,31 +395,32 @@ export function calculateROKSCost(
     // Block storage for hybrid
     if (input.storageTiB && input.storageTiB > 0) {
       const tier = input.storageTier || '10iops';
-      const storageTierData = pricingToUse.blockStorage[tier];
+      const storageTierData = pricingToUse.blockStorage?.[tier];
       const storageGB = input.storageTiB * 1024;
-      const costPerGB = (storageTierData.costPerGBMonth || 0.10) * multiplier;
+      const costPerGB = (storageTierData?.costPerGBMonth || 0.10) * multiplier;
 
       lineItems.push({
         category: 'Storage - Block',
-        description: `Block Storage - ${storageTierData.tierName}`,
+        description: `Block Storage - ${storageTierData?.tierName || tier}`,
         quantity: storageGB,
         unit: 'GB',
         unitCost: costPerGB,
         monthlyCost: storageGB * costPerGB,
         annualCost: storageGB * costPerGB * 12,
-        notes: storageTierData.description,
+        notes: storageTierData?.description || `${tier} IOPS tier`,
       });
     }
   }
 
   // Networking (basic setup)
-  const networkingCost = pricingToUse.networking.loadBalancer.perLBMonthly * multiplier * 2; // 2 LBs
+  const lbCostPerMonth = pricingToUse.networking?.loadBalancer?.perLBMonthly ?? 21.60;
+  const networkingCost = lbCostPerMonth * multiplier * 2; // 2 LBs
   lineItems.push({
     category: 'Networking',
     description: 'Load Balancers (2x)',
     quantity: 2,
     unit: 'LBs',
-    unitCost: pricingToUse.networking.loadBalancer.perLBMonthly * multiplier,
+    unitCost: lbCostPerMonth * multiplier,
     monthlyCost: networkingCost,
     annualCost: networkingCost * 12,
     notes: 'Application Load Balancers for ingress',
@@ -431,8 +470,10 @@ export function calculateVSICost(
 ): CostEstimate {
   const pricingToUse = pricing || getActivePricing();
   const lineItems: CostLineItem[] = [];
-  const regionData = pricingToUse.regions[region];
-  const discountData = pricingToUse.discounts[discountType];
+
+  // Defensive checks for required pricing data
+  const regionData = pricingToUse.regions?.[region] || { name: 'Dallas', multiplier: 1.0, availabilityZones: 3 };
+  const discountData = pricingToUse.discounts?.[discountType] || { name: 'On-Demand', discountPct: 0, description: 'Pay-as-you-go' };
   const multiplier = regionData.multiplier;
 
   // Group VSI profiles
@@ -466,29 +507,30 @@ export function calculateVSICost(
   // Block storage
   if (input.storageTiB > 0) {
     const tier = input.storageTier || '10iops';
-    const storageTierData = pricingToUse.blockStorage[tier];
+    const storageTierData = pricingToUse.blockStorage?.[tier];
     const storageGB = input.storageTiB * 1024;
-    const costPerGB = (storageTierData.costPerGBMonth || 0.10) * multiplier;
+    const costPerGB = (storageTierData?.costPerGBMonth || 0.10) * multiplier;
 
     lineItems.push({
       category: 'Storage - Block',
-      description: `Block Storage - ${storageTierData.tierName}`,
+      description: `Block Storage - ${storageTierData?.tierName || tier}`,
       quantity: storageGB,
       unit: 'GB',
       unitCost: costPerGB,
       monthlyCost: storageGB * costPerGB,
       annualCost: storageGB * costPerGB * 12,
-      notes: storageTierData.description,
+      notes: storageTierData?.description || `${tier} IOPS tier`,
     });
   }
 
   // Networking
   const netOpts = input.networking || {};
   const loadBalancerCount = netOpts.loadBalancerCount ?? 1;
+  const networking = pricingToUse.networking || {};
 
   // Load Balancer(s)
   if (loadBalancerCount > 0) {
-    const lbCost = pricingToUse.networking.loadBalancer.perLBMonthly * multiplier;
+    const lbCost = (networking.loadBalancer?.perLBMonthly ?? 21.60) * multiplier;
     lineItems.push({
       category: 'Networking',
       description: 'Application Load Balancer',
@@ -504,7 +546,7 @@ export function calculateVSICost(
   // VPN Gateway
   if (netOpts.includeVPN) {
     const vpnCount = netOpts.vpnGatewayCount || 1;
-    const vpnCost = pricingToUse.networking.vpnGateway.perGatewayMonthly * multiplier;
+    const vpnCost = (networking.vpnGateway?.perGatewayMonthly ?? 99) * multiplier;
     lineItems.push({
       category: 'Networking',
       description: 'VPN Gateway',
@@ -521,11 +563,11 @@ export function calculateVSICost(
   if (netOpts.includeTransitGateway) {
     const localConns = netOpts.transitGatewayLocalConnections || 1;
     const globalConns = netOpts.transitGatewayGlobalConnections || 0;
-    const transitGw = pricingToUse.networking.transitGateway;
+    const transitGw = networking.transitGateway || { localConnectionMonthly: 50, globalConnectionMonthly: 100 };
 
     // Local connections
     if (localConns > 0) {
-      const localConnCost = transitGw.localConnectionMonthly * multiplier;
+      const localConnCost = (transitGw.localConnectionMonthly ?? 50) * multiplier;
       lineItems.push({
         category: 'Networking',
         description: 'Transit Gateway - Local Connection',
@@ -540,7 +582,7 @@ export function calculateVSICost(
 
     // Global connections
     if (globalConns > 0) {
-      const globalConnCost = transitGw.globalConnectionMonthly * multiplier;
+      const globalConnCost = (transitGw.globalConnectionMonthly ?? 100) * multiplier;
       lineItems.push({
         category: 'Networking',
         description: 'Transit Gateway - Global Connection',
@@ -557,7 +599,7 @@ export function calculateVSICost(
   // Public Gateway
   if (netOpts.includePublicGateway) {
     const pgwCount = netOpts.publicGatewayCount || 1;
-    const pgwCost = pricingToUse.networking.publicGateway.perGatewayMonthly * multiplier;
+    const pgwCost = (networking.publicGateway?.perGatewayMonthly ?? 5) * multiplier;
     lineItems.push({
       category: 'Networking',
       description: 'Public Gateway',

@@ -14,6 +14,7 @@ export interface BareMetalProfile {
   nvmeDisks?: number;
   nvmeSizeGB?: number;
   totalNvmeGB?: number;
+  roksSupported?: boolean;
   hourlyRate: number;
   monthlyRate: number;
   description: string;
@@ -120,9 +121,22 @@ export function getCachedPricing(): CachedPricing | null {
     if (!cached) return null;
 
     const parsed = JSON.parse(cached) as CachedPricing;
+
+    // Validate that cached data has required structure
+    if (!parsed.data ||
+        !parsed.data.bareMetal ||
+        !parsed.data.vsi ||
+        !parsed.data.regions ||
+        !parsed.data.discounts) {
+      console.warn('Cached pricing data is incomplete, clearing cache');
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+
     return parsed;
   } catch (error) {
     console.warn('Failed to read pricing cache:', error);
+    localStorage.removeItem(CACHE_KEY);
     return null;
   }
 }
@@ -202,6 +216,7 @@ export function getStaticPricing(): IBMCloudPricing {
       vcpus: number;
       memoryGiB: number;
       hasNvme: boolean;
+      roksSupported?: boolean;
       nvmeDisks?: number;
       nvmeSizeGiB?: number;
       totalNvmeGiB?: number;
@@ -252,6 +267,7 @@ export function getStaticPricing(): IBMCloudPricing {
         nvmeDisks: profile.nvmeDisks,
         nvmeSizeGB: profile.nvmeSizeGiB,
         totalNvmeGB: profile.totalNvmeGiB,
+        roksSupported: profile.roksSupported,
         hourlyRate: profile.hourlyRate,
         monthlyRate: profile.monthlyRate,
         description: profile.description,

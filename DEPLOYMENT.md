@@ -361,6 +361,13 @@ server {
 ### Step 2: Deploy to Code Engine
 
 ```bash
+# Set target region (choose closest to your users)
+ibmcloud target -r us-south
+
+# Create a resource group (or use existing)
+ibmcloud resource group-create vcf-migration-rg
+ibmcloud target -g vcf-migration-rg
+
 # Install Code Engine plugin
 ibmcloud plugin install code-engine
 

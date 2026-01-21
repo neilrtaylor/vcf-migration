@@ -194,6 +194,27 @@ export function useDynamicProfiles(
       const counts = countProfiles(newProfiles);
       console.log('[Dynamic Profiles] Successfully updated to LIVE API profiles:', counts);
 
+      // Log final bare metal profiles being used (for debugging incorrect specs)
+      const allBareMetals = [
+        ...newProfiles.bareMetalProfiles.balanced,
+        ...newProfiles.bareMetalProfiles.compute,
+        ...newProfiles.bareMetalProfiles.memory,
+        ...newProfiles.bareMetalProfiles.veryHighMemory,
+      ];
+      console.groupCollapsed('[Dynamic Profiles] FINAL Bare Metal Profiles in App (click to expand)');
+      console.table(allBareMetals.map(p => ({
+        name: p.name,
+        physicalCores: p.physicalCores,
+        vcpus: p.vcpus,
+        memoryGiB: p.memoryGiB,
+        roksSupported: p.roksSupported,
+        hasNvme: p.hasNvme,
+        nvmeDisks: p.nvmeDisks,
+        nvmeSizeGiB: p.nvmeSizeGiB,
+        totalNvmeGiB: p.totalNvmeGiB,
+      })));
+      console.groupEnd();
+
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch profiles';

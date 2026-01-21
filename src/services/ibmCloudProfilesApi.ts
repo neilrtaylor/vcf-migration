@@ -418,7 +418,18 @@ export async function fetchVPCBareMetalProfiles(
 export function transformVPCBareMetalProfiles(profiles: VPCBareMetalProfile[]): TransformedProfile[] {
   const result: TransformedProfile[] = [];
 
+  logger.info('Transforming VPC Bare Metal profiles', { count: profiles.length });
+
   for (const profile of profiles) {
+    // Log raw API data for debugging
+    logger.debug(`Raw API profile: ${profile.name}`, {
+      cpu_core_count: profile.cpu_core_count,
+      cpu_socket_count: profile.cpu_socket_count,
+      memory: profile.memory,
+      bandwidth: profile.bandwidth,
+      disks: profile.disks,
+    });
+
     // Find NVMe storage disk (skip boot disks with size 480 or 960)
     const storageDisk = profile.disks.find(d =>
       (d.supported_interface_types.default === 'nvme' ||
@@ -443,8 +454,33 @@ export function transformVPCBareMetalProfiles(profiles: VPCBareMetalProfile[]): 
       totalNvmeGiB: hasNvme ? nvmeDisks * nvmeSizeGiB : undefined,
     };
 
+    // Log transformed profile
+    logger.debug(`Transformed profile: ${transformed.name}`, {
+      physicalCores: transformed.physicalCores,
+      vcpus: transformed.vcpus,
+      memoryGiB: transformed.memoryGiB,
+      hasNvme: transformed.hasNvme,
+      nvmeDisks: transformed.nvmeDisks,
+      nvmeSizeGiB: transformed.nvmeSizeGiB,
+      totalNvmeGiB: transformed.totalNvmeGiB,
+    });
+
     result.push(transformed);
   }
+
+  // Log summary table of all profiles
+  console.groupCollapsed('[IBM Cloud API] Bare Metal Profiles Summary (click to expand)');
+  console.table(result.map(p => ({
+    name: p.name,
+    physicalCores: p.physicalCores,
+    vcpus: p.vcpus,
+    memoryGiB: p.memoryGiB,
+    hasNvme: p.hasNvme,
+    nvmeDisks: p.nvmeDisks,
+    nvmeSizeGiB: p.nvmeSizeGiB,
+    totalNvmeGiB: p.totalNvmeGiB,
+  })));
+  console.groupEnd();
 
   // Sort by vcpus
   return result.sort((a, b) => a.vcpus - b.vcpus);
@@ -553,11 +589,27 @@ export function transformROKSMachineTypes(machineTypes: ROKSMachineType[]): {
   const vsi: TransformedProfile[] = [];
   const bareMetal: TransformedProfile[] = [];
 
+  logger.info('Transforming ROKS machine types', { count: machineTypes.length });
+
   for (const mt of machineTypes) {
-    if (mt.deprecated) continue;
+    if (mt.deprecated) {
+      logger.debug(`Skipping deprecated: ${mt.name}`);
+      continue;
+    }
 
     const isBM = mt.serverType === 'bare_metal' || mt.name.includes('.metal.');
     const hasNvme = mt.storage?.some(s => s.type === 'nvme') || false;
+
+    // Log raw ROKS data for bare metal profiles
+    if (isBM) {
+      logger.debug(`Raw ROKS bare metal: ${mt.name}`, {
+        cores: mt.cores,
+        memory: mt.memory,
+        serverType: mt.serverType,
+        storage: mt.storage,
+        networkSpeed: mt.networkSpeed,
+      });
+    }
 
     const profile: TransformedProfile = {
       name: mt.name,
@@ -580,6 +632,22 @@ export function transformROKSMachineTypes(machineTypes: ROKSMachineType[]): {
     } else {
       vsi.push(profile);
     }
+  }
+
+  // Log ROKS bare metal summary
+  if (bareMetal.length > 0) {
+    console.groupCollapsed('[IBM Cloud API] ROKS Bare Metal Flavors (click to expand)');
+    console.table(bareMetal.map(p => ({
+      name: p.name,
+      physicalCores: p.physicalCores,
+      vcpus: p.vcpus,
+      memoryGiB: p.memoryGiB,
+      hasNvme: p.hasNvme,
+      nvmeDisks: p.nvmeDisks,
+      nvmeSizeGiB: p.nvmeSizeGiB,
+      totalNvmeGiB: p.totalNvmeGiB,
+    })));
+    console.groupEnd();
   }
 
   return {

@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "update-profiles": "npx tsx scripts/update-profiles.ts",
+    "update-pricing": "npx tsx scripts/update-pricing.ts",
+    "update-all": "npx tsx scripts/update-profiles.ts && npx tsx scripts/update-pricing.ts"
   },
   "dependencies": {
     "@carbon/icons-react": "^11.71.0",

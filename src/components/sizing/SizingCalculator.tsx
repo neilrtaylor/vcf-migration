@@ -49,6 +49,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
 
   // Dynamic profiles hook for refreshing from API
   const {
+    profiles: dynamicProfiles,
     isRefreshing: isRefreshingProfiles,
     lastUpdated: profilesLastUpdated,
     source: profilesSource,
@@ -59,10 +60,11 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
   } = useDynamicProfiles();
 
   // Get bare metal profiles (flatten from family-organized structure)
-  // Include all profiles, not just NVMe-enabled ones
+  // Use dynamic profiles from API if available, otherwise fall back to static config
   const bareMetalProfiles = useMemo(() => {
     const profiles: BareMetalProfile[] = [];
-    const bmProfiles = ibmCloudConfig.bareMetalProfiles;
+    // Use dynamic profiles from API (updated via useDynamicProfiles hook)
+    const bmProfiles = dynamicProfiles.bareMetalProfiles;
     for (const family of Object.keys(bmProfiles) as Array<keyof typeof bmProfiles>) {
       profiles.push(...(bmProfiles[family] as BareMetalProfile[]));
     }
@@ -77,7 +79,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       // Then by memory (higher first)
       return b.memoryGiB - a.memoryGiB;
     });
-  }, []);
+  }, [dynamicProfiles.bareMetalProfiles]);
   const defaults = ibmCloudConfig.defaults;
 
   // Default to first profile with NVMe (best for ROKS/ODF)
@@ -104,6 +106,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
   const systemReservedMemory = 4; // GiB for kubelet, monitoring, etc. (not ODF)
   const systemReservedCpu = 1; // Cores for OpenShift system processes
   const [nodeRedundancy, setNodeRedundancy] = useState(defaults.nodeRedundancy);
+  const [evictionThreshold, setEvictionThreshold] = useState(96); // 96% = 4% buffer before eviction
   const [storageMetric, setStorageMetric] = useState<'provisioned' | 'inUse' | 'diskCapacity'>('inUse'); // Recommended: use actual data footprint
   const [annualGrowthRate, setAnnualGrowthRate] = useState(20); // 20% annual growth default
   const [planningHorizonYears, setPlanningHorizonYears] = useState(2); // 2-year planning horizon
@@ -208,7 +211,36 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     // Total storage with all factors applied
     const totalStorageGiB = baseStorageGiB * growthMultiplier * virtOverheadMultiplier;
 
-    // Nodes required for each dimension (guard against division by zero)
+    // N+X Redundancy Calculation
+    // We need enough nodes so that after nodeRedundancy failures,
+    // the remaining nodes can handle the workload below thresholds:
+    // - CPU/Memory: eviction threshold (triggers VM migration)
+    // - Storage: ODF operational capacity (Ceph degrades above this)
+    const evictionFactor = evictionThreshold / 100;
+    const storageOperationalFactor = operationalCapacity / 100;
+    const effectiveCpuCapacity = nodeCapacity.vcpuCapacity * evictionFactor;
+    const effectiveMemoryCapacity = nodeCapacity.memoryCapacity * evictionFactor;
+    const effectiveStorageCapacity = nodeCapacity.usableStorageGiB * storageOperationalFactor;
+
+    // Nodes required for each dimension at eviction threshold (guard against division by zero)
+    // These are the minimum nodes needed to handle workload AFTER N failures
+    const nodesForCPUAtThreshold = effectiveCpuCapacity > 0
+      ? Math.ceil(totalVCPUs / effectiveCpuCapacity)
+      : 0;
+    const nodesForMemoryAtThreshold = effectiveMemoryCapacity > 0
+      ? Math.ceil(totalMemoryGiB / effectiveMemoryCapacity)
+      : 0;
+    const nodesForStorageAtThreshold = effectiveStorageCapacity > 0
+      ? Math.ceil(totalStorageGiB / effectiveStorageCapacity)
+      : 0;
+
+    // Minimum surviving nodes needed (at least 3 for ODF quorum)
+    const minSurvivingNodes = Math.max(3, nodesForCPUAtThreshold, nodesForMemoryAtThreshold, nodesForStorageAtThreshold);
+
+    // Total nodes = surviving nodes + redundancy buffer
+    const totalNodes = minSurvivingNodes + nodeRedundancy;
+
+    // Also calculate base nodes without redundancy consideration (for display)
     const nodesForCPU = nodeCapacity.vcpuCapacity > 0
       ? Math.ceil(totalVCPUs / nodeCapacity.vcpuCapacity)
       : 0;
@@ -217,17 +249,15 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       : 0;
     const nodesForStorage = nodeCapacity.usableStorageGiB > 0
       ? Math.ceil(totalStorageGiB / nodeCapacity.usableStorageGiB)
-      : 0; // No local storage = external storage needed
+      : 0;
 
-    // Minimum 3 nodes for ODF quorum
     const baseNodes = Math.max(3, nodesForCPU, nodesForMemory, nodesForStorage);
-    const totalNodes = baseNodes + nodeRedundancy;
 
-    // Determine limiting factor
+    // Determine limiting factor (based on threshold calculation)
     let limitingFactor: 'cpu' | 'memory' | 'storage' = 'cpu';
-    if (nodesForMemory >= nodesForCPU && nodesForMemory >= nodesForStorage) {
+    if (nodesForMemoryAtThreshold >= nodesForCPUAtThreshold && nodesForMemoryAtThreshold >= nodesForStorageAtThreshold) {
       limitingFactor = 'memory';
-    } else if (nodesForStorage >= nodesForCPU && nodesForStorage >= nodesForMemory) {
+    } else if (nodesForStorageAtThreshold >= nodesForCPUAtThreshold && nodesForStorageAtThreshold >= nodesForMemoryAtThreshold) {
       limitingFactor = 'storage';
     }
 
@@ -244,72 +274,91 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       nodesForCPU,
       nodesForMemory,
       nodesForStorage,
+      nodesForCPUAtThreshold,
+      nodesForMemoryAtThreshold,
+      nodesForStorageAtThreshold,
+      minSurvivingNodes,
       baseNodes,
       totalNodes,
       limitingFactor,
       vmCount: vms.length,
     };
-  }, [hasData, rawData, nodeCapacity, nodeRedundancy, storageMetric, annualGrowthRate, planningHorizonYears, virtOverhead]);
+  }, [hasData, rawData, nodeCapacity, nodeRedundancy, evictionThreshold, storageMetric, annualGrowthRate, planningHorizonYears, virtOverhead]);
 
-  // Calculate cluster efficiency metrics
-  const clusterEfficiency = useMemo(() => {
+  // N+X Validation - checks if cluster can handle workload after nodeRedundancy failures
+  const redundancyValidation = useMemo(() => {
     if (!nodeRequirements) return null;
 
     const totalNodes = nodeRequirements.totalNodes;
-    const failedNodes = 2; // Standard 2-node failure scenario
-    const healthyNodes = totalNodes;
-    const degradedNodes = Math.max(3, totalNodes - failedNodes); // Minimum 3 for ODF quorum
+    const failedNodes = nodeRedundancy; // N+1 = 1 failure, N+2 = 2 failures
+    const survivingNodes = Math.max(0, totalNodes - failedNodes);
 
-    // Per-node allocation in healthy state
-    const vmsPerNodeHealthy = Math.ceil(nodeRequirements.vmCount / healthyNodes);
-    const vcpusPerNodeHealthy = Math.ceil(nodeRequirements.totalVCPUs / healthyNodes);
-    const memoryPerNodeHealthy = Math.ceil(nodeRequirements.totalMemoryGiB / healthyNodes);
+    // Per-node workload after failures
+    const cpuPerNodeAfterFailure = survivingNodes > 0
+      ? nodeRequirements.totalVCPUs / survivingNodes
+      : Infinity;
+    const memoryPerNodeAfterFailure = survivingNodes > 0
+      ? nodeRequirements.totalMemoryGiB / survivingNodes
+      : Infinity;
+    const storagePerNodeAfterFailure = survivingNodes > 0
+      ? nodeRequirements.totalStorageGiB / survivingNodes
+      : Infinity;
 
-    // Utilization percentages in healthy state
-    const vcpuUtilHealthy = (vcpusPerNodeHealthy / nodeCapacity.vcpuCapacity) * 100;
-    const memoryUtilHealthy = (memoryPerNodeHealthy / nodeCapacity.memoryCapacity) * 100;
+    // Utilization percentages after failures
+    const cpuUtilAfterFailure = nodeCapacity.vcpuCapacity > 0
+      ? (cpuPerNodeAfterFailure / nodeCapacity.vcpuCapacity) * 100
+      : 0;
+    const memoryUtilAfterFailure = nodeCapacity.memoryCapacity > 0
+      ? (memoryPerNodeAfterFailure / nodeCapacity.memoryCapacity) * 100
+      : 0;
+    const storageUtilAfterFailure = nodeCapacity.usableStorageGiB > 0
+      ? (storagePerNodeAfterFailure / nodeCapacity.usableStorageGiB) * 100
+      : 0;
 
-    // Per-node allocation during 2-node failure
-    const vmsPerNodeDegraded = Math.ceil(nodeRequirements.vmCount / degradedNodes);
-    const vcpusPerNodeDegraded = Math.ceil(nodeRequirements.totalVCPUs / degradedNodes);
-    const memoryPerNodeDegraded = Math.ceil(nodeRequirements.totalMemoryGiB / degradedNodes);
+    // Check if each resource passes validation
+    // CPU/Memory: must stay below eviction threshold (triggers VM migration)
+    // Storage: must stay below ODF operational capacity (Ceph degrades above this)
+    const cpuPasses = cpuUtilAfterFailure <= evictionThreshold;
+    const memoryPasses = memoryUtilAfterFailure <= evictionThreshold;
+    const storagePasses = storageUtilAfterFailure <= operationalCapacity || nodeCapacity.usableStorageGiB === 0;
+    const odfQuorumPasses = survivingNodes >= 3; // Minimum 3 for ODF quorum
 
-    // Utilization percentages during failure
-    const vcpuUtilDegraded = (vcpusPerNodeDegraded / nodeCapacity.vcpuCapacity) * 100;
-    const memoryUtilDegraded = (memoryPerNodeDegraded / nodeCapacity.memoryCapacity) * 100;
+    // Overall validation
+    const allPass = cpuPasses && memoryPasses && storagePasses && odfQuorumPasses;
 
-    // Determine status based on thresholds
-    const getUtilStatus = (util: number): 'good' | 'warning' | 'critical' => {
-      if (util >= 85) return 'critical';
-      if (util >= 75) return 'warning';
-      return 'good';
-    };
+    // Also calculate healthy state utilization
+    const cpuUtilHealthy = nodeCapacity.vcpuCapacity > 0
+      ? (nodeRequirements.totalVCPUs / totalNodes / nodeCapacity.vcpuCapacity) * 100
+      : 0;
+    const memoryUtilHealthy = nodeCapacity.memoryCapacity > 0
+      ? (nodeRequirements.totalMemoryGiB / totalNodes / nodeCapacity.memoryCapacity) * 100
+      : 0;
+    const storageUtilHealthy = nodeCapacity.usableStorageGiB > 0
+      ? (nodeRequirements.totalStorageGiB / totalNodes / nodeCapacity.usableStorageGiB) * 100
+      : 0;
 
     return {
-      healthyNodes,
-      degradedNodes,
+      totalNodes,
       failedNodes,
-      // Healthy cluster metrics
-      vmsPerNodeHealthy,
-      vcpusPerNodeHealthy,
-      memoryPerNodeHealthy,
-      vcpuUtilHealthy,
+      survivingNodes,
+      evictionThreshold,
+      storageOperationalThreshold: operationalCapacity, // ODF uses different threshold
+      // Healthy state
+      cpuUtilHealthy,
       memoryUtilHealthy,
-      vcpuStatusHealthy: getUtilStatus(vcpuUtilHealthy),
-      memoryStatusHealthy: getUtilStatus(memoryUtilHealthy),
-      // Degraded cluster metrics
-      vmsPerNodeDegraded,
-      vcpusPerNodeDegraded,
-      memoryPerNodeDegraded,
-      vcpuUtilDegraded,
-      memoryUtilDegraded,
-      vcpuStatusDegraded: getUtilStatus(vcpuUtilDegraded),
-      memoryStatusDegraded: getUtilStatus(memoryUtilDegraded),
-      // Ceph health during degraded state
-      cephNodesRemaining: degradedNodes,
-      cephHealthy: degradedNodes >= 3,
+      storageUtilHealthy,
+      // Post-failure state
+      cpuUtilAfterFailure,
+      memoryUtilAfterFailure,
+      storageUtilAfterFailure,
+      // Validation results
+      cpuPasses,
+      memoryPasses,
+      storagePasses,
+      odfQuorumPasses,
+      allPass,
     };
-  }, [nodeRequirements, nodeCapacity]);
+  }, [nodeRequirements, nodeCapacity, nodeRedundancy, evictionThreshold, operationalCapacity]);
 
   // Track previous sizing to avoid unnecessary parent updates
   const prevSizingRef = useRef<string>('');
@@ -627,7 +676,22 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
             />
 
             <div className="sizing-calculator__info-text">
-              <span className="label">Recommended:</span> N+2 for maintenance + failure tolerance
+              <span className="label">N+{nodeRedundancy}:</span> Cluster survives {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''} while staying below eviction threshold
+            </div>
+
+            <Slider
+              id="eviction-threshold"
+              labelText="Eviction Threshold"
+              min={80}
+              max={99}
+              step={1}
+              value={evictionThreshold}
+              onChange={({ value }) => setEvictionThreshold(value)}
+              formatLabel={(val) => `${val}% (${100 - val}% buffer)`}
+            />
+
+            <div className="sizing-calculator__info-text">
+              <span className="label">Recommended:</span> 96% triggers VM migration before nodes become critically full
             </div>
           </Tile>
         </Column>
@@ -735,102 +799,116 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
 
               <div className="sizing-calculator__formula-display">
                 <code>
-                  max({nodeRequirements.nodesForCPU} CPU, {nodeRequirements.nodesForMemory} Memory, {nodeRequirements.nodesForStorage} Storage)
-                  + {nodeRedundancy} = <strong>{nodeRequirements.totalNodes} nodes</strong>
+                  N+{nodeRedundancy}: max({nodeRequirements.nodesForCPUAtThreshold} CPU, {nodeRequirements.nodesForMemoryAtThreshold} Memory, {nodeRequirements.nodesForStorageAtThreshold} Storage) @ {evictionThreshold}% threshold
+                  + {nodeRedundancy} failure buffer = <strong>{nodeRequirements.totalNodes} nodes</strong>
                 </code>
+              </div>
+              <div className="sizing-calculator__info-text" style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+                <span className="label">Formula:</span> Minimum nodes to stay below {evictionThreshold}% after {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''}
               </div>
             </Tile>
           </Column>
         )}
 
-        {/* Cluster Efficiency Analysis */}
-        {clusterEfficiency && (
+        {/* N+X Redundancy Validation */}
+        {redundancyValidation && (
           <Column lg={16} md={8} sm={4}>
-            <Tile className="sizing-calculator__efficiency-results">
-              <h3 className="sizing-calculator__section-title">Cluster Efficiency Analysis</h3>
+            <Tile className={`sizing-calculator__validation-results ${redundancyValidation.allPass ? 'sizing-calculator__validation-results--pass' : 'sizing-calculator__validation-results--fail'}`}>
+              <div className="sizing-calculator__validation-header">
+                <h3 className="sizing-calculator__section-title">N+{nodeRedundancy} Redundancy Validation</h3>
+                <Tag type={redundancyValidation.allPass ? 'green' : 'red'} size="md">
+                  {redundancyValidation.allPass ? 'PASSED' : 'FAILED'}
+                </Tag>
+              </div>
               <p className="sizing-calculator__subtitle">
-                Resource allocation and utilization across {clusterEfficiency.healthyNodes} nodes
+                Verifying cluster can handle workload after {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''}: CPU/Memory below {evictionThreshold}% eviction, ODF below {operationalCapacity}% operational
               </p>
 
               <Grid narrow>
-                {/* Healthy Cluster Scenario */}
+                {/* Healthy Cluster State */}
                 <Column lg={8} md={4} sm={4}>
                   <div className="sizing-calculator__efficiency-scenario sizing-calculator__efficiency-scenario--healthy">
                     <div className="sizing-calculator__efficiency-header">
-                      <Tag type="green" size="sm">Healthy Cluster</Tag>
-                      <span className="sizing-calculator__efficiency-subtitle">Per-Node Allocation ({clusterEfficiency.healthyNodes} nodes)</span>
+                      <Tag type="green" size="sm">Healthy State</Tag>
+                      <span className="sizing-calculator__efficiency-subtitle">{redundancyValidation.totalNodes} nodes</span>
                     </div>
 
                     <div className="sizing-calculator__efficiency-metrics">
                       <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">VMs per Node</span>
-                        <span className="sizing-calculator__efficiency-metric-value">{clusterEfficiency.vmsPerNodeHealthy}</span>
-                      </div>
-
-                      <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">vCPUs Allocated</span>
+                        <span className="sizing-calculator__efficiency-metric-label">CPU Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {clusterEfficiency.vcpusPerNodeHealthy}
-                          <span className={`sizing-calculator__efficiency-util sizing-calculator__efficiency-util--${clusterEfficiency.vcpuStatusHealthy}`}>
-                            ({clusterEfficiency.vcpuUtilHealthy.toFixed(0)}% of capacity)
-                          </span>
+                          {redundancyValidation.cpuUtilHealthy.toFixed(1)}%
                         </span>
                       </div>
-
                       <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">Memory Allocated</span>
+                        <span className="sizing-calculator__efficiency-metric-label">Memory Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {clusterEfficiency.memoryPerNodeHealthy} GiB
-                          <span className={`sizing-calculator__efficiency-util sizing-calculator__efficiency-util--${clusterEfficiency.memoryStatusHealthy}`}>
-                            ({clusterEfficiency.memoryUtilHealthy.toFixed(0)}% of capacity)
-                          </span>
+                          {redundancyValidation.memoryUtilHealthy.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="sizing-calculator__efficiency-metric">
+                        <span className="sizing-calculator__efficiency-metric-label">Storage Utilization</span>
+                        <span className="sizing-calculator__efficiency-metric-value">
+                          {nodeCapacity.usableStorageGiB > 0 ? `${redundancyValidation.storageUtilHealthy.toFixed(1)}%` : 'N/A (external)'}
                         </span>
                       </div>
                     </div>
                   </div>
                 </Column>
 
-                {/* 2-Node Failure Scenario */}
+                {/* Post-Failure State */}
                 <Column lg={8} md={4} sm={4}>
-                  <div className="sizing-calculator__efficiency-scenario sizing-calculator__efficiency-scenario--degraded">
+                  <div className={`sizing-calculator__efficiency-scenario ${redundancyValidation.allPass ? 'sizing-calculator__efficiency-scenario--healthy' : 'sizing-calculator__efficiency-scenario--degraded'}`}>
                     <div className="sizing-calculator__efficiency-header">
-                      <Tag type="magenta" size="sm">2-Node Failure</Tag>
-                      <span className="sizing-calculator__efficiency-subtitle">{clusterEfficiency.degradedNodes} nodes remaining</span>
+                      <Tag type={redundancyValidation.allPass ? 'teal' : 'red'} size="sm">After {nodeRedundancy} Node Failure{nodeRedundancy !== 1 ? 's' : ''}</Tag>
+                      <span className="sizing-calculator__efficiency-subtitle">{redundancyValidation.survivingNodes} nodes remaining</span>
                     </div>
 
                     <div className="sizing-calculator__efficiency-metrics">
                       <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">VMs per Node</span>
-                        <span className="sizing-calculator__efficiency-metric-value">{clusterEfficiency.vmsPerNodeDegraded}</span>
-                      </div>
-
-                      <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">vCPUs per Node</span>
+                        <span className="sizing-calculator__efficiency-metric-label">CPU Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {clusterEfficiency.vcpusPerNodeDegraded}
-                          <span className={`sizing-calculator__efficiency-util sizing-calculator__efficiency-util--${clusterEfficiency.vcpuStatusDegraded}`}>
-                            ({clusterEfficiency.vcpuUtilDegraded.toFixed(0)}% utilization{clusterEfficiency.vcpuUtilDegraded >= 75 ? ' - at threshold' : ''})
+                          <Tag type={redundancyValidation.cpuPasses ? 'green' : 'red'} size="sm">
+                            {redundancyValidation.cpuUtilAfterFailure.toFixed(1)}% {redundancyValidation.cpuPasses ? '✓' : '✗'}
+                          </Tag>
+                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                            (threshold: {evictionThreshold}%)
                           </span>
                         </span>
                       </div>
-
                       <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">Memory per Node</span>
+                        <span className="sizing-calculator__efficiency-metric-label">Memory Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {clusterEfficiency.memoryPerNodeDegraded} GiB
-                          <span className={`sizing-calculator__efficiency-util sizing-calculator__efficiency-util--${clusterEfficiency.memoryStatusDegraded}`}>
-                            ({clusterEfficiency.memoryUtilDegraded.toFixed(0)}% utilization{clusterEfficiency.memoryUtilDegraded >= 75 ? ' - at threshold' : ''})
+                          <Tag type={redundancyValidation.memoryPasses ? 'green' : 'red'} size="sm">
+                            {redundancyValidation.memoryUtilAfterFailure.toFixed(1)}% {redundancyValidation.memoryPasses ? '✓' : '✗'}
+                          </Tag>
+                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                            (threshold: {evictionThreshold}%)
                           </span>
                         </span>
                       </div>
-
                       <div className="sizing-calculator__efficiency-metric">
-                        <span className="sizing-calculator__efficiency-metric-label">Ceph/ODF Status</span>
+                        <span className="sizing-calculator__efficiency-metric-label">ODF Storage Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          <Tag type={clusterEfficiency.cephHealthy ? 'green' : 'red'} size="sm">
-                            {clusterEfficiency.cephHealthy
-                              ? `${clusterEfficiency.cephNodesRemaining} nodes for replication (healthy)`
-                              : 'Below quorum - data at risk'}
+                          {nodeCapacity.usableStorageGiB > 0 ? (
+                            <>
+                              <Tag type={redundancyValidation.storagePasses ? 'green' : 'red'} size="sm">
+                                {redundancyValidation.storageUtilAfterFailure.toFixed(1)}% {redundancyValidation.storagePasses ? '✓' : '✗'}
+                              </Tag>
+                              <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                                (ODF operational: {operationalCapacity}%)
+                              </span>
+                            </>
+                          ) : (
+                            <Tag type="gray" size="sm">N/A (external storage)</Tag>
+                          )}
+                        </span>
+                      </div>
+                      <div className="sizing-calculator__efficiency-metric">
+                        <span className="sizing-calculator__efficiency-metric-label">ODF Quorum</span>
+                        <span className="sizing-calculator__efficiency-metric-value">
+                          <Tag type={redundancyValidation.odfQuorumPasses ? 'green' : 'red'} size="sm">
+                            {redundancyValidation.survivingNodes} nodes {redundancyValidation.odfQuorumPasses ? '✓ (≥3 required)' : '✗ (<3 nodes)'}
                           </Tag>
                         </span>
                       </div>
@@ -839,20 +917,17 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                 </Column>
               </Grid>
 
-              <div className="sizing-calculator__efficiency-legend">
-                <span className="sizing-calculator__efficiency-legend-item">
-                  <span className="sizing-calculator__efficiency-legend-dot sizing-calculator__efficiency-legend-dot--good"></span>
-                  &lt;75% Good
-                </span>
-                <span className="sizing-calculator__efficiency-legend-item">
-                  <span className="sizing-calculator__efficiency-legend-dot sizing-calculator__efficiency-legend-dot--warning"></span>
-                  75-85% Warning
-                </span>
-                <span className="sizing-calculator__efficiency-legend-item">
-                  <span className="sizing-calculator__efficiency-legend-dot sizing-calculator__efficiency-legend-dot--critical"></span>
-                  &gt;85% Critical
-                </span>
-              </div>
+              {!redundancyValidation.allPass && (
+                <div className="sizing-calculator__validation-warning" style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'var(--cds-support-error)', color: 'white', borderRadius: '4px' }}>
+                  <strong>Warning:</strong> Current configuration does not meet N+{nodeRedundancy} redundancy requirements.
+                  After {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''}, the cluster will exceed capacity thresholds
+                  {!redundancyValidation.cpuPasses && ` (CPU: ${redundancyValidation.cpuUtilAfterFailure.toFixed(0)}% > ${evictionThreshold}%)`}
+                  {!redundancyValidation.memoryPasses && ` (Memory: ${redundancyValidation.memoryUtilAfterFailure.toFixed(0)}% > ${evictionThreshold}%)`}
+                  {!redundancyValidation.storagePasses && nodeCapacity.usableStorageGiB > 0 && ` (ODF: ${redundancyValidation.storageUtilAfterFailure.toFixed(0)}% > ${operationalCapacity}%)`}
+                  {!redundancyValidation.odfQuorumPasses && ` (ODF Quorum: only ${redundancyValidation.survivingNodes} nodes < 3 required)`}.
+                  Consider adding more nodes or adjusting thresholds.
+                </div>
+              )}
             </Tile>
           </Column>
         )}

@@ -56,8 +56,8 @@ describe('Cost Estimation Service', () => {
 
     it('should have reserved pricing with discounts', () => {
       const discounts = getDiscountOptions();
-      const reserved1yr = discounts.find(d => d.id === 'reserved1yr');
-      const reserved3yr = discounts.find(d => d.id === 'reserved3yr');
+      const reserved1yr = discounts.find(d => d.id === 'reserved1Year');
+      const reserved3yr = discounts.find(d => d.id === 'reserved3Year');
       expect(reserved1yr).toBeDefined();
       expect(reserved3yr).toBeDefined();
       expect(reserved1yr?.discountPct).toBeGreaterThan(0);
@@ -119,7 +119,7 @@ describe('Cost Estimation Service', () => {
 
     it('should apply discounts correctly', () => {
       const onDemandResult = calculateVSICost(basicVSIInput, 'us-south', 'onDemand');
-      const reservedResult = calculateVSICost(basicVSIInput, 'us-south', 'reserved1yr');
+      const reservedResult = calculateVSICost(basicVSIInput, 'us-south', 'reserved1Year');
 
       expect(reservedResult.totalMonthly).toBeLessThan(onDemandResult.totalMonthly);
       expect(reservedResult.discountPct).toBeGreaterThan(0);
@@ -255,7 +255,7 @@ describe('Cost Estimation Service', () => {
 
     it('should apply discounts correctly', () => {
       const onDemandResult = calculateROKSCost(basicROKSInput, 'us-south', 'onDemand');
-      const reservedResult = calculateROKSCost(basicROKSInput, 'us-south', 'reserved3yr');
+      const reservedResult = calculateROKSCost(basicROKSInput, 'us-south', 'reserved3Year');
 
       expect(reservedResult.totalMonthly).toBeLessThan(onDemandResult.totalMonthly);
     });

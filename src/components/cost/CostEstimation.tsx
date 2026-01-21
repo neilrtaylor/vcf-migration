@@ -403,6 +403,11 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
                   <div className="cost-estimation__profile-tags">
                     {isBestValue && <Tag type="green" size="sm">Best Value</Tag>}
                     {isSelected && <Tag type="blue" size="sm">Selected</Tag>}
+                    {profile.roksSupported ? (
+                      <Tag type="teal" size="sm">ROKS</Tag>
+                    ) : (
+                      <Tag type="gray" size="sm">VPC Only</Tag>
+                    )}
                   </div>
                 </div>
                 <div className="cost-estimation__profile-specs">

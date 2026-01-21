@@ -12,6 +12,9 @@ npm run lint         # ESLint
 npm test             # Run tests with Vitest
 npm run test:ui      # Run tests with UI
 npm run test:coverage # Run tests with coverage
+npm run update-profiles # Update IBM Cloud profiles from APIs (requires API key)
+npm run update-pricing  # Update IBM Cloud pricing from Global Catalog (requires API key)
+npm run update-all      # Update both profiles and pricing
 ```
 
 ## Architecture Overview
@@ -68,6 +71,75 @@ VITE_PRICING_PROXY_URL=...      # Optional: Cloud Functions proxy URL for produc
 ```
 
 Without API key, app uses static pricing from `src/data/ibmCloudConfig.json`.
+
+## Updating IBM Cloud Data
+
+The static fallback data in `src/data/ibmCloudConfig.json` can be updated with fresh data from IBM Cloud APIs.
+
+### Update Scripts
+
+```bash
+# Set your IBM Cloud API key
+export IBM_CLOUD_API_KEY=your-api-key
+
+# Update profiles only (VSI specs, bare metal specs, ROKS support)
+npm run update-profiles
+
+# Update pricing only (hourly/monthly rates from Global Catalog)
+npm run update-pricing
+
+# Update both profiles and pricing
+npm run update-all
+```
+
+### Profile Update Script (`scripts/update-profiles.ts`)
+
+1. Authenticates with IBM Cloud IAM
+2. Fetches VPC instance profiles from `GET /v1/instance/profiles`
+3. Fetches VPC bare metal profiles from `GET /v1/bare_metal_server/profiles`
+4. Fetches ROKS machine types from `GET /v2/getFlavors?provider=vpc-gen2`
+5. **Auto-detects ROKS support** by matching bare metal profiles against ROKS machine types
+6. Preserves existing pricing data (blockStorage, networking, regions, discounts, etc.)
+7. Updates `src/data/ibmCloudConfig.json`
+
+#### ROKS Support Detection
+
+The script automatically determines which bare metal profiles support ROKS worker nodes:
+
+```typescript
+// Profiles returned by the Kubernetes Service API are ROKS-supported
+const roksTypes = await fetch('/v2/getFlavors?zone=us-south-1&provider=vpc-gen2');
+
+// Each bare metal profile is checked against this list
+for (const profile of bareMetalProfiles) {
+  profile.roksSupported = roksTypes.has(profile.name);
+}
+```
+
+This data is used in the UI to show "ROKS" or "VPC Only" tags on bare metal profile cards.
+
+### Pricing Update Script (`scripts/update-pricing.ts`)
+
+1. Authenticates with IBM Cloud IAM
+2. Fetches VSI pricing from Global Catalog API
+3. Fetches Bare Metal pricing from Global Catalog API
+4. Extracts hourly rates for us-south region
+5. Calculates monthly rates (hourly × 730 hours)
+6. Updates pricing in `src/data/ibmCloudConfig.json`
+7. Preserves all other configuration (storage, networking, regions, etc.)
+
+### Dynamic vs Static Data
+
+- **Runtime (dynamic)**: The app fetches live profiles via `useDynamicProfiles()` hook when an API key is configured
+- **Fallback (static)**: When API is unavailable, the app uses `src/data/ibmCloudConfig.json`
+- **Update scripts**: Keep the static fallback data current for offline use or when APIs are unavailable
+
+### Debugging Profile Data
+
+Open browser DevTools Console to see detailed profile logs:
+- `[IBM Cloud API] Bare Metal Profiles Summary` - Raw API data
+- `[IBM Cloud API] ROKS Bare Metal Flavors` - ROKS machine types
+- `[Dynamic Profiles] FINAL Bare Metal Profiles in App` - Merged profiles used by the app
 
 ## Utilities
 

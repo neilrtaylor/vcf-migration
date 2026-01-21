@@ -266,6 +266,58 @@ npm run build
 
 ---
 
+## Data Maintenance
+
+The application includes scripts to update IBM Cloud profiles and pricing data from the official APIs.
+
+### Prerequisites
+
+```bash
+# Set your IBM Cloud API key
+export IBM_CLOUD_API_KEY=your-api-key
+
+# Or use the Vite environment variable
+export VITE_IBM_CLOUD_API_KEY=your-api-key
+```
+
+### Update Commands
+
+```bash
+# Update profiles (VSI specs, bare metal specs, ROKS support flags)
+npm run update-profiles
+
+# Update pricing (hourly/monthly rates from Global Catalog)
+npm run update-pricing
+
+# Update both profiles and pricing
+npm run update-all
+```
+
+### What Gets Updated
+
+#### Profile Update (`scripts/update-profiles.ts`)
+- **VSI Profiles** — vCPUs, memory, bandwidth from VPC API
+- **Bare Metal Profiles** — cores, memory, NVMe storage from VPC API
+- **ROKS Support Flags** — Auto-detected from Kubernetes Service API (`GET /v2/getFlavors`)
+
+The script queries the IBM Kubernetes Service API to determine which bare metal profiles are supported as ROKS worker nodes, then sets `roksSupported: true` on matching profiles.
+
+#### Pricing Update (`scripts/update-pricing.ts`)
+- **VSI Pricing** — Hourly rates from Global Catalog
+- **Bare Metal Pricing** — Hourly rates from Global Catalog
+- Monthly rates are calculated as `hourlyRate × 730 hours`
+
+### Static Fallback Data
+
+All data is stored in `src/data/ibmCloudConfig.json` which serves as:
+- **Fallback** when APIs are unavailable (CORS, no API key, etc.)
+- **Offline support** for environments without internet access
+- **Default values** that get merged with live API data
+
+Run the update scripts periodically to keep the fallback data current.
+
+---
+
 ## Contributing
 
 1. Fork the project

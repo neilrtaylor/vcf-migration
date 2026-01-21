@@ -1,0 +1,80 @@
+Processing file - uploads/RVTools_export_all_w082_2025-12-15_14.45.0018338821-a9c1-4a42-8ea8-9ff0d8f84d50.xlsx
+Found 1288 Virtual Machines.
+OK to migrate         :  761
+     Total Memory     :  16101
+     Total vCPU       :  4262
+Should not migrate    :  527
+
+Total VMs to migrate  :  761
+  vCPU per VM         :  5.60
+  Memory per VM (GiB) :  21.16
+  Storage per VM (GiB):  462.04
+  Storage Buffer %    :  10
+  Storage per VM with Buffer (GiB):  508.25
+  Storage Calculation Method:  Total Disk Capacity
+  CPU overcommit      :  4.0
+  Memory overcommit   :  1.0
+
+bx2d.metal.96x384 worker nodes required:  45
+bx2d.metal.96x384 cpu cores:  48
+bx2d.metal.96x384 memory (GB):  384
+bx2d.metal.96x384 raw storage (GB):  26560
+bx2d.metal.96x384 usable storage (GB):  8853.333333333334
+bx2d.metal.96x384 Average VM capacity per node:  17
+
+bx2d.metal.96x384 hourly cost worker node:  7.31 USD
+bx2d.metal.96x384 monthly cost worker nodes:  240133.50 USD
+bx2d.metal.96x384 OCP/OVE license (OCP License):  134816.40 USD
+
+SUMMARY ACM for Virtualization:  5584.50 USD
+SUMMARY Ansible Automation Platform:  519.75 USD
+SUMMARY ODF license:  681.82 USD
+SUMMARY total:  381735.97 USD per month
+
+The best flavor is bx2d.metal.96x384 with the lowest total monthly cost of 381735.97 USD
+
+CPU reservation
+System                    = 1 core
+ODF base (MON,MGR,RGW)    = 5 cores
+ODF devices (OSDs)        = 8 × 2 cores
+------------------------------------
+Total                     = 22 cores
+
+Memory reservation
+System                    = 4 GiB
+ODF base                  = 21 GiB
+ODF devices (OSDs)        = 8 × 5 GiB
+------------------------------------
+Total                     = 65 GiB
+
+Resource             Raw Reserved Usable for VMs
+CPU (physical cores) 48  22       26 cores
+Memory (GiB)         384 65       319 GiB
+
+CPU Utilisation:
+Usable VM CPU per node   = 26 × 4 = 104 vCPU
+Cluster total (45 nodes) = 104 × 45 = 4,680 vCPU
+Total VM vCPU usage      = 761 VMs × 5.60 vCPU per VM = 4,262 vCPU
+CPU utilization          = 4,262 / 4,680 = 91.0%
+
+Memory Utilization:
+Usable VM memory per node = 384 − 65 = 319 GiB
+Cluster total (45 nodes)  = 319 × 45 = 14,355 GiB
+Total VM memory usage     = 761 VMs × 21.16 GiB per VM = 16,103 GiB
+Memory utilization        = 16,103 / 14,355 = 112%
+
+Storage Utilization:
+Usable ODF capacity per node ≈ 8,853 GB
+Required storage = 761 × 508.25 = 386,776 GB
+Storage utilization = 386,776 / 278,880 = 139%
+
+Usable ODF capacity per node ≈ 5.3 TiB (5,827 GB)
+Required storage = 761 × 508.25 = 386,776 GB
+Storage utilization = 386,776 / 262,215 = 148%
+
+
+
+Utilization
+CPU: 4,262 / 8,640 = 49.33% utilized
+Memory: 16,101 / 17,280 = 93.18% utilized
+Storage: 386,776 / 398,400 = 97.08% utilized

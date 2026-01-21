@@ -3,7 +3,7 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
 import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, Button, InlineNotification, Loading } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
-import { Settings, Reset } from '@carbon/icons-react';
+import { Settings, Reset, ArrowUp, ArrowDown } from '@carbon/icons-react';
 import { useData, useVMs, useCustomProfiles, usePreflightChecks, useMigrationAssessment, useWavePlanning } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
@@ -228,8 +228,42 @@ export function VSIMigrationPage() {
         />
       ),
     },
-    { id: 'profileVcpus', header: 'Target vCPUs', enableSorting: true, accessorFn: (row) => row.profile.vcpus },
-    { id: 'profileMemory', header: 'Target Memory (GiB)', enableSorting: true, accessorFn: (row) => row.profile.memoryGiB },
+    {
+      id: 'profileVcpus',
+      header: 'Target vCPUs',
+      enableSorting: true,
+      accessorFn: (row) => row.profile.vcpus,
+      cell: ({ row }) => {
+        const source = row.original.vcpus;
+        const target = row.original.profile.vcpus;
+        const diff = target - source;
+        return (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            {target}
+            {diff > 0 && <ArrowUp size={16} style={{ color: '#24a148' }} />}
+            {diff < 0 && <ArrowDown size={16} style={{ color: '#da1e28' }} />}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'profileMemory',
+      header: 'Target Memory (GiB)',
+      enableSorting: true,
+      accessorFn: (row) => row.profile.memoryGiB,
+      cell: ({ row }) => {
+        const source = row.original.memoryGiB;
+        const target = row.original.profile.memoryGiB;
+        const diff = target - source;
+        return (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            {target}
+            {diff > 0 && <ArrowUp size={16} style={{ color: '#24a148' }} />}
+            {diff < 0 && <ArrowDown size={16} style={{ color: '#da1e28' }} />}
+          </span>
+        );
+      },
+    },
   ];
 
   return (

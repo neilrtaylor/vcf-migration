@@ -1,5 +1,5 @@
 // Export hooks
-export { useData, useHasData, useVMCount, usePoweredOnVMs, useTemplates, useVMs } from './useData';
+export { useData, useHasData, useVMCount, usePoweredOnVMs, useTemplates, useVMs, useNSXEdgeAppliances } from './useData';
 export { useChartFilter } from './useChartFilter';
 export type { ChartFilter } from './useChartFilter';
 

@@ -1,6 +1,6 @@
 // Network analysis page
 import { useMemo } from 'react';
-import { Grid, Column, Tile } from '@carbon/react';
+import { Grid, Column, Tile, Tag } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
@@ -221,6 +221,155 @@ export function NetworkPage() {
     { accessorKey: 'networks', header: 'Connected Networks' },
     { accessorKey: 'powerState', header: 'Power State' },
     { accessorKey: 'cluster', header: 'Cluster' },
+  ], []);
+
+  // Port Group Subnet Analysis Table: One row per port group showing all unique network prefixes
+  interface PortGroupSubnetRow {
+    [key: string]: unknown;
+    portGroup: string;
+    vSwitch: string;
+    vmCount: number;
+    nicCount: number;
+    uniquePrefixes: string[];
+    prefixCount: number;
+    hasMultiplePrefixes: boolean;
+    ipCount: number;
+    noIpCount: number;
+  }
+
+  // Helper to extract first 3 octets as network prefix
+  const getNetworkPrefix = (ip: string): string => {
+    if (!ip) return '';
+    const parts = ip.split('.');
+    if (parts.length >= 3) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
+    }
+    return '';
+  };
+
+  const portGroupSubnetData = useMemo(() => {
+    // Group by port group and collect all data
+    const portGroupMap = new Map<string, {
+      vSwitch: string;
+      vmNames: Set<string>;
+      nicCount: number;
+      prefixes: Set<string>;
+      ipCount: number;
+      noIpCount: number;
+    }>();
+
+    networks.forEach(nic => {
+      const pg = nic.networkName || 'Unknown';
+      if (!portGroupMap.has(pg)) {
+        portGroupMap.set(pg, {
+          vSwitch: nic.switchName || 'Unknown',
+          vmNames: new Set(),
+          nicCount: 0,
+          prefixes: new Set(),
+          ipCount: 0,
+          noIpCount: 0,
+        });
+      }
+      const data = portGroupMap.get(pg)!;
+      data.vmNames.add(nic.vmName);
+      data.nicCount++;
+
+      if (nic.ipv4Address) {
+        const prefix = getNetworkPrefix(nic.ipv4Address);
+        if (prefix) {
+          data.prefixes.add(prefix);
+        }
+        data.ipCount++;
+      } else {
+        data.noIpCount++;
+      }
+    });
+
+    // Convert to array
+    const result: PortGroupSubnetRow[] = [];
+    portGroupMap.forEach((data, portGroup) => {
+      const uniquePrefixes = Array.from(data.prefixes).sort();
+      result.push({
+        portGroup,
+        vSwitch: data.vSwitch,
+        vmCount: data.vmNames.size,
+        nicCount: data.nicCount,
+        uniquePrefixes,
+        prefixCount: uniquePrefixes.length,
+        hasMultiplePrefixes: uniquePrefixes.length > 1,
+        ipCount: data.ipCount,
+        noIpCount: data.noIpCount,
+      });
+    });
+
+    // Sort: multiple prefixes first (flagged), then by VM count
+    return result.sort((a, b) => {
+      if (a.hasMultiplePrefixes !== b.hasMultiplePrefixes) {
+        return a.hasMultiplePrefixes ? -1 : 1;
+      }
+      return b.vmCount - a.vmCount;
+    });
+  }, [networks]);
+
+  // Count port groups with multiple prefixes
+  const portGroupsWithMultiplePrefixes = useMemo(() => {
+    return portGroupSubnetData.filter(row => row.hasMultiplePrefixes).length;
+  }, [portGroupSubnetData]);
+
+  const portGroupSubnetColumns: ColumnDef<PortGroupSubnetRow>[] = useMemo(() => [
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        row.original.hasMultiplePrefixes ? (
+          <Tag type="red" size="sm">Multiple</Tag>
+        ) : row.original.prefixCount === 1 ? (
+          <Tag type="green" size="sm">Single</Tag>
+        ) : (
+          <Tag type="gray" size="sm">No IPs</Tag>
+        )
+      ),
+    },
+    { accessorKey: 'portGroup', header: 'Port Group', enableSorting: true },
+    { accessorKey: 'vSwitch', header: 'vSwitch', enableSorting: true },
+    { accessorKey: 'vmCount', header: 'VMs', enableSorting: true },
+    { accessorKey: 'nicCount', header: 'NICs', enableSorting: true },
+    {
+      accessorKey: 'uniquePrefixes',
+      header: 'Network Prefixes Found',
+      cell: ({ row }) => {
+        const prefixes = row.original.uniquePrefixes;
+        if (prefixes.length === 0) {
+          return <span style={{ color: '#6f6f6f' }}>No IP addresses</span>;
+        }
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+            {prefixes.map((prefix, idx) => (
+              <Tag
+                key={idx}
+                type={row.original.hasMultiplePrefixes ? 'red' : 'gray'}
+                size="sm"
+              >
+                {prefix}
+              </Tag>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'prefixCount',
+      header: 'Prefix Count',
+      enableSorting: true,
+      cell: ({ row }) => (
+        <span style={{
+          fontWeight: row.original.hasMultiplePrefixes ? 600 : 'normal',
+          color: row.original.hasMultiplePrefixes ? '#da1e28' : 'inherit',
+        }}>
+          {row.original.prefixCount}
+        </span>
+      ),
+    },
   ], []);
 
   // Connection status - only show if we have meaningful connected data
@@ -538,6 +687,49 @@ export function NetworkPage() {
               data={networkSummaryData}
               columns={networkSummaryColumns}
               defaultPageSize={10}
+            />
+          </Tile>
+        </Column>
+
+        {/* Port Group Subnet Analysis Table */}
+        <Column lg={16} md={8} sm={4}>
+          <Tile className="network-page__table-tile">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <h4 className="network-page__table-title">Port Group Subnet Analysis</h4>
+                <p className="network-page__table-subtitle">
+                  Identify port groups with multiple network prefixes (potential multiple subnets)
+                </p>
+              </div>
+              {portGroupsWithMultiplePrefixes > 0 ? (
+                <Tag type="red">
+                  {portGroupsWithMultiplePrefixes} port group{portGroupsWithMultiplePrefixes !== 1 ? 's' : ''} with multiple prefixes
+                </Tag>
+              ) : (
+                <Tag type="green">All port groups have single prefix</Tag>
+              )}
+            </div>
+            {portGroupsWithMultiplePrefixes > 0 && (
+              <div style={{
+                padding: '0.75rem',
+                marginBottom: '1rem',
+                backgroundColor: 'var(--cds-notification-background-error, #fff1f1)',
+                borderLeft: '4px solid var(--cds-support-error, #da1e28)',
+                borderRadius: '4px',
+              }}>
+                <strong>Review Required:</strong> {portGroupsWithMultiplePrefixes} port group{portGroupsWithMultiplePrefixes !== 1 ? 's have' : ' has'} IPs
+                from different network prefixes (first 3 octets differ). If each port group should contain only one subnet, verify the configuration.
+              </div>
+            )}
+            <EnhancedDataTable
+              data={portGroupSubnetData}
+              columns={portGroupSubnetColumns}
+              defaultPageSize={15}
+              enableSearch
+              enablePagination
+              enableSorting
+              enableExport
+              exportFilename="port-group-subnet-analysis"
             />
           </Tile>
         </Column>

@@ -44,7 +44,11 @@
       "WebFetch(domain:xphyr.net)",
       "WebFetch(domain:pronteff.com)",
       "WebFetch(domain:community.veeam.com)",
-      "WebFetch(domain:docs.redhat.com)"
+      "WebFetch(domain:docs.redhat.com)",
+      "Bash(npm run update-profiles:*)",
+      "Bash(npm run update-pricing:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
