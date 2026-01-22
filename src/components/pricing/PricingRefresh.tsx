@@ -39,6 +39,8 @@ function getSourceDisplay(source: PricingSource): { label: string; kind: 'blue' 
   switch (source) {
     case 'api':
       return { label: 'Live API', kind: 'green' };
+    case 'proxy':
+      return { label: 'Live Proxy', kind: 'green' };
     case 'cached':
       return { label: 'Cached', kind: 'blue' };
     case 'static':
@@ -89,7 +91,7 @@ export function PricingRefresh({
         <div className="pricing-refresh__source">
           {isApiAvailable === false ? (
             <CloudOffline size={16} className="pricing-refresh__icon pricing-refresh__icon--offline" />
-          ) : source === 'api' ? (
+          ) : source === 'api' || source === 'proxy' ? (
             <Checkmark size={16} className="pricing-refresh__icon pricing-refresh__icon--api" />
           ) : (
             <Warning size={16} className="pricing-refresh__icon pricing-refresh__icon--static" />

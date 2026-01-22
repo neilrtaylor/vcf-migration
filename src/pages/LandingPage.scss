@@ -27,6 +27,15 @@
     margin-bottom: spacing.$spacing-08;
   }
 
+  &__privacy-note {
+    @include type.type-style('helper-text-01');
+    color: theme.$text-secondary;
+    text-align: center;
+    margin-top: spacing.$spacing-05;
+    padding-top: spacing.$spacing-04;
+    border-top: 1px solid theme.$border-subtle-00;
+  }
+
   &__features {
     padding-top: spacing.$spacing-07;
 

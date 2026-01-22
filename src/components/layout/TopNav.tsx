@@ -6,8 +6,10 @@ import {
   HeaderGlobalAction,
 } from '@carbon/react';
 import { Information, Upload, DocumentExport, DataTableReference, Document, Light, Asleep } from '@carbon/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { useHasData } from '@/hooks';
 import { useTheme } from '@/context';
+import { ROUTES } from '@/utils/constants';
 
 interface TopNavProps {
   onUploadClick?: () => void;
@@ -19,6 +21,7 @@ interface TopNavProps {
 export function TopNav({ onUploadClick, onExportPDFClick, onExportExcelClick, onExportDocxClick }: TopNavProps) {
   const hasData = useHasData();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   return (
     <Header aria-label="RVTools Analyzer">
@@ -72,6 +75,7 @@ export function TopNav({ onUploadClick, onExportPDFClick, onExportExcelClick, on
         <HeaderGlobalAction
           aria-label="About"
           tooltipAlignment="end"
+          onClick={() => navigate(ROUTES.documentation)}
         >
           <Information size={20} />
         </HeaderGlobalAction>

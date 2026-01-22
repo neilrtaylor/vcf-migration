@@ -1,17 +1,16 @@
 {
-  "name": "vcf-pricing-proxy",
-  "version": "2.0.0",
-  "description": "IBM Code Engine pricing proxy for VCF Migration app",
+  "name": "vcf-profiles-proxy",
+  "version": "1.0.0",
+  "description": "IBM Code Engine profiles proxy for VCF Migration app",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node test.js",
     "deploy": "./deploy.sh"
   },
   "keywords": [
     "ibm-cloud",
     "code-engine",
-    "pricing",
+    "profiles",
     "proxy"
   ],
   "author": "",

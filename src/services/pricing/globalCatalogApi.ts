@@ -1,5 +1,5 @@
 // IBM Cloud Global Catalog API client for fetching pricing data
-// Supports both direct API access and Cloud Functions proxy
+// Supports both direct API access and Code Engine proxy
 
 import { withRetry, isRetryableError } from '@/utils/retry';
 import { createLogger, parseApiError, isCorsError, getUserFriendlyMessage } from '@/utils/logger';
@@ -99,7 +99,7 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
 // API key from environment variable
 const ENV_API_KEY = import.meta.env.VITE_IBM_CLOUD_API_KEY as string | undefined;
 
-// Pricing proxy URL (IBM Cloud Functions)
+// Pricing proxy URL (IBM Code Engine)
 const PRICING_PROXY_URL = import.meta.env.VITE_PRICING_PROXY_URL as string | undefined;
 
 // IAM token endpoint (also needs proxy in dev)
@@ -493,7 +493,7 @@ export function getProxyUrl(): string | undefined {
 }
 
 /**
- * Fetch pricing data from the Cloud Functions proxy
+ * Fetch pricing data from the Code Engine proxy
  * This is the preferred method as it keeps API credentials server-side
  */
 export async function fetchFromProxy(

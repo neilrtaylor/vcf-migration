@@ -47,6 +47,9 @@ export function LandingPage() {
               onDataParsed={handleDataParsed}
               onError={handleError}
             />
+            <p className="landing-page__privacy-note">
+              Your data stays private — files are processed entirely in your browser and never uploaded to any server.
+            </p>
           </Tile>
         </Column>
 

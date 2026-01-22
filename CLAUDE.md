@@ -66,8 +66,9 @@ IBM Carbon Design System (`@carbon/react`) - all UI components follow Carbon pat
 ## Environment Variables
 
 ```bash
-VITE_IBM_CLOUD_API_KEY=...      # Optional: enables live IBM Cloud pricing
-VITE_PRICING_PROXY_URL=...      # Optional: Cloud Functions proxy URL for production
+VITE_IBM_CLOUD_API_KEY=...      # Optional: enables live pricing/profiles (exposes key in browser)
+VITE_PRICING_PROXY_URL=...      # Optional: Code Engine pricing proxy URL (recommended)
+VITE_PROFILES_PROXY_URL=...     # Optional: Code Engine profiles proxy URL (recommended)
 ```
 
 Without API key, app uses static pricing from `src/data/ibmCloudConfig.json`.

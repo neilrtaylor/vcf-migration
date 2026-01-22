@@ -40,6 +40,8 @@ function getSourceDisplay(source: ProfilesSource): { label: string; kind: 'blue'
   switch (source) {
     case 'api':
       return { label: 'Live API', kind: 'green' };
+    case 'proxy':
+      return { label: 'Live Proxy', kind: 'green' };
     case 'cached':
       return { label: 'Cached', kind: 'blue' };
     case 'static':
@@ -91,7 +93,7 @@ export function ProfilesRefresh({
         <div className="profiles-refresh__source">
           {isApiAvailable === false ? (
             <CloudOffline size={16} className="profiles-refresh__icon profiles-refresh__icon--offline" />
-          ) : source === 'api' ? (
+          ) : source === 'api' || source === 'proxy' ? (
             <Checkmark size={16} className="profiles-refresh__icon profiles-refresh__icon--api" />
           ) : (
             <Warning size={16} className="profiles-refresh__icon profiles-refresh__icon--static" />

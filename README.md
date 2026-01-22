@@ -224,7 +224,7 @@ Without an API key, the application uses static pricing data from `ibmCloudPrici
 
 ```bash
   ┌─────────────────┐         ┌──────────────────────┐         ┌─────────────────┐
-  │   Browser       │ ──────> │  Cloud Functions     │ ──────> │  IBM Cloud      │
+  │   Browser       │ ──────> │  Code Engine         │ ──────> │  IBM Cloud      │
   │   (Frontend)    │         │  Proxy               │         │  Global Catalog │
   │                 │ <────── │  (1-hour cache)      │ <────── │  API            │
   └─────────────────┘         └──────────────────────┘         └─────────────────┘
@@ -250,6 +250,61 @@ VITE_PRICING_PROXY_URL=https://your-function-url
 # 4. Rebuild and deploy
 npm run build
 ```
+
+---
+
+## Data Privacy & Security
+
+This application is designed with privacy and security in mind. **Your infrastructure data never leaves your browser.**
+
+### How Your Data Is Handled
+
+| Data Type | Where Processed | Stored? | Sent to Server? |
+|-----------|-----------------|---------|-----------------|
+| RVTools Excel files | Browser only | No | Never |
+| VM inventory data | Browser memory | Session only | Never |
+| Analysis results | Browser only | No | Never |
+| Pricing/profiles cache | Browser localStorage | Yes (clearable) | Never |
+
+### Client-Side Processing
+
+- **RVTools files are parsed entirely in your browser** using JavaScript (SheetJS library)
+- No file uploads occur — your infrastructure inventory stays on your machine
+- All VM analysis, sizing calculations, and cost estimations run locally
+- Generated reports (Excel, PDF, Word) are created in-browser and downloaded directly
+
+### IBM Cloud API Calls
+
+When using live pricing/profiles (via proxy or direct API):
+
+- **Only public catalog data is fetched** (pricing, VSI profiles, bare metal specs)
+- **No VM data is ever sent** to IBM Cloud or any external service
+- API calls are read-only queries to public IBM Cloud endpoints
+- Proxies only cache pricing/profile data — no user data is stored
+
+### Local Storage
+
+The app uses browser localStorage to cache:
+- IBM Cloud pricing data (24-hour cache)
+- IBM Cloud profile data (24-hour cache)
+- Your custom profile overrides (persistent until cleared)
+
+You can clear this data anytime via browser settings or the app's "Clear Cache" buttons.
+
+### No Analytics or Tracking
+
+This application does not include:
+- Analytics services (Google Analytics, etc.)
+- User tracking or telemetry
+- Cookies for tracking purposes
+- Third-party advertising
+
+### Self-Hosted Deployment
+
+For maximum security, you can deploy this application entirely within your own infrastructure:
+- Host the static frontend on your own servers
+- Deploy the pricing/profiles proxies in your own IBM Cloud account
+- No external dependencies required after deployment
 
 ---
 

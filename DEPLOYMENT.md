@@ -386,6 +386,12 @@ ibmcloud ce application create --name vcf-migration \
 ibmcloud ce application get --name vcf-migration --output url
 ```
 
+To redeploy:
+
+```bash
+ibmcloud ce app update --name vcf-migration  --build-source . 
+```
+
 ### Step 3: Custom Domain (Optional)
 
 ```bash
@@ -489,11 +495,11 @@ ibmcloud iam api-key-create vcf-migration-pricing \
 echo "VITE_IBM_CLOUD_API_KEY=your-api-key" >> /etc/environment
 ```
 
-Note: Since this is a client-side application, the API key would be exposed in the browser. For production, use the Cloud Functions pricing proxy (see below).
+Note: Since this is a client-side application, the API key would be exposed in the browser. For production, use the Code Engine pricing proxy (see below).
 
 ---
 
-## Cloud Functions Pricing Proxy (Recommended)
+## Code Engine Pricing Proxy (Recommended)
 
 The pricing proxy keeps your IBM Cloud API credentials secure server-side while providing live pricing data to the frontend.
 
@@ -502,7 +508,7 @@ The pricing proxy keeps your IBM Cloud API credentials secure server-side while 
 | Approach | Security | CORS | Caching |
 |----------|----------|------|---------|
 | Direct API key in browser | Exposed | Issues | None |
-| **Cloud Functions Proxy** | **Secure** | **Handled** | **1-hour cache** |
+| **Code Engine Proxy** | **Secure** | **Handled** | **1-hour cache** |
 | Static fallback data | N/A | N/A | N/A |
 
 ### Step 1: Create an API Key
@@ -531,7 +537,7 @@ export IBM_CLOUD_API_KEY="your-api-key-from-step-1"
 
 The script will output a URL like:
 ```
-https://us-south.functions.cloud.ibm.com/api/v1/web/abc123/default/vcf-pricing-proxy
+https://vcf-pricing-proxy.xxxx.us-south.codeengine.appdomain.cloud
 ```
 
 ### Step 3: Configure the Frontend
@@ -539,7 +545,7 @@ https://us-south.functions.cloud.ibm.com/api/v1/web/abc123/default/vcf-pricing-p
 Add the proxy URL to your `.env` file:
 
 ```bash
-VITE_PRICING_PROXY_URL=https://us-south.functions.cloud.ibm.com/api/v1/web/abc123/default/vcf-pricing-proxy
+VITE_PRICING_PROXY_URL=https://vcf-pricing-proxy.xxxx.us-south.codeengine.appdomain.cloud
 ```
 
 ### Step 4: Rebuild and Deploy
@@ -554,67 +560,149 @@ npm run build
 If you prefer to deploy manually without the script:
 
 ```bash
-# Install Cloud Functions plugin
-ibmcloud plugin install cloud-functions
+# Install Code Engine plugin
+ibmcloud plugin install code-engine
 
 # Login and target region
 ibmcloud login --sso
 ibmcloud target -r us-south
 
-# Create namespace
-ibmcloud fn namespace create vcf-migration
-ibmcloud fn namespace target vcf-migration
+# Create project
+ibmcloud ce project create --name vcf-migration
+ibmcloud ce project select --name vcf-migration
 
-# Deploy the function
+# Create secret for API key (optional)
+ibmcloud ce secret create --name vcf-api-key \
+  --from-literal IBM_CLOUD_API_KEY="your-api-key"
+
+# Deploy the application
 cd functions/pricing-proxy
-ibmcloud fn action create vcf-pricing-proxy index.js \
-  --kind nodejs:18 \
-  --web true \
-  --timeout 30000 \
-  --memory 256 \
-  --param IBM_CLOUD_API_KEY "your-api-key"
+ibmcloud ce app create --name vcf-pricing-proxy \
+  --build-source . \
+  --strategy dockerfile \
+  --port 8080 \
+  --min-scale 0 \
+  --max-scale 3 \
+  --env-from-secret vcf-api-key
 
 # Get the URL
-ibmcloud fn action get vcf-pricing-proxy --url
+ibmcloud ce app get --name vcf-pricing-proxy --output url
 ```
 
 ### Testing the Proxy
 
 ```bash
-# Test the deployed function
-curl https://your-function-url
+# Test the deployed application
+curl https://your-app-url
 
 # Should return JSON with pricing data:
 # {
-#   "version": "2026-01-14",
-#   "source": "ibm-cloud-functions-proxy",
+#   "version": "2026-01-21",
+#   "source": "ibm-code-engine-proxy",
 #   "cached": false,
 #   "vsiProfiles": { ... },
 #   ...
 # }
+
+# Health check
+curl https://your-app-url/health
 ```
+
+To redeploy:
+
+```bash
+ibmcloud ce app update --name vcf-pricing-proxy --build-source .         
+```
+
 
 ### Proxy Cost
 
-IBM Cloud Functions includes a generous free tier:
-- 5 million executions/month
-- 400,000 GB-seconds/month
+Code Engine pricing is based on actual usage with scale-to-zero:
+- **vCPU**: $0.00003420/vCPU-second
+- **Memory**: $0.00000356/GiB-second
+- **Idle cost**: $0/month (scales to zero)
 
-For a typical frontend app with occasional pricing refreshes, **this is essentially free**.
+For a typical frontend app with occasional pricing refreshes, **this costs $1-5/month or less**.
 
 ### Updating the Proxy
 
-To update the pricing data or function code:
+To update the application code:
 
 ```bash
 # Redeploy with latest code
 cd functions/pricing-proxy
-ibmcloud fn action update vcf-pricing-proxy index.js \
-  --kind nodejs:18
+ibmcloud ce app update --name vcf-pricing-proxy --build-source .
 
 # Force refresh cached data
-curl 'https://your-function-url?refresh=true'
+curl 'https://your-app-url?refresh=true'
 ```
+
+---
+
+## Code Engine Profiles Proxy (Optional)
+
+The profiles proxy keeps your IBM Cloud API credentials secure while providing live VPC and ROKS profile data to the frontend.
+
+### Why Use the Profiles Proxy?
+
+| Data Source | Without Proxy | With Proxy |
+|-------------|---------------|------------|
+| VSI Profiles | Static JSON | Live from VPC API |
+| Bare Metal Profiles | Static JSON | Live from VPC API |
+| ROKS Machine Types | Static JSON | Live from Kubernetes API |
+| API Key | Exposed in browser | Secure on server |
+
+### Deploy the Profiles Proxy
+
+The profiles proxy uses the same API key as the pricing proxy.
+
+```bash
+cd functions/profiles-proxy
+
+# Make deployment script executable
+chmod +x deploy.sh
+
+# Set your API key (same as pricing proxy)
+export IBM_CLOUD_API_KEY="your-api-key"
+
+# Deploy
+./deploy.sh
+```
+
+The script will output a URL like:
+```
+https://vcf-profiles-proxy.xxxx.us-south.codeengine.appdomain.cloud
+```
+
+### Configure the Frontend
+
+Add the proxy URL to your `.env` file:
+
+```bash
+VITE_PROFILES_PROXY_URL=https://vcf-profiles-proxy.xxxx.us-south.codeengine.appdomain.cloud
+```
+
+### API Usage
+
+```bash
+# Get profiles (default region: us-south)
+curl https://your-profiles-proxy-url
+
+# Get profiles for a different region
+curl 'https://your-profiles-proxy-url?region=eu-de&zone=eu-de-1'
+
+# Force refresh
+curl 'https://your-profiles-proxy-url?refresh=true'
+```
+
+### Required IAM Permissions
+
+The API key needs these permissions for the profiles proxy:
+
+| Service | Role | Purpose |
+|---------|------|---------|
+| VPC Infrastructure Services | Viewer | Read VSI/Bare Metal profiles |
+| Kubernetes Service | Viewer | Read ROKS machine types |
 
 ---
 
@@ -951,6 +1039,39 @@ ssh -i ~/.ssh/ibm_vcf_migration root@<floating-ip> "echo 'Connection OK'"
 # Verify disk space
 df -h /var/www/
 ```
+
+---
+
+## Data Privacy
+
+This application is designed to keep your infrastructure data private and secure.
+
+### User Data Handling
+
+| Component | Data Processed | Data Stored | Data Transmitted |
+|-----------|----------------|-------------|------------------|
+| **Frontend (Browser)** | RVTools files, VM analysis | localStorage cache only | Never to external servers |
+| **Pricing Proxy** | None | Pricing cache (1hr) | IBM Cloud Catalog API only |
+| **Profiles Proxy** | None | Profiles cache (1hr) | IBM Cloud VPC/ROKS APIs only |
+
+### Key Privacy Principles
+
+1. **Client-Side Processing**: All RVTools file parsing and VM analysis occurs entirely in the user's browser. No infrastructure data is ever uploaded to any server.
+
+2. **No Data Collection**: The application does not collect, store, or transmit any user data or infrastructure information. There is no analytics, telemetry, or tracking.
+
+3. **Proxy Isolation**: The Code Engine proxies only fetch public IBM Cloud pricing and profile data. They never receive or process any user infrastructure data.
+
+4. **Local Storage**: Browser localStorage is used only for caching pricing/profile data and user preferences. Users can clear this data at any time.
+
+5. **Self-Contained**: When deployed, the application is fully self-contained within your IBM Cloud account with no external dependencies.
+
+### Communicating to Users
+
+Consider adding a privacy notice to your deployment:
+- Add a "Privacy" link in the app footer
+- Include privacy information in user documentation
+- Reference the client-side architecture in security reviews
 
 ---
 

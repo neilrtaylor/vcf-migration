@@ -690,6 +690,10 @@ export function DocumentationPage() {
                       <span>Profiles fetched from IBM Cloud VPC/Kubernetes APIs</span>
                     </div>
                     <div className="documentation-page__status-item">
+                      <Tag type="green">Live Proxy</Tag>
+                      <span>Profiles fetched via Code Engine proxy (recommended)</span>
+                    </div>
+                    <div className="documentation-page__status-item">
                       <Tag type="blue">Cached</Tag>
                       <span>Using previously fetched profile data (24-hour cache)</span>
                     </div>
@@ -698,6 +702,81 @@ export function DocumentationPage() {
                       <span>Using bundled profile data from ibmCloudConfig.json</span>
                     </div>
                   </div>
+                </Tile>
+              </div>
+            </AccordionItem>
+
+            <AccordionItem title="Data Privacy & Security">
+              <div className="documentation-page__section">
+                <Tile className="documentation-page__metric-card">
+                  <h4>Your Data Stays Private</h4>
+                  <p>
+                    This application is designed with privacy as a core principle. <strong>Your infrastructure
+                    data never leaves your browser.</strong>
+                  </p>
+                  <UnorderedList>
+                    <ListItem><strong>Client-Side Processing</strong> - All RVTools file parsing happens entirely in your browser using JavaScript</ListItem>
+                    <ListItem><strong>No File Uploads</strong> - Your Excel files are never sent to any server</ListItem>
+                    <ListItem><strong>Local Analysis</strong> - All VM analysis, sizing calculations, and cost estimations run locally</ListItem>
+                    <ListItem><strong>Direct Downloads</strong> - Generated reports (Excel, PDF, Word) are created in-browser and downloaded directly</ListItem>
+                  </UnorderedList>
+                </Tile>
+
+                <Tile className="documentation-page__metric-card">
+                  <h4>Data Handling Summary</h4>
+                  <div className="documentation-page__status-list">
+                    <div className="documentation-page__status-item">
+                      <Tag type="green">RVTools Files</Tag>
+                      <span>Processed in browser only, never uploaded</span>
+                    </div>
+                    <div className="documentation-page__status-item">
+                      <Tag type="green">VM Inventory</Tag>
+                      <span>Stored in browser memory during session only</span>
+                    </div>
+                    <div className="documentation-page__status-item">
+                      <Tag type="green">Analysis Results</Tag>
+                      <span>Computed locally, never transmitted</span>
+                    </div>
+                    <div className="documentation-page__status-item">
+                      <Tag type="blue">Pricing/Profiles Cache</Tag>
+                      <span>Stored in browser localStorage (clearable)</span>
+                    </div>
+                  </div>
+                </Tile>
+
+                <Tile className="documentation-page__metric-card">
+                  <h4>IBM Cloud API Calls</h4>
+                  <p>When using live pricing or profiles (via proxy or direct API):</p>
+                  <UnorderedList>
+                    <ListItem><strong>Public Data Only</strong> - Only fetches public catalog data (pricing, VSI profiles, bare metal specs)</ListItem>
+                    <ListItem><strong>No VM Data Sent</strong> - Your infrastructure information is never transmitted to IBM Cloud</ListItem>
+                    <ListItem><strong>Read-Only Queries</strong> - API calls are read-only queries to public IBM Cloud endpoints</ListItem>
+                    <ListItem><strong>Proxy Isolation</strong> - Proxies only cache pricing/profile data, never user data</ListItem>
+                  </UnorderedList>
+                </Tile>
+
+                <Tile className="documentation-page__metric-card">
+                  <h4>No Tracking</h4>
+                  <p>This application does not include:</p>
+                  <UnorderedList>
+                    <ListItem>Analytics services (Google Analytics, etc.)</ListItem>
+                    <ListItem>User tracking or telemetry</ListItem>
+                    <ListItem>Cookies for tracking purposes</ListItem>
+                    <ListItem>Third-party advertising</ListItem>
+                  </UnorderedList>
+                </Tile>
+
+                <Tile className="documentation-page__metric-card">
+                  <h4>Local Storage</h4>
+                  <p>The app uses browser localStorage to cache:</p>
+                  <UnorderedList>
+                    <ListItem>IBM Cloud pricing data (24-hour cache)</ListItem>
+                    <ListItem>IBM Cloud profile data (24-hour cache)</ListItem>
+                    <ListItem>Your custom profile overrides (persistent until cleared)</ListItem>
+                  </UnorderedList>
+                  <p style={{ marginTop: '0.5rem' }}>
+                    You can clear this data anytime via browser settings or the app's "Clear Cache" buttons.
+                  </p>
                 </Tile>
               </div>
             </AccordionItem>

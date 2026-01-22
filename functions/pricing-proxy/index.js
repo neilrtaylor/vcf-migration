@@ -1,26 +1,44 @@
 /**
- * IBM Cloud Functions - Pricing Proxy
+ * IBM Code Engine - Pricing Proxy
  *
- * This function proxies requests to the IBM Cloud Global Catalog API,
+ * This service proxies requests to the IBM Cloud Global Catalog API,
  * caching results to reduce API calls and keeping credentials server-side.
  *
- * Environment Parameters:
- *   - IBM_CLOUD_API_KEY: Your IBM Cloud API key (bound as parameter)
+ * Environment Variables:
+ *   - IBM_CLOUD_API_KEY: Your IBM Cloud API key
+ *   - PORT: Server port (default: 8080)
  *
  * Query Parameters:
  *   - refresh: Set to "true" to bypass cache and fetch fresh data
  */
 
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+const PORT = process.env.PORT || 8080;
+
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour cache
 const GLOBAL_CATALOG_BASE = 'https://globalcatalog.cloud.ibm.com/api/v1';
 
-// In-memory cache (persists across warm invocations)
+// In-memory cache
 let pricingCache = {
-  vsiProfiles: null,
-  bareMetalProfiles: null,
-  blockStorage: null,
+  data: null,
   lastUpdated: 0,
 };
+
+// Enable CORS for all origins
+app.use(cors());
+
+// Health check endpoint (required for Code Engine)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
+
+// Readiness check endpoint
+app.get('/ready', (req, res) => {
+  res.status(200).json({ status: 'ready' });
+});
 
 /**
  * Get IAM access token from API key
@@ -30,7 +48,7 @@ async function getAccessToken(apiKey) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
     body: `grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=${apiKey}`,
   });
@@ -49,8 +67,8 @@ async function getAccessToken(apiKey) {
 async function fetchFromCatalog(endpoint, token) {
   const response = await fetch(`${GLOBAL_CATALOG_BASE}${endpoint}`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json',
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
     },
   });
 
@@ -62,31 +80,6 @@ async function fetchFromCatalog(endpoint, token) {
 }
 
 /**
- * Extract VSI profile pricing from catalog data
- */
-function extractVSIProfiles(catalogData) {
-  const profiles = {};
-
-  // Process catalog resources for VSI profiles
-  if (catalogData.resources) {
-    for (const resource of catalogData.resources) {
-      if (resource.kind === 'iaas' && resource.name?.includes('instance')) {
-        // Extract pricing metrics
-        const pricing = resource.pricing || {};
-        profiles[resource.id] = {
-          id: resource.id,
-          name: resource.name,
-          hourlyRate: pricing.hourly || 0,
-          monthlyRate: pricing.monthly || 0,
-        };
-      }
-    }
-  }
-
-  return profiles;
-}
-
-/**
  * Fetch and aggregate all pricing data
  */
 async function fetchAllPricing(apiKey) {
@@ -94,15 +87,19 @@ async function fetchAllPricing(apiKey) {
 
   // Fetch pricing data in parallel
   const [vsiData, storageData] = await Promise.all([
-    fetchFromCatalog('?q=kind:iaas%20tag:is.instance', token).catch(() => ({ resources: [] })),
-    fetchFromCatalog('?q=kind:iaas%20tag:is.volume', token).catch(() => ({ resources: [] })),
+    fetchFromCatalog('?q=kind:iaas%20tag:is.instance', token).catch(() => ({
+      resources: [],
+    })),
+    fetchFromCatalog('?q=kind:iaas%20tag:is.volume', token).catch(() => ({
+      resources: [],
+    })),
   ]);
 
   // Build pricing structure matching frontend expectations
   const pricing = {
     version: new Date().toISOString().split('T')[0],
     lastUpdated: new Date().toISOString(),
-    source: 'ibm-cloud-functions-proxy',
+    source: 'ibm-code-engine-proxy',
 
     regions: {
       'us-south': { name: 'Dallas', multiplier: 1.0 },
@@ -114,7 +111,7 @@ async function fetchAllPricing(apiKey) {
       'jp-osa': { name: 'Osaka', multiplier: 1.08 },
       'au-syd': { name: 'Sydney', multiplier: 1.08 },
       'ca-tor': { name: 'Toronto', multiplier: 1.02 },
-      'br-sao': { name: 'São Paulo', multiplier: 1.10 },
+      'br-sao': { name: 'São Paulo', multiplier: 1.1 },
     },
 
     discountOptions: {
@@ -149,14 +146,14 @@ async function fetchAllPricing(apiKey) {
 
       // Memory (mx2)
       'mx2-2x16': { vcpus: 2, memoryGiB: 16, hourlyRate: 0.125 },
-      'mx2-4x32': { vcpus: 4, memoryGiB: 32, hourlyRate: 0.250 },
-      'mx2-8x64': { vcpus: 8, memoryGiB: 64, hourlyRate: 0.500 },
-      'mx2-16x128': { vcpus: 16, memoryGiB: 128, hourlyRate: 1.000 },
-      'mx2-32x256': { vcpus: 32, memoryGiB: 256, hourlyRate: 2.000 },
-      'mx2-48x384': { vcpus: 48, memoryGiB: 384, hourlyRate: 3.000 },
-      'mx2-64x512': { vcpus: 64, memoryGiB: 512, hourlyRate: 4.000 },
-      'mx2-96x768': { vcpus: 96, memoryGiB: 768, hourlyRate: 6.000 },
-      'mx2-128x1024': { vcpus: 128, memoryGiB: 1024, hourlyRate: 8.000 },
+      'mx2-4x32': { vcpus: 4, memoryGiB: 32, hourlyRate: 0.25 },
+      'mx2-8x64': { vcpus: 8, memoryGiB: 64, hourlyRate: 0.5 },
+      'mx2-16x128': { vcpus: 16, memoryGiB: 128, hourlyRate: 1.0 },
+      'mx2-32x256': { vcpus: 32, memoryGiB: 256, hourlyRate: 2.0 },
+      'mx2-48x384': { vcpus: 48, memoryGiB: 384, hourlyRate: 3.0 },
+      'mx2-64x512': { vcpus: 64, memoryGiB: 512, hourlyRate: 4.0 },
+      'mx2-96x768': { vcpus: 96, memoryGiB: 768, hourlyRate: 6.0 },
+      'mx2-128x1024': { vcpus: 128, memoryGiB: 1024, hourlyRate: 8.0 },
     },
 
     // Block storage pricing
@@ -166,7 +163,7 @@ async function fetchAllPricing(apiKey) {
         iopsPerGB: 3,
       },
       custom: {
-        costPerGBMonth: 0.10,
+        costPerGBMonth: 0.1,
         costPerIOPS: 0.07,
       },
       tiers: {
@@ -201,7 +198,7 @@ async function fetchAllPricing(apiKey) {
     // ROKS cluster pricing
     roks: {
       clusterManagementFee: 0, // Free for VPC clusters
-      workerNodeMarkup: 0,     // No markup on worker nodes
+      workerNodeMarkup: 0, // No markup on worker nodes
     },
 
     // ODF storage pricing
@@ -229,44 +226,87 @@ async function fetchAllPricing(apiKey) {
 }
 
 /**
- * Main function entry point
+ * Get default pricing data (used when API key is not available)
  */
-async function main(params) {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+function getDefaultPricing() {
+  return {
+    version: new Date().toISOString().split('T')[0],
+    lastUpdated: new Date().toISOString(),
+    source: 'ibm-code-engine-proxy-defaults',
+
+    regions: {
+      'us-south': { name: 'Dallas', multiplier: 1.0 },
+      'us-east': { name: 'Washington DC', multiplier: 1.0 },
+      'eu-gb': { name: 'London', multiplier: 1.05 },
+      'eu-de': { name: 'Frankfurt', multiplier: 1.05 },
+      'eu-es': { name: 'Madrid', multiplier: 1.05 },
+      'jp-tok': { name: 'Tokyo', multiplier: 1.08 },
+      'jp-osa': { name: 'Osaka', multiplier: 1.08 },
+      'au-syd': { name: 'Sydney', multiplier: 1.08 },
+      'ca-tor': { name: 'Toronto', multiplier: 1.02 },
+      'br-sao': { name: 'São Paulo', multiplier: 1.1 },
+    },
+
+    discountOptions: {
+      onDemand: { name: 'On-Demand', discountPct: 0 },
+      oneYear: { name: '1-Year Reserved', discountPct: 20 },
+      threeYear: { name: '3-Year Reserved', discountPct: 40 },
+    },
+
+    vsiProfiles: {
+      'bx2-2x8': { vcpus: 2, memoryGiB: 8, hourlyRate: 0.099 },
+      'bx2-4x16': { vcpus: 4, memoryGiB: 16, hourlyRate: 0.198 },
+      'bx2-8x32': { vcpus: 8, memoryGiB: 32, hourlyRate: 0.396 },
+      'cx2-2x4': { vcpus: 2, memoryGiB: 4, hourlyRate: 0.083 },
+      'cx2-4x8': { vcpus: 4, memoryGiB: 8, hourlyRate: 0.166 },
+      'mx2-2x16': { vcpus: 2, memoryGiB: 16, hourlyRate: 0.125 },
+      'mx2-4x32': { vcpus: 4, memoryGiB: 32, hourlyRate: 0.25 },
+    },
+
+    blockStorage: {
+      generalPurpose: { costPerGBMonth: 0.08, iopsPerGB: 3 },
+      tiers: {
+        '3iops': { costPerGBMonth: 0.08, iopsPerGB: 3 },
+        '5iops': { costPerGBMonth: 0.13, iopsPerGB: 5 },
+        '10iops': { costPerGBMonth: 0.25, iopsPerGB: 10 },
+      },
+    },
+
+    bareMetal: {
+      'bx2d-metal-96x384': {
+        vcpus: 96,
+        memoryGiB: 384,
+        monthlyRate: 2850,
+      },
+    },
+
+    roks: { clusterManagementFee: 0, workerNodeMarkup: 0 },
+    odf: { perTBMonth: 60, minimumTB: 0.5 },
+    networking: {
+      loadBalancer: { perLBMonthly: 35, perGBProcessed: 0.008 },
+      floatingIP: { monthlyRate: 4 },
+      vpnGateway: { monthlyRate: 75 },
+    },
   };
+}
 
-  // Handle CORS preflight
-  if (params.__ow_method === 'options') {
-    return {
-      statusCode: 204,
-      headers,
-      body: '',
-    };
-  }
-
+// Main pricing endpoint
+app.get('/', async (req, res) => {
   try {
-    const apiKey = params.IBM_CLOUD_API_KEY || params.apiKey;
-    const forceRefresh = params.refresh === 'true';
+    const apiKey = process.env.IBM_CLOUD_API_KEY;
+    const forceRefresh = req.query.refresh === 'true';
     const now = Date.now();
 
     // Check cache validity
-    const cacheValid = pricingCache.lastUpdated &&
-                       (now - pricingCache.lastUpdated) < CACHE_TTL_MS;
+    const cacheValid =
+      pricingCache.lastUpdated && now - pricingCache.lastUpdated < CACHE_TTL_MS;
 
     if (cacheValid && !forceRefresh && pricingCache.data) {
-      return {
-        statusCode: 200,
-        headers,
-        body: {
-          ...pricingCache.data,
-          cached: true,
-          cacheAge: Math.round((now - pricingCache.lastUpdated) / 1000),
-        },
-      };
+      return res.json({
+        ...pricingCache.data,
+        cached: true,
+        cacheAge: Math.round((now - pricingCache.lastUpdated) / 1000),
+      });
     }
 
     // Fetch fresh pricing data
@@ -274,8 +314,8 @@ async function main(params) {
     if (apiKey) {
       pricing = await fetchAllPricing(apiKey);
     } else {
-      // Return default pricing if no API key
-      pricing = await fetchAllPricing(''); // Will use defaults
+      console.log('No API key configured, returning default pricing');
+      pricing = getDefaultPricing();
     }
 
     // Update cache
@@ -284,47 +324,36 @@ async function main(params) {
       lastUpdated: now,
     };
 
-    return {
-      statusCode: 200,
-      headers,
-      body: {
-        ...pricing,
-        cached: false,
-      },
-    };
-
+    return res.json({
+      ...pricing,
+      cached: false,
+    });
   } catch (error) {
     console.error('Pricing proxy error:', error);
 
     // Return cached data if available, even if stale
     if (pricingCache.data) {
-      return {
-        statusCode: 200,
-        headers,
-        body: {
-          ...pricingCache.data,
-          cached: true,
-          stale: true,
-          error: error.message,
-        },
-      };
+      return res.json({
+        ...pricingCache.data,
+        cached: true,
+        stale: true,
+        error: error.message,
+      });
     }
 
-    return {
-      statusCode: 500,
-      headers,
-      body: {
-        error: 'Failed to fetch pricing data',
-        message: error.message,
-      },
-    };
+    // Return default pricing as fallback
+    return res.status(500).json({
+      ...getDefaultPricing(),
+      error: 'Failed to fetch pricing data',
+      message: error.message,
+    });
   }
-}
+});
 
-// Export for IBM Cloud Functions
-exports.main = main;
-
-// Export for local testing
-if (typeof module !== 'undefined') {
-  module.exports = { main };
-}
+// Start server
+app.listen(PORT, () => {
+  console.log(`Pricing proxy server listening on port ${PORT}`);
+  console.log(
+    `API key configured: ${process.env.IBM_CLOUD_API_KEY ? 'Yes' : 'No'}`
+  );
+});

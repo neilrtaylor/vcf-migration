@@ -91,6 +91,9 @@ const DEFAULT_TIMEOUT = 30000;
 // API key from environment variable
 const ENV_API_KEY = import.meta.env.VITE_IBM_CLOUD_API_KEY as string | undefined;
 
+// Profiles proxy URL (IBM Code Engine)
+const PROFILES_PROXY_URL = import.meta.env.VITE_PROFILES_PROXY_URL as string | undefined;
+
 // Regional VPC endpoints - use proxy in development to avoid CORS
 const VPC_REGIONS: Record<string, string> = import.meta.env.DEV
   ? {
@@ -136,6 +139,112 @@ let cachedIamToken: { token: string; expiry: number } | null = null;
  */
 export function isApiKeyConfigured(): boolean {
   return !!ENV_API_KEY;
+}
+
+/**
+ * Check if profiles proxy is configured
+ */
+export function isProfilesProxyConfigured(): boolean {
+  return !!PROFILES_PROXY_URL;
+}
+
+/**
+ * Get the profiles proxy URL
+ */
+export function getProfilesProxyUrl(): string | undefined {
+  return PROFILES_PROXY_URL;
+}
+
+/**
+ * Response from profiles proxy
+ */
+export interface ProxyProfilesResponse {
+  version: string;
+  lastUpdated: string;
+  source: string;
+  region: string;
+  zone: string;
+  vsiProfiles: Array<{
+    name: string;
+    family: string;
+    vcpus: number;
+    memoryGiB: number;
+    bandwidthGbps: number;
+  }>;
+  bareMetalProfiles: Array<{
+    name: string;
+    family: string;
+    vcpus: number;
+    physicalCores: number;
+    memoryGiB: number;
+    bandwidthGbps: number;
+    hasNvme: boolean;
+    nvmeDisks: number;
+    nvmeSizeGiB: number;
+    totalNvmeGiB: number;
+    roksSupported: boolean;
+  }>;
+  counts: {
+    vsi: number;
+    bareMetal: number;
+    roksVSI: number;
+    roksBM: number;
+  };
+  cached?: boolean;
+  cacheAge?: number;
+  error?: string;
+}
+
+/**
+ * Fetch profiles from the Code Engine proxy
+ */
+export async function fetchFromProfilesProxy(
+  options?: { refresh?: boolean; region?: string; zone?: string; timeout?: number }
+): Promise<ProxyProfilesResponse> {
+  if (!PROFILES_PROXY_URL) {
+    throw new Error('Profiles proxy URL not configured. Set VITE_PROFILES_PROXY_URL environment variable.');
+  }
+
+  const url = new URL(PROFILES_PROXY_URL);
+  if (options?.refresh) {
+    url.searchParams.set('refresh', 'true');
+  }
+  if (options?.region) {
+    url.searchParams.set('region', options.region);
+  }
+  if (options?.zone) {
+    url.searchParams.set('zone', options.zone);
+  }
+
+  logger.info('Fetching from profiles proxy', { url: url.toString() });
+
+  const response = await fetchWithTimeout(
+    url.toString(),
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    },
+    options?.timeout || DEFAULT_TIMEOUT
+  );
+
+  if (!response.ok) {
+    const apiError = await parseApiError(response, 'Profiles proxy');
+    throw new Error(apiError.message);
+  }
+
+  const data = await response.json();
+
+  logger.info('Profiles proxy response received', {
+    cached: data.cached,
+    cacheAge: data.cacheAge,
+    source: data.source,
+    vsiProfiles: data.counts?.vsi || data.vsiProfiles?.length || 0,
+    bareMetalProfiles: data.counts?.bareMetal || data.bareMetalProfiles?.length || 0,
+  });
+
+  return data;
 }
 
 // ===== HELPER FUNCTIONS =====

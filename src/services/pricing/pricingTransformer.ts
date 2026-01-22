@@ -450,7 +450,7 @@ export function transformProxyToAppPricing(proxyData: ProxyPricingResponse): IBM
   return {
     ...staticPricing,
     pricingVersion: proxyData.version || new Date().toISOString().split('T')[0],
-    notes: `Pricing from Cloud Functions proxy (${proxyData.source || 'proxy'})`,
+    notes: `Pricing from Code Engine proxy (${proxyData.source || 'proxy'})`,
     vsi: Object.keys(vsiProfiles).length > 0 ? vsiProfiles : staticPricing.vsi,
     bareMetal: Object.keys(bareMetalProfiles).length > 0 ? bareMetalProfiles : staticPricing.bareMetal,
     blockStorage: Object.keys(blockStorageTiers).length > 0 ? blockStorageTiers : staticPricing.blockStorage,

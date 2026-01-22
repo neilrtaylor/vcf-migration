@@ -1,17 +1,16 @@
 #!/bin/bash
 set -e
 
-# VCF Migration Pricing Proxy - Code Engine Deployment Script
-# Deploys the pricing proxy application to IBM Code Engine
+# VCF Migration Profiles Proxy - Code Engine Deployment Script
+# Deploys the profiles proxy application to IBM Code Engine
 
-echo "=== VCF Pricing Proxy - Code Engine Deployment ==="
+echo "=== VCF Profiles Proxy - Code Engine Deployment ==="
 echo ""
 
 # Configuration
-APP_NAME="vcf-pricing-proxy"
+APP_NAME="vcf-profiles-proxy"
 PROJECT_NAME="${CE_PROJECT_NAME:-vcf-migration}"
 REGION="${IBM_CLOUD_REGION:-us-south}"
-RESOURCE_GROUP="${IBM_CLOUD_RESOURCE_GROUP:-default}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -45,12 +44,19 @@ check_prerequisites() {
     echo -e "${GREEN}Prerequisites OK${NC}"
 }
 
-# Set target region and resource group
+# Set target region
 set_target() {
     echo ""
-    echo "Setting target region and resource group..."
-    ibmcloud target -r "$REGION" -g "$RESOURCE_GROUP"
-    echo -e "${GREEN}Target set: $REGION / $RESOURCE_GROUP${NC}"
+    echo "Setting target region..."
+    ibmcloud target -r "$REGION"
+
+    # Only set resource group if explicitly provided
+    if [ -n "$IBM_CLOUD_RESOURCE_GROUP" ]; then
+        ibmcloud target -g "$IBM_CLOUD_RESOURCE_GROUP"
+        echo -e "${GREEN}Target set: $REGION / $IBM_CLOUD_RESOURCE_GROUP${NC}"
+    else
+        echo -e "${GREEN}Target set: $REGION (using current resource group)${NC}"
+    fi
 }
 
 # Create or select Code Engine project
@@ -75,7 +81,7 @@ setup_project() {
 create_secret() {
     if [ -n "$IBM_CLOUD_API_KEY" ]; then
         echo ""
-        echo "Creating secret for API key..."
+        echo "Creating/updating secret for API key..."
 
         # Delete existing secret if it exists
         ibmcloud ce secret delete --name vcf-api-key --force 2>/dev/null || true
@@ -86,7 +92,9 @@ create_secret() {
 
         echo -e "${GREEN}Secret created: vcf-api-key${NC}"
     else
-        echo -e "${YELLOW}Warning: IBM_CLOUD_API_KEY not set. App will return default pricing.${NC}"
+        echo -e "${YELLOW}Warning: IBM_CLOUD_API_KEY not set. Profiles proxy requires an API key.${NC}"
+        echo -e "${YELLOW}Set IBM_CLOUD_API_KEY environment variable and run again.${NC}"
+        exit 1
     fi
 }
 
@@ -106,12 +114,8 @@ deploy_app() {
         --cpu 0.25
         --memory 0.5G
         --concurrency 100
+        --env-from-secret vcf-api-key
     )
-
-    # Add secret reference if API key was provided
-    if [ -n "$IBM_CLOUD_API_KEY" ]; then
-        DEPLOY_ARGS+=(--env-from-secret vcf-api-key)
-    fi
 
     # Check if app exists
     if ibmcloud ce app get --name "$APP_NAME" &> /dev/null; then
@@ -152,7 +156,7 @@ get_app_url() {
     echo "  curl '${APP_URL}/health'"
     echo ""
     echo "Add to your .env file:"
-    echo "  VITE_PRICING_PROXY_URL=${APP_URL}"
+    echo "  VITE_PROFILES_PROXY_URL=${APP_URL}"
     echo ""
 }
 

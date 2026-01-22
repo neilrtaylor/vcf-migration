@@ -19,7 +19,10 @@ import {
   transformROKSMachineTypes,
   testProfilesApiConnection,
   isApiKeyConfigured,
+  isProfilesProxyConfigured,
+  fetchFromProfilesProxy,
   type TransformedProfile,
+  type ProxyProfilesResponse,
 } from '@/services/ibmCloudProfilesApi';
 
 export interface UseDynamicProfilesConfig {
@@ -69,10 +72,45 @@ export function useDynamicProfiles(
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(null);
 
   /**
-   * Fetch fresh profiles from IBM Cloud APIs
+   * Fetch fresh profiles from proxy or IBM Cloud APIs
    */
   const fetchProfiles = useCallback(async () => {
     console.log('[Dynamic Profiles] Starting profiles fetch...', { region, zone });
+
+    // Check if proxy is configured - prefer proxy over direct API
+    if (isProfilesProxyConfigured()) {
+      console.log('[Dynamic Profiles] Proxy configured, fetching from proxy...');
+      try {
+        const proxyData = await fetchFromProfilesProxy({ region, zone });
+        console.log('[Dynamic Profiles] Proxy data received:', {
+          vsiProfiles: proxyData.counts?.vsi || proxyData.vsiProfiles?.length || 0,
+          bareMetalProfiles: proxyData.counts?.bareMetal || proxyData.bareMetalProfiles?.length || 0,
+          cached: proxyData.cached,
+          source: proxyData.source,
+        });
+
+        // Transform proxy response to IBMCloudProfiles format
+        const newProfiles = transformProxyResponse(proxyData, region, zone);
+
+        // Cache the data
+        setCachedProfiles(newProfiles, 'proxy');
+
+        // Update state
+        setProfiles(newProfiles);
+        setLastUpdated(new Date());
+        setSource('proxy');
+        setIsApiAvailable(true);
+        setError(null);
+
+        const counts = countProfiles(newProfiles);
+        console.log('[Dynamic Profiles] Successfully updated from PROXY:', counts);
+
+        return true;
+      } catch (err) {
+        console.warn('[Dynamic Profiles] Proxy fetch failed:', err instanceof Error ? err.message : err);
+        // Fall through to direct API if proxy fails
+      }
+    }
 
     try {
       // Fetch VPC instance profiles, VPC bare metal profiles, and ROKS flavors in parallel
@@ -281,15 +319,21 @@ export function useDynamicProfiles(
         counts: countProfiles(current.data),
       });
 
-      // Check if API key is configured
+      // Check if proxy or API key is configured
+      const hasProxy = isProfilesProxyConfigured();
       const hasApiKey = config?.apiKey || isApiKeyConfigured();
 
-      if (!hasApiKey) {
-        console.log('[Dynamic Profiles] No API key configured, using static data');
+      if (!hasProxy && !hasApiKey) {
+        console.log('[Dynamic Profiles] No proxy or API key configured, using static data');
         setIsApiAvailable(false);
-        setError('API key required. Set VITE_IBM_CLOUD_API_KEY in .env file.');
+        setError('Configure VITE_PROFILES_PROXY_URL or VITE_IBM_CLOUD_API_KEY in .env file.');
         setIsLoading(false);
         return;
+      }
+
+      // If proxy is configured, we don't need API key check
+      if (hasProxy) {
+        console.log('[Dynamic Profiles] Profiles proxy configured');
       }
 
       // Test API connectivity
@@ -371,6 +415,100 @@ function groupBareMetalByFamily(profiles: Array<{ name: string; family: string; 
   }
 
   return grouped;
+}
+
+/**
+ * Transform proxy response to IBMCloudProfiles format
+ */
+function transformProxyResponse(
+  proxyData: ProxyProfilesResponse,
+  region: string,
+  zone: string
+): IBMCloudProfiles {
+  // Group VSI profiles by family
+  const vsiByFamily: VSIProfilesByFamily = {
+    balanced: [],
+    compute: [],
+    memory: [],
+    veryHighMemory: [],
+    ultraHighMemory: [],
+    gpu: [],
+    other: [],
+  };
+
+  for (const profile of proxyData.vsiProfiles || []) {
+    const familyKey = mapFamilyToKey(profile.family);
+    if (vsiByFamily[familyKey]) {
+      vsiByFamily[familyKey].push({
+        name: profile.name,
+        family: profile.family,
+        vcpus: profile.vcpus,
+        memoryGiB: profile.memoryGiB,
+        bandwidthGbps: profile.bandwidthGbps,
+      });
+    }
+  }
+
+  // Group bare metal profiles by family
+  const bareMetalByFamily: BareMetalProfilesByFamily = {
+    balanced: [],
+    compute: [],
+    memory: [],
+    veryHighMemory: [],
+  };
+
+  for (const profile of proxyData.bareMetalProfiles || []) {
+    const familyKey = mapBareMetalFamilyToKey(profile.family);
+    if (bareMetalByFamily[familyKey]) {
+      bareMetalByFamily[familyKey].push({
+        name: profile.name,
+        family: profile.family,
+        vcpus: profile.vcpus,
+        physicalCores: profile.physicalCores,
+        memoryGiB: profile.memoryGiB,
+        bandwidthGbps: profile.bandwidthGbps,
+        hasNvme: profile.hasNvme,
+        nvmeDisks: profile.nvmeDisks,
+        nvmeSizeGiB: profile.nvmeSizeGiB,
+        totalNvmeGiB: profile.totalNvmeGiB,
+        roksSupported: profile.roksSupported,
+      });
+    }
+  }
+
+  return {
+    version: proxyData.version || new Date().toISOString().split('T')[0],
+    vsiProfiles: vsiByFamily,
+    bareMetalProfiles: bareMetalByFamily,
+    region,
+    zone,
+  };
+}
+
+/**
+ * Map VSI family name to key
+ */
+function mapFamilyToKey(family: string): keyof VSIProfilesByFamily {
+  const familyLower = family.toLowerCase();
+  if (familyLower.includes('balanced') || familyLower.startsWith('bx')) return 'balanced';
+  if (familyLower.includes('compute') || familyLower.startsWith('cx')) return 'compute';
+  if (familyLower.includes('memory') || familyLower.startsWith('mx')) return 'memory';
+  if (familyLower.includes('very') || familyLower.startsWith('vx')) return 'veryHighMemory';
+  if (familyLower.includes('ultra') || familyLower.startsWith('ux')) return 'ultraHighMemory';
+  if (familyLower.includes('gpu') || familyLower.startsWith('gx')) return 'gpu';
+  return 'other';
+}
+
+/**
+ * Map bare metal family name to key
+ */
+function mapBareMetalFamilyToKey(family: string): keyof BareMetalProfilesByFamily {
+  const familyLower = family.toLowerCase();
+  if (familyLower.includes('balanced') || familyLower.startsWith('bx')) return 'balanced';
+  if (familyLower.includes('compute') || familyLower.startsWith('cx')) return 'compute';
+  if (familyLower.includes('memory') || familyLower.startsWith('mx')) return 'memory';
+  if (familyLower.includes('very') || familyLower.startsWith('vx')) return 'veryHighMemory';
+  return 'balanced';
 }
 
 export default useDynamicProfiles;

@@ -209,3 +209,4 @@ node_modules
 
 # Env
 .env
+.nrt
