@@ -256,7 +256,8 @@ export interface VDatastoreInfo {
   freePercent: number;
   siocEnabled: boolean;
   siocThreshold: number | null;
-  hostCount: number;
+  hosts: string | null;  // Comma-separated list of host names
+  hostCount: number;     // Calculated count of hosts
   datacenter: string;
   cluster: string | null;
 }

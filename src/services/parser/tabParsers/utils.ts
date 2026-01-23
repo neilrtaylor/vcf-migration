@@ -19,6 +19,21 @@ export function parseSheet(sheet: WorkSheet, columnMap: ColumnMap): ParsedRow[] 
   // First row is headers
   const headers = rawData[0] as string[];
 
+  // Normalize header for matching: remove quotes, lowercase, trim, normalize whitespace
+  const normalizeHeader = (header: string): string => {
+    return header
+      .replace(/^["']+|["']+$/g, '') // Remove leading/trailing quotes
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' '); // Normalize multiple spaces to single space
+  };
+
+  // Build normalized lookup map for headers
+  const normalizedColumnMap: ColumnMap = {};
+  for (const [key, value] of Object.entries(columnMap)) {
+    normalizedColumnMap[normalizeHeader(key)] = value;
+  }
+
   // Build mapping from column index to field name
   const indexToField: Map<number, string> = new Map();
 
@@ -26,12 +41,31 @@ export function parseSheet(sheet: WorkSheet, columnMap: ColumnMap): ParsedRow[] 
     if (!header) return;
 
     const headerStr = String(header).trim();
-    const fieldName = columnMap[headerStr];
+    // Strip quotes from header for matching
+    const headerStrClean = headerStr.replace(/^["']+|["']+$/g, '').trim();
+
+    // Try exact match first (with quotes stripped)
+    let fieldName = columnMap[headerStrClean];
+    // Then try normalized match
+    if (!fieldName) {
+      fieldName = normalizedColumnMap[normalizeHeader(headerStr)];
+    }
 
     if (fieldName) {
       indexToField.set(index, fieldName);
     }
   });
+
+  // Debug: Log headers and matches to help identify issues
+  if (import.meta.env.DEV) {
+    const unmatchedHeaders = headers.filter((header, index) => {
+      if (!header) return false;
+      return !indexToField.has(index);
+    });
+    if (unmatchedHeaders.length > 0) {
+      console.debug('[Parser] Unmatched headers:', unmatchedHeaders.map(h => `"${h}"`));
+    }
+  }
 
   // Parse data rows
   const rows: ParsedRow[] = [];

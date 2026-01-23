@@ -222,6 +222,79 @@ The `patterns` array contains lowercase strings matched against RVTools "Guest O
 
 The service (`src/services/migration/osCompatibility.ts`) performs case-insensitive substring matching.
 
+## Version Management
+
+The application version and metadata are displayed on the About page (`/about`) and injected at build time.
+
+### Version Configuration
+
+Version info is sourced from `package.json` and injected via Vite's `define` option in `vite.config.ts`:
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `__APP_VERSION__` | `package.json` version | Semantic version (e.g., "1.0.0") |
+| `__APP_NAME__` | `package.json` name | Package name |
+| `__APP_DESCRIPTION__` | `package.json` description | App description |
+| `__APP_AUTHOR__` | `package.json` author | Author name |
+| `__APP_LICENSE__` | `package.json` license | License type |
+| `__BUILD_TIME__` | Generated at build | ISO timestamp of build |
+
+TypeScript declarations for these globals are in `src/vite-env.d.ts`.
+
+### Updating the Version
+
+1. **Update version in `package.json`:**
+   ```json
+   {
+     "version": "1.1.0"
+   }
+   ```
+
+2. **Add changelog entry in `src/data/changelog.json`:**
+   ```json
+   {
+     "releases": [
+       {
+         "version": "1.1.0",
+         "date": "2026-02-15",
+         "sections": {
+           "added": ["New feature description"],
+           "changed": ["Modified behavior description"],
+           "fixed": ["Bug fix description"],
+           "removed": ["Removed feature description"]
+         }
+       },
+       // ... previous releases
+     ]
+   }
+   ```
+
+3. **Rebuild the application** - version is injected at build time
+
+### Changelog Format
+
+The changelog follows [Keep a Changelog](https://keepachangelog.com/) conventions:
+
+| Section | Use For |
+|---------|---------|
+| `added` | New features |
+| `changed` | Changes to existing functionality |
+| `fixed` | Bug fixes |
+| `removed` | Removed features |
+| `deprecated` | Features marked for future removal |
+| `security` | Security-related changes |
+
+Only include sections that have entries for a given release.
+
+### About Page
+
+The About page (`src/pages/AboutPage.tsx`) displays:
+- Application version and metadata
+- Build timestamp
+- Technology stack
+- Changelog with expandable release notes
+- Resource links to documentation
+
 ## Utilities
 
 ### Retry Logic (`src/utils/retry.ts`)

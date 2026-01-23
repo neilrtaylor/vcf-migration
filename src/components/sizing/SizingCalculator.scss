@@ -178,23 +178,20 @@
     }
   }
 
-  &__formula-display {
-    margin-top: spacing.$spacing-05;
-    padding: spacing.$spacing-04;
-    background-color: var(--cds-layer-02, #f4f4f4);
-    border-radius: 4px;
-    text-align: center;
-
-    code {
-      @include type.type-style('code-02');
-      font-family: 'IBM Plex Mono', monospace;
-      color: var(--cds-text-primary, #161616);
-
-      strong {
-        color: var(--cds-support-success, #24a148);
-      }
-    }
+  &__workload-util {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-helper, #6f6f6f);
+    display: block;
+    margin-top: spacing.$spacing-02;
   }
+
+  &__workload-detail {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-helper, #6f6f6f);
+    display: block;
+    margin-top: spacing.$spacing-02;
+  }
+
 
   &__no-data {
     padding: spacing.$spacing-05;

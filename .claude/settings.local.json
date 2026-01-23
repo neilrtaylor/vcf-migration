@@ -49,7 +49,9 @@
       "Bash(npm run update-pricing:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(timeout 15 npm run dev:*)"
     ]
   }
 }

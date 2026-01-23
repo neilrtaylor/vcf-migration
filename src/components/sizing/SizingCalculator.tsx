@@ -15,6 +15,7 @@ import {
 import { useData, useDynamicProfiles } from '@/hooks';
 import { formatNumber, formatBytes } from '@/utils/formatters';
 import { ProfilesRefresh } from '@/components/profiles';
+import { StorageBreakdownBar, STORAGE_SEGMENT_COLORS } from './StorageBreakdownBar';
 import ibmCloudConfig from '@/data/ibmCloudConfig.json';
 import './SizingCalculator.scss';
 
@@ -147,18 +148,23 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     const availableMemoryGiB = Math.max(0, selectedProfile.memoryGiB - totalReservedMemory);
     const memoryCapacity = Math.floor(availableMemoryGiB * memoryOvercommit);
 
-    // Storage capacity calculation
-    // Raw NVMe / replica factor × operational capacity × (1 - Ceph overhead)
+    // Storage capacity calculation (per odf.md methodology)
+    // Step 1: Max per node = Raw NVMe / replica factor × (1 - Ceph overhead)
+    //         This is the maximum storage available after replication and Ceph overhead
+    // Step 2: Usable per node = Max per node × operational capacity
+    //         This is the target capacity for node sizing (leaving headroom for Ceph operations)
     const rawStorageGiB = selectedProfile.totalNvmeGiB ?? 0;
-    const storageEfficiency = (1 / replicaFactor) * (operationalCapacity / 100) * (1 - cephOverhead / 100);
-    const usableStorageGiB = Math.floor(rawStorageGiB * storageEfficiency);
+    const maxStorageEfficiency = (1 / replicaFactor) * (1 - cephOverhead / 100);
+    const maxUsableStorageGiB = Math.floor(rawStorageGiB * maxStorageEfficiency);
+    const usableStorageGiB = Math.floor(maxUsableStorageGiB * (operationalCapacity / 100));
 
     return {
       vcpuCapacity,
       memoryCapacity,
-      usableStorageGiB,
+      maxUsableStorageGiB,  // Max capacity before OpCap (for utilization calculations)
+      usableStorageGiB,     // Target capacity at OpCap (for node sizing)
       rawStorageGiB,
-      storageEfficiency,
+      maxStorageEfficiency,
       effectiveCores,
       availableCores,
       availableMemoryGiB,
@@ -216,11 +222,11 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     // the remaining nodes can handle the workload below thresholds:
     // - CPU/Memory: eviction threshold (triggers VM migration)
     // - Storage: ODF operational capacity (Ceph degrades above this)
+    // Note: usableStorageGiB already includes OpCap, so no additional multiplier needed
     const evictionFactor = evictionThreshold / 100;
-    const storageOperationalFactor = operationalCapacity / 100;
     const effectiveCpuCapacity = nodeCapacity.vcpuCapacity * evictionFactor;
     const effectiveMemoryCapacity = nodeCapacity.memoryCapacity * evictionFactor;
-    const effectiveStorageCapacity = nodeCapacity.usableStorageGiB * storageOperationalFactor;
+    const effectiveStorageCapacity = nodeCapacity.usableStorageGiB; // Already at OpCap target
 
     // Nodes required for each dimension at eviction threshold (guard against division by zero)
     // These are the minimum nodes needed to handle workload AFTER N failures
@@ -305,14 +311,18 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       : Infinity;
 
     // Utilization percentages after failures
+    // CPU/Memory: percentage of full capacity (compared against eviction threshold)
+    // Storage: percentage of max usable (compared against operational capacity)
     const cpuUtilAfterFailure = nodeCapacity.vcpuCapacity > 0
       ? (cpuPerNodeAfterFailure / nodeCapacity.vcpuCapacity) * 100
       : 0;
     const memoryUtilAfterFailure = nodeCapacity.memoryCapacity > 0
       ? (memoryPerNodeAfterFailure / nodeCapacity.memoryCapacity) * 100
       : 0;
-    const storageUtilAfterFailure = nodeCapacity.usableStorageGiB > 0
-      ? (storagePerNodeAfterFailure / nodeCapacity.usableStorageGiB) * 100
+    // Storage utilization is against maxUsableStorageGiB (before OpCap)
+    // so the comparison to operationalCapacity is meaningful (per odf.md methodology)
+    const storageUtilAfterFailure = nodeCapacity.maxUsableStorageGiB > 0
+      ? (storagePerNodeAfterFailure / nodeCapacity.maxUsableStorageGiB) * 100
       : 0;
 
     // Check if each resource passes validation
@@ -320,21 +330,22 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     // Storage: must stay below ODF operational capacity (Ceph degrades above this)
     const cpuPasses = cpuUtilAfterFailure <= evictionThreshold;
     const memoryPasses = memoryUtilAfterFailure <= evictionThreshold;
-    const storagePasses = storageUtilAfterFailure <= operationalCapacity || nodeCapacity.usableStorageGiB === 0;
+    const storagePasses = storageUtilAfterFailure <= operationalCapacity || nodeCapacity.maxUsableStorageGiB === 0;
     const odfQuorumPasses = survivingNodes >= 3; // Minimum 3 for ODF quorum
 
     // Overall validation
     const allPass = cpuPasses && memoryPasses && storagePasses && odfQuorumPasses;
 
     // Also calculate healthy state utilization
+    // Storage uses maxUsableStorageGiB for consistency with post-failure calculations
     const cpuUtilHealthy = nodeCapacity.vcpuCapacity > 0
       ? (nodeRequirements.totalVCPUs / totalNodes / nodeCapacity.vcpuCapacity) * 100
       : 0;
     const memoryUtilHealthy = nodeCapacity.memoryCapacity > 0
       ? (nodeRequirements.totalMemoryGiB / totalNodes / nodeCapacity.memoryCapacity) * 100
       : 0;
-    const storageUtilHealthy = nodeCapacity.usableStorageGiB > 0
-      ? (nodeRequirements.totalStorageGiB / totalNodes / nodeCapacity.usableStorageGiB) * 100
+    const storageUtilHealthy = nodeCapacity.maxUsableStorageGiB > 0
+      ? (nodeRequirements.totalStorageGiB / totalNodes / nodeCapacity.maxUsableStorageGiB) * 100
       : 0;
 
     return {
@@ -727,10 +738,20 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
 
               <Column lg={4} md={4} sm={4}>
                 <div className="sizing-calculator__result-card sizing-calculator__result-card--storage">
+                  <span className="sizing-calculator__result-label">Max Usable Storage</span>
+                  <span className="sizing-calculator__result-value">{formatBytes(nodeCapacity.maxUsableStorageGiB * 1024 * 1024 * 1024)}</span>
+                  <span className="sizing-calculator__result-detail">
+                    1/{replicaFactor} × {100 - cephOverhead}%
+                  </span>
+                </div>
+              </Column>
+
+              <Column lg={4} md={4} sm={4}>
+                <div className="sizing-calculator__result-card sizing-calculator__result-card--storage">
                   <span className="sizing-calculator__result-label">Usable Storage</span>
                   <span className="sizing-calculator__result-value">{formatBytes(nodeCapacity.usableStorageGiB * 1024 * 1024 * 1024)}</span>
                   <span className="sizing-calculator__result-detail">
-                    1/{replicaFactor} × {operationalCapacity}% × {100 - cephOverhead}%
+                    Max × {operationalCapacity}% Operational Capacity
                   </span>
                 </div>
               </Column>
@@ -756,6 +777,11 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                       {nodeRequirements.nodesForCPU} nodes
                       {nodeRequirements.limitingFactor === 'cpu' && <Tag type="red" size="sm">Limiting</Tag>}
                     </span>
+                    <span className="sizing-calculator__workload-util">
+                      {nodeCapacity.vcpuCapacity > 0 && nodeRequirements.nodesForCPU > 0
+                        ? `${((nodeRequirements.totalVCPUs / (nodeRequirements.nodesForCPU * nodeCapacity.vcpuCapacity)) * 100).toFixed(1)}% utilization`
+                        : ''}
+                    </span>
                   </div>
                 </Column>
 
@@ -766,6 +792,11 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                     <span className={`sizing-calculator__workload-nodes ${nodeRequirements.limitingFactor === 'memory' ? 'sizing-calculator__workload-nodes--limiting' : ''}`}>
                       {nodeRequirements.nodesForMemory} nodes
                       {nodeRequirements.limitingFactor === 'memory' && <Tag type="red" size="sm">Limiting</Tag>}
+                    </span>
+                    <span className="sizing-calculator__workload-util">
+                      {nodeCapacity.memoryCapacity > 0 && nodeRequirements.nodesForMemory > 0
+                        ? `${((nodeRequirements.totalMemoryGiB / (nodeRequirements.nodesForMemory * nodeCapacity.memoryCapacity)) * 100).toFixed(1)}% utilization`
+                        : ''}
                     </span>
                   </div>
                 </Column>
@@ -778,7 +809,12 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                       {nodeRequirements.nodesForStorage} nodes
                       {nodeRequirements.limitingFactor === 'storage' && <Tag type="red" size="sm">Limiting</Tag>}
                     </span>
-                    <span className="sizing-calculator__workload-detail" style={{ fontSize: '0.7rem', color: '#525252', marginTop: '0.25rem' }}>
+                    <span className="sizing-calculator__workload-util">
+                      {nodeCapacity.maxUsableStorageGiB > 0 && nodeRequirements.nodesForStorage > 0
+                        ? `${((nodeRequirements.totalStorageGiB / (nodeRequirements.nodesForStorage * nodeCapacity.maxUsableStorageGiB)) * 100).toFixed(1)}% of max (< ${operationalCapacity}%)`
+                        : 'External storage'}
+                    </span>
+                    <span className="sizing-calculator__workload-detail">
                       Base: {formatBytes(nodeRequirements.baseStorageGiB * 1024 * 1024 * 1024)} ({storageMetric === 'inUse' ? 'In Use' : storageMetric === 'diskCapacity' ? 'Disk Capacity' : 'Provisioned'})
                     </span>
                   </div>
@@ -791,21 +827,64 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                       {nodeRequirements.totalNodes}
                     </span>
                     <span className="sizing-calculator__workload-nodes">
-                      {nodeRequirements.baseNodes} base + {nodeRedundancy} redundancy
+                      {nodeRequirements.minSurvivingNodes} @ threshold + {nodeRedundancy} redundancy
                     </span>
                   </div>
                 </Column>
               </Grid>
 
-              <div className="sizing-calculator__formula-display">
-                <code>
-                  N+{nodeRedundancy}: max({nodeRequirements.nodesForCPUAtThreshold} CPU, {nodeRequirements.nodesForMemoryAtThreshold} Memory, {nodeRequirements.nodesForStorageAtThreshold} Storage) @ {evictionThreshold}% threshold
-                  + {nodeRedundancy} failure buffer = <strong>{nodeRequirements.totalNodes} nodes</strong>
-                </code>
+              {/* Storage Breakdown Visualization */}
+              <div style={{ marginTop: '1.5rem', padding: '0 1rem' }}>
+                <StorageBreakdownBar
+                  title="Storage Requirement Breakdown"
+                  segments={[
+                    {
+                      label: 'VM Data',
+                      value: nodeRequirements.baseStorageGiB,
+                      color: STORAGE_SEGMENT_COLORS.vmData,
+                      description: `Base ${storageMetric === 'inUse' ? 'in-use' : storageMetric === 'diskCapacity' ? 'disk capacity' : 'provisioned'} storage`,
+                    },
+                    {
+                      label: 'Growth',
+                      value: nodeRequirements.baseStorageGiB * (nodeRequirements.growthMultiplier - 1),
+                      color: STORAGE_SEGMENT_COLORS.growth,
+                      description: `${annualGrowthRate}% annual growth over ${planningHorizonYears} year${planningHorizonYears !== 1 ? 's' : ''}`,
+                    },
+                    {
+                      label: 'Virt. Overhead',
+                      value: (nodeRequirements.baseStorageGiB * nodeRequirements.growthMultiplier) * (nodeRequirements.virtOverheadMultiplier - 1),
+                      color: STORAGE_SEGMENT_COLORS.overhead,
+                      description: `${virtOverhead}% virtualization overhead (snapshots, clones, migration)`,
+                    },
+                  ]}
+                />
+                {nodeCapacity.maxUsableStorageGiB > 0 && (
+                  <StorageBreakdownBar
+                    title="Raw Storage Required (ODF)"
+                    segments={[
+                      {
+                        label: 'Usable Data',
+                        value: nodeRequirements.totalStorageGiB,
+                        color: STORAGE_SEGMENT_COLORS.vmData,
+                        description: 'Total usable storage requirement',
+                      },
+                      {
+                        label: 'Replica',
+                        value: nodeRequirements.totalStorageGiB * (replicaFactor - 1),
+                        color: STORAGE_SEGMENT_COLORS.replica,
+                        description: `${replicaFactor}x replication for data protection`,
+                      },
+                      {
+                        label: 'Operational Headroom',
+                        value: (nodeRequirements.totalStorageGiB * replicaFactor) * ((100 / operationalCapacity) - 1),
+                        color: STORAGE_SEGMENT_COLORS.headroom,
+                        description: `${100 - operationalCapacity}% operational headroom buffer`,
+                      },
+                    ]}
+                  />
+                )}
               </div>
-              <div className="sizing-calculator__info-text" style={{ marginTop: '0.5rem', textAlign: 'center' }}>
-                <span className="label">Formula:</span> Minimum nodes to stay below {evictionThreshold}% after {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''}
-              </div>
+
             </Tile>
           </Column>
         )}
@@ -849,7 +928,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                       <div className="sizing-calculator__efficiency-metric">
                         <span className="sizing-calculator__efficiency-metric-label">Storage Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {nodeCapacity.usableStorageGiB > 0 ? `${redundancyValidation.storageUtilHealthy.toFixed(1)}%` : 'N/A (external)'}
+                          {nodeCapacity.maxUsableStorageGiB > 0 ? `${redundancyValidation.storageUtilHealthy.toFixed(1)}%` : 'N/A (external)'}
                         </span>
                       </div>
                     </div>
@@ -890,7 +969,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                       <div className="sizing-calculator__efficiency-metric">
                         <span className="sizing-calculator__efficiency-metric-label">ODF Storage Utilization</span>
                         <span className="sizing-calculator__efficiency-metric-value">
-                          {nodeCapacity.usableStorageGiB > 0 ? (
+                          {nodeCapacity.maxUsableStorageGiB > 0 ? (
                             <>
                               <Tag type={redundancyValidation.storagePasses ? 'green' : 'red'} size="sm">
                                 {redundancyValidation.storageUtilAfterFailure.toFixed(1)}% {redundancyValidation.storagePasses ? '✓' : '✗'}
@@ -923,7 +1002,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
                   After {nodeRedundancy} node failure{nodeRedundancy !== 1 ? 's' : ''}, the cluster will exceed capacity thresholds
                   {!redundancyValidation.cpuPasses && ` (CPU: ${redundancyValidation.cpuUtilAfterFailure.toFixed(0)}% > ${evictionThreshold}%)`}
                   {!redundancyValidation.memoryPasses && ` (Memory: ${redundancyValidation.memoryUtilAfterFailure.toFixed(0)}% > ${evictionThreshold}%)`}
-                  {!redundancyValidation.storagePasses && nodeCapacity.usableStorageGiB > 0 && ` (ODF: ${redundancyValidation.storageUtilAfterFailure.toFixed(0)}% > ${operationalCapacity}%)`}
+                  {!redundancyValidation.storagePasses && nodeCapacity.maxUsableStorageGiB > 0 && ` (ODF: ${redundancyValidation.storageUtilAfterFailure.toFixed(0)}% > ${operationalCapacity}%)`}
                   {!redundancyValidation.odfQuorumPasses && ` (ODF Quorum: only ${redundancyValidation.survivingNodes} nodes < 3 required)`}.
                   Consider adding more nodes or adjusting thresholds.
                 </div>

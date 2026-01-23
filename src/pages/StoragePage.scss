@@ -86,4 +86,20 @@
     text-align: center;
     padding: spacing.$spacing-05;
   }
+
+  &__table-tile {
+    min-height: auto;
+  }
+
+  &__table-subtitle {
+    @include type.type-style('body-compact-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__utilization-cell {
+    display: inline-block;
+    min-width: 4rem;
+    text-align: right;
+  }
 }

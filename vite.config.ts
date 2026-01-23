@@ -3,6 +3,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import pkg from './package.json'
 
 // Plugin to serve IBM Plex fonts from node_modules
 // Carbon styles reference fonts with ~@ibm/plex paths which Vite doesn't handle by default
@@ -129,5 +130,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_NAME__: JSON.stringify(pkg.name),
+    __APP_DESCRIPTION__: JSON.stringify(pkg.description),
+    __APP_AUTHOR__: JSON.stringify(pkg.author),
+    __APP_LICENSE__: JSON.stringify(pkg.license),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
 })

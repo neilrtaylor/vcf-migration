@@ -1,4 +1,5 @@
 // Storage analysis page
+import { useMemo } from 'react';
 import { Grid, Column, Tile } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { useData, useChartFilter } from '@/hooks';
@@ -7,6 +8,8 @@ import { mibToGiB, mibToTiB, formatNumber } from '@/utils/formatters';
 import { HorizontalBarChart, DoughnutChart, Heatmap } from '@/components/charts';
 import type { HeatmapCell } from '@/components/charts';
 import { FilterBadge, MetricCard } from '@/components/common';
+import { EnhancedDataTable } from '@/components/tables/EnhancedDataTable';
+import type { ColumnDef } from '@tanstack/react-table';
 import './StoragePage.scss';
 
 export function StoragePage() {
@@ -105,6 +108,106 @@ export function StoragePage() {
       setFilter('datastoreType', label, 'typeChart');
     }
   };
+
+  // Datastore utilization table data
+  interface DatastoreUtilRow {
+    name: string;
+    type: string;
+    size: number;
+    used: number;
+    free: number;
+    utilization: number;
+    vmCount: number;
+    hostCount: number;
+  }
+
+  const datastoreUtilTableData: DatastoreUtilRow[] = useMemo(() =>
+    filteredDatastores
+      .filter(ds => ds.capacityMiB > 0)
+      .map(ds => ({
+        name: ds.name,
+        type: ds.type || 'Unknown',
+        size: mibToGiB(ds.capacityMiB),
+        used: mibToGiB(ds.inUseMiB),
+        free: mibToGiB(ds.freeMiB),
+        utilization: (ds.inUseMiB / ds.capacityMiB) * 100,
+        vmCount: ds.vmCount,
+        hostCount: ds.hostCount,
+      }))
+      .sort((a, b) => b.utilization - a.utilization),
+    [filteredDatastores]
+  );
+
+  // Color-coded utilization cell renderer
+  const getUtilizationColor = (value: number): string => {
+    if (value >= 80) return 'var(--cds-support-error, #da1e28)';
+    if (value >= 50) return 'var(--cds-support-warning, #f1c21b)';
+    return 'var(--cds-support-success, #24a148)';
+  };
+
+  const datastoreUtilColumns: ColumnDef<DatastoreUtilRow, unknown>[] = useMemo(() => [
+    {
+      id: 'name',
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ getValue }) => getValue() as string,
+    },
+    {
+      id: 'type',
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ getValue }) => getValue() as string,
+    },
+    {
+      id: 'size',
+      accessorKey: 'size',
+      header: 'Size (GiB)',
+      cell: ({ getValue }) => formatNumber((getValue() as number), 1),
+    },
+    {
+      id: 'used',
+      accessorKey: 'used',
+      header: 'Used (GiB)',
+      cell: ({ getValue }) => formatNumber((getValue() as number), 1),
+    },
+    {
+      id: 'free',
+      accessorKey: 'free',
+      header: 'Free (GiB)',
+      cell: ({ getValue }) => formatNumber((getValue() as number), 1),
+    },
+    {
+      id: 'vmCount',
+      accessorKey: 'vmCount',
+      header: 'VMs',
+      cell: ({ getValue }) => formatNumber(getValue() as number),
+    },
+    {
+      id: 'hostCount',
+      accessorKey: 'hostCount',
+      header: 'Hosts',
+      cell: ({ getValue }) => formatNumber(getValue() as number),
+    },
+    {
+      id: 'utilization',
+      accessorKey: 'utilization',
+      header: 'Utilized',
+      cell: ({ getValue }) => {
+        const value = getValue() as number;
+        return (
+          <span
+            className="storage-page__utilization-cell"
+            style={{
+              color: getUtilizationColor(value),
+              fontWeight: value >= 80 ? 600 : 400,
+            }}
+          >
+            {value.toFixed(1)}%
+          </span>
+        );
+      },
+    },
+  ], []);
 
   // Datastore utilization heatmap data (grouped by datacenter)
   const datastoreUtilHeatmap: HeatmapCell[] = datastores
@@ -337,13 +440,40 @@ export function StoragePage() {
           />
         </Column>
 
+        {/* Datastore Utilization Table */}
+        {datastoreUtilTableData.length > 0 && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="storage-page__chart-tile storage-page__table-tile">
+              <h3>Datastore Utilization</h3>
+              <p className="storage-page__table-subtitle">
+                {chartFilter?.dimension === 'datastoreType'
+                  ? `Showing ${datastoreUtilTableData.length} ${extractTypeFromLabel(chartFilter.value)} datastores`
+                  : `All ${datastoreUtilTableData.length} datastores sorted by utilization`}
+                {' '}<span style={{ color: 'var(--cds-support-success)' }}>●</span> &lt;50%
+                {' '}<span style={{ color: 'var(--cds-support-warning)' }}>●</span> 50-80%
+                {' '}<span style={{ color: 'var(--cds-support-error)' }}>●</span> &gt;80%
+              </p>
+              <EnhancedDataTable
+                data={datastoreUtilTableData}
+                columns={datastoreUtilColumns}
+                enableSearch={true}
+                enablePagination={true}
+                enableSorting={true}
+                enableExport={true}
+                defaultPageSize={25}
+                exportFilename="datastore-utilization"
+              />
+            </Tile>
+          </Column>
+        )}
+
         {/* Datastore Utilization Heatmap */}
         {datastoreUtilHeatmap.length > 0 && (
           <Column lg={16} md={8} sm={4}>
             <Tile className="storage-page__chart-tile">
               <Heatmap
-                title="Datastore Utilization"
-                subtitle="Utilization by datastore (Green <50%, Yellow 50-80%, Red >80%)"
+                title="Datastore Utilization Heatmap"
+                subtitle="Top 30 datastores by utilization (Green <50%, Yellow 50-80%, Red >80%)"
                 data={datastoreUtilHeatmap}
                 height={Math.min(600, 100 + datastoreUtilHeatmap.length * 28)}
                 colorScale="utilization"

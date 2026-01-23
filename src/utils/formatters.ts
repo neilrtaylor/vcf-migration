@@ -43,9 +43,15 @@ export function mibToTiB(mib: number): number {
 }
 
 /**
- * Format number with commas
+ * Format number with commas and optional decimal places
  */
-export function formatNumber(num: number): string {
+export function formatNumber(num: number, decimals?: number): string {
+  if (decimals !== undefined) {
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
   return num.toLocaleString();
 }
 

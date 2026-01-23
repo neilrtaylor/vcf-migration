@@ -141,7 +141,7 @@ describe('parseVDatastore', () => {
   });
 
   describe('host count', () => {
-    it('parses host count', () => {
+    it('parses numeric host count from # Hosts column', () => {
       const headers = ['Name', '# Hosts', 'Datacenter'];
       const rows = [
         ['shared-ds', 8, 'DC1'],
@@ -151,6 +151,55 @@ describe('parseVDatastore', () => {
       const result = parseVDatastore(sheet);
 
       expect(result[0].hostCount).toBe(8);
+    });
+
+    it('calculates host count from comma-separated host names in # Hosts column', () => {
+      const headers = ['Name', '# Hosts', 'Datacenter'];
+      const rows = [
+        ['shared-ds', 'host1.example.com, host2.example.com, host3.example.com', 'DC1'],
+      ];
+
+      const sheet = createMockSheet(headers, rows);
+      const result = parseVDatastore(sheet);
+
+      expect(result[0].hostCount).toBe(3);
+    });
+
+    it('parses host names from separate Hosts column', () => {
+      const headers = ['Name', 'Hosts', 'Datacenter'];
+      const rows = [
+        ['shared-ds', 'host1.example.com, host2.example.com', 'DC1'],
+      ];
+
+      const sheet = createMockSheet(headers, rows);
+      const result = parseVDatastore(sheet);
+
+      expect(result[0].hosts).toBe('host1.example.com, host2.example.com');
+      expect(result[0].hostCount).toBe(2);
+    });
+
+    it('handles single host', () => {
+      const headers = ['Name', '# Hosts', 'Datacenter'];
+      const rows = [
+        ['local-ds', 'host1.example.com', 'DC1'],
+      ];
+
+      const sheet = createMockSheet(headers, rows);
+      const result = parseVDatastore(sheet);
+
+      expect(result[0].hostCount).toBe(1);
+    });
+
+    it('handles empty hosts', () => {
+      const headers = ['Name', '# Hosts', 'Datacenter'];
+      const rows = [
+        ['orphan-ds', '', 'DC1'],
+      ];
+
+      const sheet = createMockSheet(headers, rows);
+      const result = parseVDatastore(sheet);
+
+      expect(result[0].hostCount).toBe(0);
     });
   });
 

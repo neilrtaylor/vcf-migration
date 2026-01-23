@@ -1,0 +1,24 @@
+{
+  "releases": [
+    {
+      "version": "1.0.0",
+      "date": "2026-01-22",
+      "sections": {
+        "added": [
+          "RVTools Excel file parsing and analysis",
+          "ROKS migration sizing with ODF storage support",
+          "VSI migration planning with profile matching",
+          "Pre-flight compatibility checks for MTV migration",
+          "Export to Excel, PDF, Word, and YAML formats",
+          "IBM Cloud live pricing integration via Global Catalog API",
+          "OS compatibility assessment for ROKS and VSI targets",
+          "Interactive sizing calculator with infrastructure reservations",
+          "Workload discovery and analysis dashboard",
+          "Storage breakdown visualization with datastore analysis",
+          "Network configuration analysis",
+          "Cluster and host inventory views"
+        ]
+      }
+    }
+  ]
+}

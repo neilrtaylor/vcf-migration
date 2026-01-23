@@ -25,6 +25,7 @@ const InfoPage = lazy(() => import('@/pages/InfoPage').then(m => ({ default: m.I
 const DocumentationPage = lazy(() => import('@/pages/DocumentationPage').then(m => ({ default: m.DocumentationPage })));
 const VSIMigrationMethodsPage = lazy(() => import('@/pages/VSIMigrationMethodsPage').then(m => ({ default: m.VSIMigrationMethodsPage })));
 const MTVDocumentationPage = lazy(() => import('@/pages/MTVDocumentationPage').then(m => ({ default: m.MTVDocumentationPage })));
+const AboutPage = lazy(() => import('@/pages/AboutPage').then(m => ({ default: m.AboutPage })));
 
 // Suspense wrapper for lazy-loaded pages
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -107,6 +108,10 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.mtvDocumentation.slice(1),
         element: <PageLoader><MTVDocumentationPage /></PageLoader>,
+      },
+      {
+        path: ROUTES.about.slice(1),
+        element: <PageLoader><AboutPage /></PageLoader>,
       },
       {
         path: '*',

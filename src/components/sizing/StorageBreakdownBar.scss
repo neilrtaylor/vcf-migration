@@ -1,0 +1,99 @@
+// Storage breakdown bar visualization styles
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.storage-breakdown-bar {
+  margin: spacing.$spacing-04 0;
+
+  &__title {
+    @include type.type-style('label-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-03;
+    font-weight: 600;
+  }
+
+  &__container {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-04;
+  }
+
+  &__bar {
+    flex: 1;
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: var(--cds-layer-02, #e0e0e0);
+  }
+
+  &__segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2px;
+    transition: opacity 0.2s ease;
+    cursor: default;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  &__segment-label {
+    @include type.type-style('label-01');
+    color: #ffffff;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 spacing.$spacing-02;
+  }
+
+  &__total {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-primary, #161616);
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 100px;
+    text-align: right;
+  }
+
+  &__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-04;
+    margin-top: spacing.$spacing-04;
+    padding-top: spacing.$spacing-03;
+    border-top: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+  }
+
+  &__legend-item {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-02;
+  }
+
+  &__legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  &__legend-label {
+    @include type.type-style('label-01');
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__legend-value {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-primary, #161616);
+    font-weight: 500;
+  }
+
+  &__legend-percent {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-secondary, #525252);
+  }
+}

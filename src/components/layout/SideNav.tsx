@@ -24,6 +24,7 @@ import {
   Book,
   DataShare,
   Migrate,
+  Help,
 } from '@carbon/icons-react';
 import { useHasData } from '@/hooks';
 import { ROUTES } from '@/utils/constants';
@@ -219,6 +220,15 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           isActive={isActive(ROUTES.mtvDocumentation)}
         >
           MTV Guide
+        </SideNavLink>
+
+        <SideNavLink
+          renderIcon={Help}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.about)}
+          isActive={isActive(ROUTES.about)}
+        >
+          About
         </SideNavLink>
       </SideNavItems>
     </CarbonSideNav>
