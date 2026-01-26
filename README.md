@@ -6,6 +6,10 @@ This project provides an interactive interface for analyzing VMware environments
 
 ---
 
+# For Users
+
+This section covers how to use the VCF Migration application for migration planning and analysis.
+
 ## Key Features
 
 ### Data Import & Analysis
@@ -36,18 +40,7 @@ This project provides an interactive interface for analyzing VMware environments
 - **Discount Options** — On-Demand, 1-Year Reserved, and 3-Year Reserved pricing
 - **Cost Breakdown** — Detailed line-item costs for compute, storage, and networking
 - **Monthly/Annual Projections** — Cost forecasting for budget planning
-- **Custom Profiles** - Features:
-
-    1. Profile Override - Users can override the auto-mapped VSI profile for any VM by clicking the edit icon in the VM mapping table
-    2. Custom Profile Definition - Users can define custom profiles with specific vCPUs, memory, and pricing
-    3. Persistence - All overrides and custom profiles are stored in localStorage
-    4. Visual Indicators - Override tags and notification banner when profiles are customized
-    5. Bulk Actions - "Clear All Overrides" button to reset all customizations
-    6. Integration - Overrides automatically apply to cost estimation and BOM export
-    7. Usage - Navigate to the VSI Migration > Sizing tab:
-    - Click Custom Profiles button to define new profiles
-    - In the VM to VSI Profile Mapping table, click the edit icon to override any VM's profile
-    - Changes are persisted across sessions
+- **Custom Profiles** — Override auto-mapped VSI profiles or define custom profiles with specific vCPUs, memory, and pricing
 
 ### Export & Reporting
 
@@ -74,143 +67,7 @@ This project provides an interactive interface for analyzing VMware environments
 
 ---
 
-## Technology Stack
-
-- **React 18** with TypeScript for type-safe UI development
-- **Vite** for fast development and optimized production builds
-- **IBM Carbon Design System** for enterprise-grade UI components
-- **Chart.js** for data visualization
-- **ExcelJS** for Excel generation with styling and formulas
-- **SheetJS (xlsx)** for reading Excel files
-- **jsPDF** for PDF report generation
-
-See [TECHNOLOGIES.md](TECHNOLOGIES.md) for detailed technology documentation.
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [README.md](README.md) | This file - project overview and getting started |
-| [User Guide](docs/USER_GUIDE.md) | Comprehensive step-by-step usage instructions |
-| [TECHNOLOGIES.md](TECHNOLOGIES.md) | Detailed technology stack documentation |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guides for IBM Cloud |
-| [CLAUDE.md](CLAUDE.md) | Development guidelines and architecture reference |
-| [PRD.md](PRD.md) | Product Requirements Document |
-
-### In-App Documentation
-
-The application also includes built-in documentation accessible from the sidebar:
-- **/user-guide** - Interactive User Guide with the same content as `docs/USER_GUIDE.md`
-- **/about** - Application version, changelog, and technology stack
-- **/overhead-reference** - OpenShift Virtualization overhead calculation reference
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** >= 18.x
-- **npm** >= 9.x or **yarn**
-
-### Installation
-
-```bash
-git clone https://github.com/neilrtaylor/vcf-migration.git
-cd vcf-migration
-npm install
-```
-
-### Development
-
-```bash
-npm run dev
-```
-
-Opens at `http://localhost:5173`
-
-### Production Build
-
-```bash
-npm run build
-npm run preview
-```
-
-### Production Deployment
-
-For deploying to IBM Cloud, see [DEPLOYMENT.md](DEPLOYMENT.md) which covers:
-- **VPC VSI with Nginx** — Full control, enterprise deployments
-- **Code Engine** — Serverless, auto-scaling
-- **Cloud Object Storage + CDN** — Static hosting, cost-effective
-
----
-
-## Project Structure
-
-```
-vcf-migration/
-├── public/                    # Static assets
-│   └── favicon.png            # IBM Cloud favicon (from cloud.ibm.com)
-├── src/
-│   ├── components/
-│   │   ├── charts/           # Visualization components
-│   │   ├── common/           # Reusable UI components
-│   │   ├── cost/             # Cost estimation components
-│   │   ├── export/           # Export functionality
-│   │   ├── layout/           # Navigation and layout
-│   │   ├── pricing/          # Pricing display components
-│   │   ├── sizing/           # Sizing calculators
-│   │   └── tables/           # Data table components
-│   ├── data/                 # Static data files
-│   │   ├── ibmCloudPricing.json    # Fallback pricing data
-│   │   ├── ibmCloudProfiles.json   # VSI profile definitions
-│   │   ├── mtvRequirements.json    # MTV validation rules
-│   │   └── redhatOSCompatibility.json
-│   ├── hooks/                # Custom React hooks
-│   ├── pages/                # Route pages
-│   │   ├── ROKSMigrationPage.tsx   # ROKS analysis
-│   │   ├── VSIMigrationPage.tsx    # VPC VSI analysis
-│   │   └── ...
-│   ├── services/
-│   │   ├── costEstimation.ts       # Cost calculation logic
-│   │   ├── export/                 # Export generators
-│   │   │   ├── bomXlsxGenerator.ts # BOM Excel export
-│   │   │   ├── pdfGenerator.ts     # PDF reports
-│   │   │   └── ...
-│   │   └── pricing/                # IBM Cloud pricing
-│   │       ├── globalCatalogApi.ts # API integration
-│   │       └── pricingCache.ts     # Caching layer
-│   ├── styles/               # SCSS stylesheets
-│   ├── types/                # TypeScript type definitions
-│   └── utils/                # Utility functions
-├── DEPLOYMENT.md             # Production deployment guide
-├── PRD.md                    # Product Requirements Document
-├── TECHNOLOGIES.md           # Technology documentation
-└── README.md
-```
-
----
-
-## User Guide
-
-For comprehensive step-by-step instructions, see the **[User Guide](docs/USER_GUIDE.md)**.
-
-The guide covers:
-- Quick start (5-step overview)
-- Importing RVTools data
-- Understanding the Dashboard
-- Infrastructure analysis (Compute, Storage, Network, Clusters, Hosts)
-- Workload discovery and VM management
-- Migration assessment (ROKS and VSI)
-- Wave planning
-- Cost estimation
-- Generating reports (PDF, Excel, Word, BOM, YAML)
-
----
-
-## Usage
+## Quick Start
 
 ### 1. Import RVTools Data
 
@@ -245,61 +102,27 @@ Navigate to either:
 
 ---
 
-## Branding
+## User Documentation
 
-The application uses official IBM Cloud branding:
+For comprehensive step-by-step instructions, see the **[User Guide](docs/USER_GUIDE.md)**.
 
-- **Page Title**: "VCF Migration Planning"
-- **Favicon**: Official IBM Cloud favicon (`public/favicon.png`) downloaded from `https://cloud.ibm.com`
-- **UI Components**: IBM Carbon Design System
+The guide covers:
+- Quick start (5-step overview)
+- Importing RVTools data
+- Understanding the Dashboard
+- Infrastructure analysis (Compute, Storage, Network, Clusters, Hosts)
+- Workload discovery and VM management
+- Migration assessment (ROKS and VSI)
+- Wave planning
+- Cost estimation
+- Generating reports (PDF, Excel, Word, BOM, YAML)
 
-To update the favicon, replace `public/favicon.png` with your desired icon (48x48 PNG recommended).
+### In-App Documentation
 
----
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file based on `.env.example`:
-
-```env
-# IBM Cloud API (optional - enables live pricing)
-VITE_IBM_CLOUD_API_KEY=your-api-key
-```
-
-Without an API key, the application uses static pricing data from `ibmCloudPricing.json`.
-
-### How It Works
-
-```bash
-  ┌─────────────────┐         ┌──────────────────────┐         ┌─────────────────┐
-  │   Browser       │ ──────> │  Code Engine         │ ──────> │  IBM Cloud      │
-  │   (Frontend)    │         │  Proxy               │         │  Global Catalog │
-  │                 │ <────── │  (1-hour cache)      │ <────── │  API            │
-  └─────────────────┘         └──────────────────────┘         └─────────────────┘
-                                       │
-                                API Key secure
-                                on server
-```
-
-To deploy:
-
-```bash
-# 1. Create API key
-ibmcloud iam api-key-create vcf-pricing-proxy
-
-# 2. Deploy proxy
-cd functions/pricing-proxy
-export IBM_CLOUD_API_KEY="your-key"
-./deploy.sh
-
-# 3. Add URL to frontend .env
-VITE_PRICING_PROXY_URL=https://your-function-url
-
-# 4. Rebuild and deploy
-npm run build
-```
+The application includes built-in documentation accessible from the sidebar:
+- **/user-guide** - Interactive User Guide
+- **/about** - Application version, changelog, and technology stack
+- **/overhead-reference** - OpenShift Virtualization overhead calculation reference
 
 ---
 
@@ -349,13 +172,6 @@ This application does not include:
 - Cookies for tracking purposes
 - Third-party advertising
 
-### Self-Hosted Deployment
-
-For maximum security, you can deploy this application entirely within your own infrastructure:
-- Host the static frontend on your own servers
-- Deploy the pricing/profiles proxies in your own IBM Cloud account
-- No external dependencies required after deployment
-
 ---
 
 ## Data Sources
@@ -368,6 +184,191 @@ For maximum security, you can deploy this application entirely within your own i
 - Global Catalog API for live pricing
 - Static fallback data updated periodically
 - Regional multipliers for accurate estimates
+
+---
+
+## Branding
+
+The application uses official IBM Cloud branding:
+
+- **Page Title**: "VCF Migration Planning"
+- **Favicon**: Official IBM Cloud favicon (`public/favicon.png`) downloaded from `https://cloud.ibm.com`
+- **UI Components**: IBM Carbon Design System
+
+---
+
+# For Developers
+
+This section covers development setup, project architecture, and contribution guidelines.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [README.md](README.md) | This file - project overview and getting started |
+| [User Guide](docs/USER_GUIDE.md) | Comprehensive step-by-step usage instructions |
+| [TECHNOLOGIES.md](TECHNOLOGIES.md) | Detailed technology stack documentation |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guides for IBM Cloud |
+| [CLAUDE.md](CLAUDE.md) | Development guidelines and architecture reference |
+| [PRD.md](PRD.md) | Product Requirements Document |
+
+---
+
+## Technology Stack
+
+- **React 18** with TypeScript for type-safe UI development
+- **Vite** for fast development and optimized production builds
+- **IBM Carbon Design System** for enterprise-grade UI components
+- **Chart.js** for data visualization
+- **ExcelJS** for Excel generation with styling and formulas
+- **SheetJS (xlsx)** for reading Excel files
+- **jsPDF** for PDF report generation
+
+See [TECHNOLOGIES.md](TECHNOLOGIES.md) for detailed technology documentation.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** >= 18.x
+- **npm** >= 9.x or **yarn**
+
+### Installation
+
+```bash
+git clone https://github.com/neilrtaylor/vcf-migration.git
+cd vcf-migration
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Opens at `http://localhost:5173`
+
+### Production Build
+
+```bash
+npm run build
+npm run preview
+```
+
+### Testing
+
+```bash
+npm test              # Run tests with Vitest
+npm run test:ui       # Run tests with UI
+npm run test:coverage # Run tests with coverage
+```
+
+---
+
+## Project Structure
+
+```
+vcf-migration/
+├── public/                    # Static assets
+│   └── favicon.png            # IBM Cloud favicon (from cloud.ibm.com)
+├── src/
+│   ├── components/
+│   │   ├── charts/           # Visualization components
+│   │   ├── common/           # Reusable UI components
+│   │   ├── cost/             # Cost estimation components
+│   │   ├── export/           # Export functionality
+│   │   ├── layout/           # Navigation and layout
+│   │   ├── pricing/          # Pricing display components
+│   │   ├── sizing/           # Sizing calculators
+│   │   └── tables/           # Data table components
+│   ├── data/                 # Static data files
+│   │   ├── ibmCloudPricing.json    # Fallback pricing data
+│   │   ├── ibmCloudProfiles.json   # VSI profile definitions
+│   │   ├── mtvRequirements.json    # MTV validation rules
+│   │   └── redhatOSCompatibility.json
+│   ├── hooks/                # Custom React hooks
+│   ├── pages/                # Route pages
+│   │   ├── ROKSMigrationPage.tsx   # ROKS analysis
+│   │   ├── VSIMigrationPage.tsx    # VPC VSI analysis
+│   │   └── ...
+│   ├── services/
+│   │   ├── costEstimation.ts       # Cost calculation logic
+│   │   ├── export/                 # Export generators
+│   │   │   ├── bomXlsxGenerator.ts # BOM Excel export
+│   │   │   ├── pdfGenerator.ts     # PDF reports
+│   │   │   └── ...
+│   │   └── pricing/                # IBM Cloud pricing
+│   │       ├── globalCatalogApi.ts # API integration
+│   │       └── pricingCache.ts     # Caching layer
+│   ├── styles/               # SCSS stylesheets
+│   ├── types/                # TypeScript type definitions
+│   └── utils/                # Utility functions
+├── docs/                     # Documentation files
+│   └── USER_GUIDE.md         # User documentation
+├── scripts/                  # Build and update scripts
+│   ├── update-profiles.ts    # Update IBM Cloud profiles
+│   └── update-pricing.ts     # Update IBM Cloud pricing
+├── DEPLOYMENT.md             # Production deployment guide
+├── PRD.md                    # Product Requirements Document
+├── TECHNOLOGIES.md           # Technology documentation
+├── CLAUDE.md                 # Development guidelines
+└── README.md
+```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```env
+# IBM Cloud API (optional - enables live pricing)
+VITE_IBM_CLOUD_API_KEY=your-api-key
+
+# Pricing proxy URL (optional - for production deployments)
+VITE_PRICING_PROXY_URL=https://your-function-url
+
+# Profiles proxy URL (optional - for production deployments)
+VITE_PROFILES_PROXY_URL=https://your-function-url
+```
+
+Without an API key, the application uses static pricing data from `ibmCloudConfig.json`.
+
+### Architecture: Pricing Proxy
+
+```
+  ┌─────────────────┐         ┌──────────────────────┐         ┌─────────────────┐
+  │   Browser       │ ──────> │  Code Engine         │ ──────> │  IBM Cloud      │
+  │   (Frontend)    │         │  Proxy               │         │  Global Catalog │
+  │                 │ <────── │  (1-hour cache)      │ <────── │  API            │
+  └─────────────────┘         └──────────────────────┘         └─────────────────┘
+                                       │
+                                API Key secure
+                                on server
+```
+
+To deploy the pricing proxy:
+
+```bash
+# 1. Create API key
+ibmcloud iam api-key-create vcf-pricing-proxy
+
+# 2. Deploy proxy
+cd functions/pricing-proxy
+export IBM_CLOUD_API_KEY="your-key"
+./deploy.sh
+
+# 3. Add URL to frontend .env
+VITE_PRICING_PROXY_URL=https://your-function-url
+
+# 4. Rebuild and deploy
+npm run build
+```
 
 ---
 
@@ -423,6 +424,22 @@ Run the update scripts periodically to keep the fallback data current.
 
 ---
 
+## Production Deployment
+
+For deploying to IBM Cloud, see [DEPLOYMENT.md](DEPLOYMENT.md) which covers:
+- **VPC VSI with Nginx** — Full control, enterprise deployments
+- **Code Engine** — Serverless, auto-scaling
+- **Cloud Object Storage + CDN** — Static hosting, cost-effective
+
+### Self-Hosted Deployment
+
+For maximum security, you can deploy this application entirely within your own infrastructure:
+- Host the static frontend on your own servers
+- Deploy the pricing/profiles proxies in your own IBM Cloud account
+- No external dependencies required after deployment
+
+---
+
 ## Contributing
 
 1. Fork the project
@@ -430,6 +447,8 @@ Run the update scripts periodically to keep the fallback data current.
 3. Commit your changes
 4. Push to your branch (`git push origin feature/foo`)
 5. Open a Pull Request
+
+See [CLAUDE.md](CLAUDE.md) for development guidelines and coding standards.
 
 ---
 
