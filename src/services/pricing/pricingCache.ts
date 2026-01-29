@@ -15,6 +15,8 @@ export interface BareMetalProfile {
   nvmeSizeGB?: number;
   totalNvmeGB?: number;
   roksSupported?: boolean;
+  isCustom?: boolean;
+  tag?: string;
   hourlyRate: number;
   monthlyRate: number;
   description: string;
@@ -273,6 +275,44 @@ export function getStaticPricing(): IBMCloudPricing {
         description: profile.description,
       };
     }
+  }
+
+  // Transform custom bare metal profiles
+  const customBareMetalProfiles = (config as { customBareMetalProfiles?: Array<{
+    name: string;
+    tag?: string;
+    physicalCores: number;
+    vcpus: number;
+    memoryGiB: number;
+    hasNvme: boolean;
+    nvmeDisks?: number;
+    nvmeSizeGiB?: number;
+    totalNvmeGiB?: number;
+    roksSupported?: boolean;
+    hourlyRate?: number;
+    monthlyRate?: number;
+    useCase?: string;
+    description?: string;
+  }> }).customBareMetalProfiles || [];
+
+  for (const profile of customBareMetalProfiles) {
+    bareMetal[profile.name] = {
+      profile: profile.name,
+      family: 'custom',
+      vcpus: profile.vcpus,
+      physicalCores: profile.physicalCores,
+      memoryGiB: profile.memoryGiB,
+      hasNvme: profile.hasNvme,
+      nvmeDisks: profile.nvmeDisks,
+      nvmeSizeGB: profile.nvmeSizeGiB,
+      totalNvmeGB: profile.totalNvmeGiB,
+      roksSupported: profile.roksSupported,
+      isCustom: true,
+      tag: profile.tag || 'Custom',
+      hourlyRate: profile.hourlyRate || 0,
+      monthlyRate: profile.monthlyRate || 0,
+      description: profile.description || `Custom - ${profile.vcpus} vCPUs, ${profile.memoryGiB} GiB RAM`,
+    };
   }
 
   // Transform VSI profiles from array structure to flat Record

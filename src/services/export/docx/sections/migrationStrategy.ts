@@ -2,11 +2,12 @@
 
 import { Paragraph, Table, TableRow, PageBreak, HeadingLevel, BorderStyle, AlignmentType } from 'docx';
 import type { RVToolsData, VirtualMachine, VNetworkInfo } from '@/types/rvtools';
+import type { MigrationInsights } from '@/services/ai/types';
 import { mibToGiB } from '@/utils/formatters';
 import { STYLES, type DocumentContent, type NetworkWave } from '../types';
-import { createHeading, createParagraph, createBulletList, createTableCell } from '../utils/helpers';
+import { createHeading, createParagraph, createBulletList, createTableCell, createAISection } from '../utils/helpers';
 
-export function buildMigrationStrategy(rawData: RVToolsData): DocumentContent[] {
+export function buildMigrationStrategy(rawData: RVToolsData, aiInsights?: MigrationInsights | null): DocumentContent[] {
   const networks = rawData.vNetwork;
   const vms = rawData.vInfo.filter((vm: VirtualMachine) => vm.powerState === 'poweredOn' && !vm.template);
 
@@ -76,7 +77,7 @@ export function buildMigrationStrategy(rawData: RVToolsData): DocumentContent[] 
   networkWaves.sort((a, b) => a.vmCount - b.vmCount);
   const topWaves = networkWaves.slice(0, 20);
 
-  return [
+  const sections: DocumentContent[] = [
     createHeading('5. Migration Strategy', HeadingLevel.HEADING_1),
     createParagraph(
       'This section outlines the recommended migration approach based on network topology analysis. Migrating workloads by subnet or port group minimizes network reconfiguration and reduces risk during cutover.',
@@ -164,7 +165,20 @@ export function buildMigrationStrategy(rawData: RVToolsData): DocumentContent[] 
       `Note: Showing 20 of ${networkWaves.length} port groups. Smaller waves are listed first to identify pilot migration candidates.`,
       { spacing: { before: 120 } }
     ) : new Paragraph({}),
-
-    new Paragraph({ children: [new PageBreak()] }),
   ];
+
+  // Add AI migration strategy if available
+  if (aiInsights?.migrationStrategy) {
+    sections.push(
+      ...createAISection(
+        '5.5 AI Migration Strategy',
+        aiInsights.migrationStrategy,
+        HeadingLevel.HEADING_2
+      )
+    );
+  }
+
+  sections.push(new Paragraph({ children: [new PageBreak()] }));
+
+  return sections;
 }

@@ -50,9 +50,21 @@
     justify-content: flex-end;
   }
 
+  &__summary-value--auto-excluded {
+    color: var(--cds-support-error, #da1e28);
+  }
+
   &__row--excluded {
     opacity: 0.6;
     background-color: var(--cds-layer-01, #f4f4f4);
+  }
+
+  &__row--overridden {
+    background-color: rgba(36, 161, 72, 0.05);
+  }
+
+  &__status-filter {
+    min-width: 10rem;
   }
 
   &__unclassified {

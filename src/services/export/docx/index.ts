@@ -46,6 +46,8 @@ export async function generateDocxReport(
   rawData: RVToolsData,
   options: DocxExportOptions = {}
 ): Promise<Blob> {
+  const aiInsights = options.aiInsights ?? null;
+
   const finalOptions: Required<DocxExportOptions> = {
     clientName: options.clientName || reportTemplates.placeholders.clientName,
     preparedBy: options.preparedBy || reportTemplates.placeholders.preparedBy,
@@ -54,6 +56,7 @@ export async function generateDocxReport(
     includeVSI: options.includeVSI ?? true,
     includeCosts: options.includeCosts ?? true,
     maxIssueVMs: options.maxIssueVMs ?? 20,
+    aiInsights: aiInsights,
   };
 
   // Reset caption counters for fresh document
@@ -65,7 +68,7 @@ export async function generateDocxReport(
   const vsiMappings = calculateVSIMappings(rawData);
 
   // Build document sections (await async functions)
-  const executiveSummary = await buildExecutiveSummary(rawData, readiness);
+  const executiveSummary = await buildExecutiveSummary(rawData, readiness, aiInsights);
   const environmentAnalysis = await buildEnvironmentAnalysis(rawData);
 
   // Build Table of Contents section
@@ -95,7 +98,7 @@ export async function generateDocxReport(
       spacing: { before: 120, after: 120 },
       children: [
         new TextRun({
-          text: 'Note: To update the Table of Contents in Microsoft Word, right-click on it and select "Update Field" → "Update entire table".',
+          text: 'Note: When opening this document, click "Yes" to update fields and populate the Table of Contents with correct page numbers.',
           size: 18,
           italics: true,
           color: STYLES.secondaryColor,
@@ -112,9 +115,9 @@ export async function generateDocxReport(
     ...executiveSummary,
     ...buildAssumptionsAndScope(),
     ...environmentAnalysis,
-    ...buildMigrationReadiness(readiness, finalOptions.maxIssueVMs),
+    ...buildMigrationReadiness(readiness, finalOptions.maxIssueVMs, aiInsights),
     ...buildMigrationOptions(),
-    ...buildMigrationStrategy(rawData),
+    ...buildMigrationStrategy(rawData, aiInsights),
   ];
 
   if (finalOptions.includeROKS) {
@@ -126,16 +129,19 @@ export async function generateDocxReport(
   }
 
   if (finalOptions.includeCosts && (finalOptions.includeROKS || finalOptions.includeVSI)) {
-    sections.push(...buildCostEstimation(roksSizing, vsiMappings));
+    sections.push(...buildCostEstimation(roksSizing, vsiMappings, aiInsights));
   }
 
-  sections.push(...buildNextSteps(finalOptions));
+  sections.push(...buildNextSteps(finalOptions, aiInsights));
 
   // Add appendices if there are more VMs than shown in main body
   sections.push(...buildAppendices(readiness, finalOptions.maxIssueVMs));
 
   // Create document with professional header/footer
   const doc = new Document({
+    features: {
+      updateFields: true,
+    },
     creator: finalOptions.companyName,
     title: `VMware Migration Assessment - ${finalOptions.clientName}`,
     description: 'VMware to IBM Cloud Migration Assessment Report',

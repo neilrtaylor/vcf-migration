@@ -1,4 +1,5 @@
 // Data context for global state management
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useReducer, useCallback, type ReactNode } from 'react';
 import { dataReducer, initialState, type DataState, type DataAction, type ChartFilter } from './dataReducer';
 import type { RVToolsData, AnalysisResults } from '@/types';

@@ -1,9 +1,8 @@
 // Network analysis page
-import { useMemo, useState, useCallback } from 'react';
-import { Grid, Column, Tile, Tag, TextInput, Toggle, InlineNotification } from '@carbon/react';
-import { Edit } from '@carbon/icons-react';
+import { useMemo, useState } from 'react';
+import { Grid, Column, Tile, Tag, Toggle } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
-import { useData, useSubnetOverrides, isValidCIDRList, useVMOverrides } from '@/hooks';
+import { useData, useVMOverrides } from '@/hooks';
 import { getVMIdentifier } from '@/utils/vmIdentifier';
 import { ROUTES } from '@/utils/constants';
 import { formatNumber } from '@/utils/formatters';
@@ -14,294 +13,55 @@ import { EnhancedDataTable } from '@/components/tables';
 import type { ColumnDef } from '@tanstack/react-table';
 import './NetworkPage.scss';
 
+// Type definitions moved outside component to avoid re-creation on each render
+interface MultiNicVMRow {
+  [key: string]: unknown;
+  vmName: string;
+  nicCount: number;
+  networks: string;
+  powerState: string;
+  cluster: string;
+}
+
+interface PortGroupSubnetRow {
+  [key: string]: unknown;
+  portGroup: string;
+  vSwitch: string;
+  vmCount: number;
+  nicCount: number;
+  uniquePrefixes: string[];
+  prefixCount: number;
+  hasMultiplePrefixes: boolean;
+  ipCount: number;
+  noIpCount: number;
+}
+
+// Helper to extract first 3 octets as network prefix
+const getNetworkPrefix = (ip: string): string => {
+  if (!ip) return '';
+  const parts = ip.split('.');
+  if (parts.length >= 3) {
+    return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
+  }
+  return '';
+};
+
 export function NetworkPage() {
   const { rawData } = useData();
-  const subnetOverrides = useSubnetOverrides();
   const vmOverrides = useVMOverrides();
   const [showAllVMLabels, setShowAllVMLabels] = useState(false);
-  const [editingPortGroup, setEditingPortGroup] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
 
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
+  // Derive data from rawData with safe fallbacks for when rawData is null
+  const networks = useMemo(() => rawData?.vNetwork ?? [], [rawData?.vNetwork]);
+  const vms = useMemo(() => (rawData?.vInfo ?? []).filter(vm => !vm.template), [rawData?.vInfo]);
 
-  const networks = rawData.vNetwork;
-  const vms = rawData.vInfo.filter(vm => !vm.template);
-
-  // Calculate network metrics
-  const uniqueNetworks = new Set(networks.map(n => n.networkName)).size;
-  const uniqueSwitches = new Set(networks.map(n => n.switchName).filter(Boolean)).size;
-
-  // Connection status - check both connected and disconnected NICs
-  // The Connected column shows adapter connection state (connected to virtual switch)
-  const connectedNICs = networks.filter(n => n.connected === true).length;
-  const disconnectedNICs = networks.filter(n => n.connected === false).length;
-  // If all NICs show as disconnected, it might be a data issue or all NICs are genuinely disconnected
-  // We show the counts regardless to give visibility into the data
-  const hasConnectedData = connectedNICs > 0 || (networks.length > 0 && disconnectedNICs < networks.length);
-
-  // NIC adapter type distribution (normalize to handle case variations)
-  const adapterTypes = networks.reduce((acc, nic) => {
-    const type = nic.adapterType || 'Unknown';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Case-insensitive adapter type counts for display
-  const vmxnet3Count = networks.filter(n =>
-    n.adapterType?.toLowerCase().includes('vmxnet3') ||
-    n.adapterType?.toLowerCase().includes('vmxnet 3')
-  ).length;
-
-  const adapterChartData = Object.entries(adapterTypes)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
-
-  // Network/Port group distribution
-  const networkDistribution = networks.reduce((acc, nic) => {
-    const network = nic.networkName || 'Unknown';
-    acc[network] = (acc[network] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const topNetworks = Object.entries(networkDistribution)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 15);
-
-  // VMs by NIC count
-  const vmNicCounts = vms.map(vm => {
+  // VMs by NIC count - needed by useMemo hooks below
+  const vmNicCounts = useMemo(() => vms.map(vm => {
     const nicCount = networks.filter(n => n.vmName === vm.vmName).length;
     return { vmName: vm.vmName, nicCount };
-  });
-
-  const nicCountDistribution = vmNicCounts.reduce((acc, vm) => {
-    const bucket = vm.nicCount === 0 ? '0' :
-                   vm.nicCount === 1 ? '1' :
-                   vm.nicCount === 2 ? '2' :
-                   vm.nicCount === 3 ? '3' :
-                   vm.nicCount <= 5 ? '4-5' : '6+';
-    acc[bucket] = (acc[bucket] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const nicCountChartData = ['0', '1', '2', '3', '4-5', '6+']
-    .map(bucket => ({
-      label: `${bucket} NICs`,
-      value: nicCountDistribution[bucket] || 0,
-    }))
-    .filter(d => d.value > 0);
-
-  // Top VMs by NIC count
-  const topNicVMs = [...vmNicCounts]
-    .sort((a, b) => b.nicCount - a.nicCount)
-    .slice(0, 15)
-    .filter(vm => vm.nicCount > 0)
-    .map(vm => ({
-      label: vm.vmName,
-      value: vm.nicCount,
-    }));
-
-  // Network Summary Table: Port groups with VM counts and IP subnet guessing
-  interface NetworkSummaryRow {
-    [key: string]: unknown;
-    portGroup: string;
-    vSwitch: string;
-    vmCount: number;
-    nicCount: number;
-    guessedSubnet: string;
-    subnet: string;        // Final subnet (override or guessed)
-    hasOverride: boolean;  // Whether user has set a manual subnet
-    sampleIPs: string;
-  }
-
-  // Handlers for inline subnet editing
-  const handleStartEdit = useCallback((portGroup: string, currentSubnet: string) => {
-    setEditingPortGroup(portGroup);
-    setEditValue(currentSubnet === 'N/A' ? '' : currentSubnet);
-  }, []);
-
-  const handleSaveEdit = useCallback((portGroup: string) => {
-    if (editValue.trim() === '' || editValue === 'N/A') {
-      subnetOverrides.removeOverride(portGroup);
-    } else if (isValidCIDRList(editValue.trim())) {
-      subnetOverrides.setSubnet(portGroup, editValue.trim());
-    }
-    setEditingPortGroup(null);
-    setEditValue('');
-  }, [editValue, subnetOverrides]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingPortGroup(null);
-    setEditValue('');
-  }, []);
-
-  const networkSummaryData = useMemo(() => {
-    // Group NICs by port group
-    const portGroupMap = new Map<string, {
-      vSwitch: string;
-      vmNames: Set<string>;
-      nicCount: number;
-      ips: string[];
-    }>();
-
-    networks.forEach(nic => {
-      const pg = nic.networkName || 'Unknown';
-      if (!portGroupMap.has(pg)) {
-        portGroupMap.set(pg, {
-          vSwitch: nic.switchName || 'Unknown',
-          vmNames: new Set(),
-          nicCount: 0,
-          ips: [],
-        });
-      }
-      const data = portGroupMap.get(pg)!;
-      data.vmNames.add(nic.vmName);
-      data.nicCount++;
-      if (nic.ipv4Address) {
-        data.ips.push(nic.ipv4Address);
-      }
-    });
-
-    // Convert to array and guess subnets
-    const result: NetworkSummaryRow[] = [];
-    portGroupMap.forEach((data, portGroup) => {
-      // Subnet guessing: find ALL unique prefixes (first 3 octets)
-      let guessedSubnet = 'N/A';
-      if (data.ips.length > 0) {
-        const uniquePrefixes = new Set<string>();
-        data.ips.forEach(ip => {
-          const parts = ip.split('.');
-          if (parts.length >= 3) {
-            const prefix = `${parts[0]}.${parts[1]}.${parts[2]}`;
-            uniquePrefixes.add(prefix);
-          }
-        });
-        // Convert all unique prefixes to CIDR notation
-        const subnets = Array.from(uniquePrefixes)
-          .sort()
-          .map(prefix => `${prefix}.0/24`);
-        if (subnets.length > 0) {
-          guessedSubnet = subnets.join(', ');
-        }
-      }
-
-      // Check for user override
-      const hasOverride = subnetOverrides.hasOverride(portGroup);
-      const subnet = hasOverride
-        ? subnetOverrides.getSubnet(portGroup)!
-        : guessedSubnet;
-
-      result.push({
-        portGroup,
-        vSwitch: data.vSwitch,
-        vmCount: data.vmNames.size,
-        nicCount: data.nicCount,
-        guessedSubnet,
-        subnet,
-        hasOverride,
-        sampleIPs: data.ips.slice(0, 3).join(', ') || 'N/A',
-      });
-    });
-
-    return result.sort((a, b) => b.vmCount - a.vmCount);
-  }, [networks, subnetOverrides]);
-
-  const networkSummaryColumns: ColumnDef<NetworkSummaryRow>[] = useMemo(() => [
-    { accessorKey: 'portGroup', header: 'Port Group' },
-    { accessorKey: 'vSwitch', header: 'vSwitch' },
-    { accessorKey: 'vmCount', header: 'VMs' },
-    { accessorKey: 'nicCount', header: 'NICs' },
-    {
-      accessorKey: 'subnet',
-      header: 'Subnet',
-      cell: ({ row }) => {
-        const portGroup = row.original.portGroup;
-        const subnet = row.original.subnet;
-        const hasOverride = row.original.hasOverride;
-        const isEditing = editingPortGroup === portGroup;
-
-        // Parse subnets for display
-        const subnets = subnet === 'N/A' ? [] : subnet.split(',').map(s => s.trim());
-        const hasMultiple = subnets.length > 1;
-
-        if (isEditing) {
-          return (
-            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-              <TextInput
-                id={`subnet-edit-${portGroup}`}
-                labelText=""
-                hideLabel
-                size="sm"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveEdit(portGroup);
-                  if (e.key === 'Escape') handleCancelEdit();
-                }}
-                placeholder="e.g., 10.0.1.0/24, 10.0.2.0/24"
-                invalid={editValue.trim() !== '' && editValue !== 'N/A' && !isValidCIDRList(editValue.trim())}
-                invalidText="Invalid CIDR format (use comma to separate multiple)"
-                style={{ width: '220px' }}
-                autoFocus
-              />
-              <button
-                onClick={() => handleSaveEdit(portGroup)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#24a148', fontSize: '1rem' }}
-                title="Save"
-              >
-                ✓
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#da1e28', fontSize: '1rem' }}
-                title="Cancel"
-              >
-                ✗
-              </button>
-            </div>
-          );
-        }
-
-        return (
-          <div
-            className="network-page__editable-cell"
-            onClick={() => handleStartEdit(portGroup, subnet)}
-            title="Click to edit subnet"
-          >
-            <div className="network-page__editable-cell-content">
-              {subnet === 'N/A' ? (
-                <span style={{ color: '#6f6f6f' }}>N/A</span>
-              ) : (
-                subnets.map((s, idx) => (
-                  <Tag key={idx} type={hasMultiple ? 'purple' : 'gray'} size="sm">
-                    {s}
-                  </Tag>
-                ))
-              )}
-              {!hasOverride && subnet !== 'N/A' && (
-                <Tag type="outline" size="sm">Guessed</Tag>
-              )}
-            </div>
-            <Edit size={14} className="network-page__edit-icon" />
-          </div>
-        );
-      },
-    },
-    { accessorKey: 'sampleIPs', header: 'Sample IPs' },
-  ], [editingPortGroup, editValue, handleStartEdit, handleSaveEdit, handleCancelEdit]);
+  }), [vms, networks]);
 
   // Multi-NIC VMs Table: VMs with more than 1 NIC
-  interface MultiNicVMRow {
-    [key: string]: unknown;
-    vmName: string;
-    nicCount: number;
-    networks: string;
-    powerState: string;
-    cluster: string;
-  }
-
   const multiNicVMData = useMemo(() => {
     const result: MultiNicVMRow[] = [];
     const multiNicVMs = vmNicCounts.filter(vm => vm.nicCount > 1);
@@ -341,29 +101,6 @@ export function NetworkPage() {
   ], []);
 
   // Port Group Subnet Analysis Table: One row per port group showing all unique network prefixes
-  interface PortGroupSubnetRow {
-    [key: string]: unknown;
-    portGroup: string;
-    vSwitch: string;
-    vmCount: number;
-    nicCount: number;
-    uniquePrefixes: string[];
-    prefixCount: number;
-    hasMultiplePrefixes: boolean;
-    ipCount: number;
-    noIpCount: number;
-  }
-
-  // Helper to extract first 3 octets as network prefix
-  const getNetworkPrefix = (ip: string): string => {
-    if (!ip) return '';
-    const parts = ip.split('.');
-    if (parts.length >= 3) {
-      return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
-    }
-    return '';
-  };
-
   const portGroupSubnetData = useMemo(() => {
     // Group by port group and collect all data
     const portGroupMap = new Map<string, {
@@ -488,6 +225,79 @@ export function NetworkPage() {
       ),
     },
   ], []);
+
+  // Early return AFTER all hooks have been called
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
+
+  // Calculate network metrics (these are not hooks, so they can be after early return)
+  const uniqueNetworks = new Set(networks.map(n => n.networkName)).size;
+  const uniqueSwitches = new Set(networks.map(n => n.switchName).filter(Boolean)).size;
+
+  // Connection status - check both connected and disconnected NICs
+  // The Connected column shows adapter connection state (connected to virtual switch)
+  const connectedNICs = networks.filter(n => n.connected === true).length;
+  const disconnectedNICs = networks.filter(n => n.connected === false).length;
+  // If all NICs show as disconnected, it might be a data issue or all NICs are genuinely disconnected
+  // We show the counts regardless to give visibility into the data
+  const hasConnectedData = connectedNICs > 0 || (networks.length > 0 && disconnectedNICs < networks.length);
+
+  // NIC adapter type distribution (normalize to handle case variations)
+  const adapterTypes = networks.reduce((acc, nic) => {
+    const type = nic.adapterType || 'Unknown';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Case-insensitive adapter type counts for display
+  const vmxnet3Count = networks.filter(n =>
+    n.adapterType?.toLowerCase().includes('vmxnet3') ||
+    n.adapterType?.toLowerCase().includes('vmxnet 3')
+  ).length;
+
+  const adapterChartData = Object.entries(adapterTypes)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  // Network/Port group distribution
+  const networkDistribution = networks.reduce((acc, nic) => {
+    const network = nic.networkName || 'Unknown';
+    acc[network] = (acc[network] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topNetworks = Object.entries(networkDistribution)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 15);
+
+  const nicCountDistribution = vmNicCounts.reduce((acc, vm) => {
+    const bucket = vm.nicCount === 0 ? '0' :
+                   vm.nicCount === 1 ? '1' :
+                   vm.nicCount === 2 ? '2' :
+                   vm.nicCount === 3 ? '3' :
+                   vm.nicCount <= 5 ? '4-5' : '6+';
+    acc[bucket] = (acc[bucket] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const nicCountChartData = ['0', '1', '2', '3', '4-5', '6+']
+    .map(bucket => ({
+      label: `${bucket} NICs`,
+      value: nicCountDistribution[bucket] || 0,
+    }))
+    .filter(d => d.value > 0);
+
+  // Top VMs by NIC count
+  const topNicVMs = [...vmNicCounts]
+    .sort((a, b) => b.nicCount - a.nicCount)
+    .slice(0, 15)
+    .filter(vm => vm.nicCount > 0)
+    .map(vm => ({
+      label: vm.vmName,
+      value: vm.nicCount,
+    }));
 
   // Connection status - only show if we have meaningful connected data
   const connectionStatus = hasConnectedData
@@ -805,27 +615,6 @@ export function NetworkPage() {
             variant="success"
             tooltip="VMXNET3 is the recommended high-performance paravirtualized adapter type for migration."
           />
-        </Column>
-
-        {/* Network Summary Table */}
-        <Column lg={16} md={8} sm={4}>
-          <Tile className="network-page__table-tile">
-            <h4 className="network-page__table-title">Network Summary</h4>
-            <p className="network-page__table-subtitle">Port groups with VM counts and estimated IP subnets</p>
-            <InlineNotification
-              kind="info"
-              lowContrast
-              hideCloseButton
-              title="Editable subnets:"
-              subtitle="Click any subnet cell to manually enter or correct the CIDR notation. Use commas to specify multiple subnets. Your changes are saved automatically."
-              className="network-page__edit-instruction"
-            />
-            <EnhancedDataTable
-              data={networkSummaryData}
-              columns={networkSummaryColumns}
-              defaultPageSize={10}
-            />
-          </Tile>
         </Column>
 
         {/* Port Group Subnet Analysis Table */}

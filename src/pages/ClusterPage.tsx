@@ -17,36 +17,32 @@ export function ClusterPage() {
   const { rawData } = useData();
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
 
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
-
-  const clustersRaw = rawData.vCluster;
-  const hosts = rawData.vHost;
-  const vms = rawData.vInfo.filter(vm => !vm.template);
+  const clustersRaw = useMemo(() => rawData?.vCluster ?? [], [rawData?.vCluster]);
+  const hosts = useMemo(() => rawData?.vHost ?? [], [rawData?.vHost]);
+  const vms = useMemo(() => (rawData?.vInfo ?? []).filter(vm => !vm.template), [rawData?.vInfo]);
 
   // Derive VM counts per cluster from vInfo (since vCluster may not have this column)
-  const vmCountsByCluster = vms.reduce((acc, vm) => {
+  const vmCountsByCluster = useMemo(() => vms.reduce((acc, vm) => {
     const cluster = vm.cluster || 'No Cluster';
     acc[cluster] = (acc[cluster] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, number>), [vms]);
 
   // Derive datacenter per cluster from vHost (since vCluster may not have this column)
-  const datacenterByCluster = hosts.reduce((acc, host) => {
+  const datacenterByCluster = useMemo(() => hosts.reduce((acc, host) => {
     const cluster = host.cluster || 'No Cluster';
     if (!acc[cluster] && host.datacenter) {
       acc[cluster] = host.datacenter;
     }
     return acc;
-  }, {} as Record<string, string>);
+  }, {} as Record<string, string>), [hosts]);
 
   // Augment cluster data with derived values
-  const clusters = clustersRaw.map(c => ({
+  const clusters = useMemo(() => clustersRaw.map(c => ({
     ...c,
     vmCount: c.vmCount || vmCountsByCluster[c.name] || 0,
     datacenter: c.datacenter || datacenterByCluster[c.name] || '',
-  }));
+  })), [clustersRaw, vmCountsByCluster, datacenterByCluster]);
 
   // Build filter options for the VM table
   const clusterFilterOptions: FilterOption[] = useMemo(() => {
@@ -64,6 +60,10 @@ export function ClusterPage() {
     if (!selectedCluster) return vms;
     return vms.filter(vm => vm.cluster === selectedCluster);
   }, [vms, selectedCluster]);
+
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
 
   // Summary metrics
   const totalClusters = clusters.length;

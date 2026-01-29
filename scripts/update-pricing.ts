@@ -333,12 +333,22 @@ async function fetchBareMetalPricing(token: string): Promise<Map<string, { hourl
   return pricing;
 }
 
+// Config type for pricing updates
+interface IBMCloudConfig {
+  vsiPricing?: Record<string, { hourlyRate: number; monthlyRate: number }>;
+  bareMetalPricing?: Record<string, { hourlyRate: number; monthlyRate: number }>;
+  vsiProfiles?: Record<string, Array<{ name: string; hourlyRate?: number; monthlyRate?: number }>>;
+  bareMetalProfiles?: Record<string, Array<{ name: string; hourlyRate?: number; monthlyRate?: number }>>;
+  version?: string;
+  [key: string]: unknown;
+}
+
 // Update the config with new pricing
 function updateConfigWithPricing(
-  existingConfig: any,
+  existingConfig: IBMCloudConfig,
   vsiPricing: Map<string, { hourlyRate: number; monthlyRate: number }>,
   bareMetalPricing: Map<string, { hourlyRate: number; monthlyRate: number }>
-): any {
+): IBMCloudConfig {
   const newConfig = { ...existingConfig };
 
   // Update VSI pricing section
@@ -415,12 +425,12 @@ async function main() {
 
   // Load existing config
   console.log('Loading existing configuration...');
-  let existingConfig: any = {};
+  let existingConfig: IBMCloudConfig = {};
   try {
     const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-    existingConfig = JSON.parse(content);
+    existingConfig = JSON.parse(content) as IBMCloudConfig;
     console.log(`  Loaded ${CONFIG_PATH}`);
-  } catch (err) {
+  } catch {
     console.error('  Error: Could not load existing config');
     console.error('  Run "npm run update-profiles" first to create the config file');
     process.exit(1);

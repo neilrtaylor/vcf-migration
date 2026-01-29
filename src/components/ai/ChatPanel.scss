@@ -1,0 +1,138 @@
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/colors' as colors;
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+
+  &__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: spacing.$spacing-05;
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-04;
+  }
+
+  &__welcome {
+    text-align: center;
+    padding: spacing.$spacing-07 spacing.$spacing-05;
+    color: var(--cds-text-secondary);
+
+    h5 {
+      @include type.type-style('heading-compact-02');
+      margin-bottom: spacing.$spacing-03;
+      color: var(--cds-text-primary);
+    }
+
+    p {
+      @include type.type-style('body-01');
+      margin-bottom: spacing.$spacing-05;
+    }
+  }
+
+  &__message {
+    display: flex;
+
+    &--user {
+      justify-content: flex-end;
+
+      .chat-panel__bubble {
+        background-color: var(--cds-interactive);
+        color: var(--cds-text-on-color);
+        border-radius: spacing.$spacing-04 spacing.$spacing-04 0 spacing.$spacing-04;
+        max-width: 80%;
+      }
+    }
+
+    &--assistant {
+      justify-content: flex-start;
+
+      .chat-panel__bubble {
+        background-color: var(--cds-layer-02);
+        color: var(--cds-text-primary);
+        border-radius: spacing.$spacing-04 spacing.$spacing-04 spacing.$spacing-04 0;
+        max-width: 85%;
+      }
+    }
+  }
+
+  &__bubble {
+    padding: spacing.$spacing-04 spacing.$spacing-05;
+    position: relative;
+  }
+
+  &__ai-tag {
+    margin-bottom: spacing.$spacing-02;
+  }
+
+  &__text {
+    @include type.type-style('body-01');
+
+    p {
+      margin: 0;
+
+      &:not(:last-child) {
+        margin-bottom: spacing.$spacing-03;
+      }
+
+      &:empty {
+        display: none;
+      }
+    }
+  }
+
+  &__loading {
+    padding: spacing.$spacing-03 0;
+  }
+
+  &__error {
+    margin: spacing.$spacing-03 0;
+  }
+
+  &__suggestions {
+    padding: 0 spacing.$spacing-05 spacing.$spacing-03;
+  }
+
+  &__suggestion-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-03;
+  }
+
+  &__suggestion-chip {
+    @include type.type-style('body-compact-01');
+    border: 1px solid var(--cds-border-subtle);
+    border-radius: spacing.$spacing-04;
+  }
+
+  &__input-area {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    padding: spacing.$spacing-04 spacing.$spacing-05;
+    border-top: 1px solid var(--cds-border-subtle);
+    background-color: var(--cds-layer-01);
+
+    .cds--text-input-wrapper {
+      flex: 1;
+    }
+  }
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: spacing.$spacing-07;
+    text-align: center;
+    color: var(--cds-text-secondary);
+
+    p {
+      @include type.type-style('body-01');
+    }
+  }
+}

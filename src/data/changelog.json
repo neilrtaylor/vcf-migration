@@ -1,6 +1,84 @@
 {
   "releases": [
     {
+      "version": "1.1.1",
+      "date": "2026-01-28",
+      "sections": {
+        "added": [
+          "AI wave planning suggestions with per-wave risk narratives and dependency warnings (POST /api/wave-suggestions)",
+          "AI cost optimization recommendations with prioritized savings estimates for VSI (POST /api/cost-optimization)",
+          "AI remediation guidance with step-by-step instructions for migration blockers (POST /api/remediation)",
+          "AI Wave Analysis panel in Wave Planning tab on ROKS and VSI migration pages",
+          "AI Cost Optimization panel in Cost Estimation tab on VSI migration page",
+          "AI Remediation Guidance panel in Pre-Flight Checks tab on ROKS and VSI migration pages",
+          "AI-enhanced export reports:",
+          "  — DOCX reports include AI executive summary, risk assessment, strategy, recommendations, and cost optimizations",
+          "  — PDF reports include dedicated AI Migration Insights page",
+          "  — Excel reports include AI Recommendations sheet",
+          "  — BOM Excel reports include AI Notes sheet with cost optimization guidance",
+          "  — All AI content includes watsonx.ai disclaimer and graceful degradation when AI is unavailable",
+          "25 future ROKS bare metal profiles (bx3d, cx3d, mx3d, mx3de, ux3de, mx2de, bx3, cx3, mx3) added as custom profiles in ibmCloudConfig.json"
+        ],
+        "changed": [
+          "Sizing Calculator now defaults to the best-value (cheapest) ROKS+NVMe bare metal profile instead of the first in the list",
+          "Clicking a bare metal profile tile in ROKS Cost Estimation switches to the Sizing tab with that profile pre-selected",
+          "ROKS Cost Estimation profile comparison tiles now display custom profile tags (e.g., 'Future', 'On-Prem') as purple badges",
+          "Custom bare metal profiles with no pricing data now show 'Unable to Price' instead of '$0' in cost estimation summary, line items, and profile comparison tiles",
+          "Renamed 'Workload Discovery' to 'Discovery' in navigation and page title",
+          "Discovery page now uses tabs: 'Workload' (existing content) and 'Networks' (Network Summary table)",
+          "Moved Network Summary table from Network page to Discovery > Networks tab",
+          "Extracted NetworkSummaryTable into reusable component (src/components/network/)"
+        ]
+      }
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-01-27",
+      "sections": {
+        "added": [
+          "AI-powered features using IBM watsonx.ai via Code Engine proxy:",
+          "  — Workload classification with confidence scoring and reasoning (purple 'AI' tags)",
+          "  — VSI right-sizing recommendations with cost optimization insights",
+          "  — Migration insights panel with executive summary, risk assessment, and recommendations",
+          "  — Context-aware chatbot for migration planning (floating widget and full-page at /chat)",
+          "  — Settings page (/settings) with AI toggle, proxy connectivity test, consent, and cache management",
+          "  — AI status indicators across the app (SideNav, chat widget, insights panel)",
+          "Unified single-page Workload Discovery layout replacing previous multi-tab design:",
+          "  — Metric cards: Total VMs, Classified VMs, Unclassified, and VMs in Scope",
+          "  — Interactive chart linked to VM table — click a bar to filter by workload type",
+          "  — Workload type info tile showing description and detection patterns for selected type",
+          "  — Unified VM table showing ALL VMs with Workload Type, Status, and inline actions",
+          "  — Workload type filter bar with Unclassified tile for VMs needing categorization",
+          "Four-tier classification precedence: User > Maintainer > AI > Rule-based pattern match",
+          "  — User overrides (via UI) take highest priority",
+          "  — Maintainer authoritative classifications (authoritativeClassifications in workloadPatterns.json) — AI cannot override, shown with teal 'Maintainer' tag",
+          "  — AI classification fills gaps when available",
+          "  — Rule-based pattern matching as fallback when no AI",
+          "Fully maintainer-configurable auto-exclusion rules in workloadPatterns.json (no hardcoded logic):",
+          "  — fieldRules for VM properties (template, powerState)",
+          "  — namePatterns for VM name matching (contains, startsWith, endsWith, exact, regex with excludePatterns)",
+          "  — Templates, powered-off, VMware infrastructure, AD/DNS, and network edge appliances auto-excluded",
+          "  — Users can force-include or manually exclude via UI",
+          "VM management features: exclude/include VMs, bulk operations, workload type overrides, per-VM notes, CSV export, JSON export/import of overrides",
+          "Custom bare metal profiles for ROKS Sizing Calculator — define future ROKS hardware in ibmCloudConfig.json",
+          "Migration-relevant descriptions for all 14 workload types in workloadPatterns.json",
+          "Maintainer guide (_maintainerGuide) in workloadPatterns.json explaining all three config sections"
+        ],
+        "changed": [
+          "Discovery page redesigned from multi-tab layout to unified single page with chart-to-table linking",
+          "Classification and auto-exclusion are independent systems — a VM can have a workload type AND be auto-excluded",
+          "All auto-exclusion logic moved from hardcoded TypeScript to JSON-driven rules in workloadPatterns.json",
+          "Standardized user-facing terminology to 'Workload Type' across all UI and documentation",
+          "Migration pages (VSI, ROKS) use unified exclusion logic: force-included > manually excluded > auto-excluded > default included"
+        ],
+        "fixed": [
+          "cust-edge and service-edge VMs correctly identified as network appliances (not falsely excluded as VMware infrastructure)",
+          "ROKS Sizing Calculator excludes user-excluded VMs from CPU, memory, and storage calculations",
+          "VSI cost estimation storage total only includes disks from non-excluded powered-on VMs"
+        ]
+      }
+    },
+    {
       "version": "1.0.4",
       "date": "2026-01-26",
       "sections": {

@@ -8,6 +8,7 @@ import { VSIMigrationPage } from './VSIMigrationPage';
 vi.mock('@/hooks', () => ({
   useData: vi.fn(),
   useVMs: vi.fn(),
+  useAllVMs: vi.fn(() => []),
   useCustomProfiles: vi.fn(),
   usePreflightChecks: vi.fn(),
   useMigrationAssessment: vi.fn(),
@@ -15,10 +16,28 @@ vi.mock('@/hooks', () => ({
   useVMOverrides: vi.fn(() => ({
     overrides: {},
     isExcluded: () => false,
+    isForceIncluded: () => false,
+    isEffectivelyExcluded: () => false,
     getWorkloadType: () => undefined,
     getNotes: () => undefined,
     excludedCount: 0,
+    forceIncludedCount: 0,
     overrideCount: 0,
+  })),
+  useAutoExclusion: vi.fn(() => ({
+    autoExclusionMap: new Map(),
+    getAutoExclusionById: () => ({ isAutoExcluded: false, reasons: [], labels: [] }),
+    autoExcludedCount: 0,
+    autoExcludedBreakdown: { templates: 0, poweredOff: 0, vmwareInfrastructure: 0, windowsInfrastructure: 0 },
+  })),
+  useAIRightsizing: vi.fn(() => ({
+    recommendations: {},
+    isLoading: false,
+    error: null,
+    getRecommendation: () => null,
+    refreshRecommendations: vi.fn(),
+    clearCache: vi.fn(),
+    isAvailable: false,
   })),
 }));
 
@@ -81,7 +100,15 @@ vi.mock('@/components/migration', () => ({
   OSCompatibilityPanel: () => <div data-testid="os-compatibility-panel" />,
 }));
 
-import { useData, useVMs, useCustomProfiles, usePreflightChecks, useMigrationAssessment, useWavePlanning } from '@/hooks';
+vi.mock('@/components/ai/AIInsightsPanel', () => ({
+  AIInsightsPanel: () => <div data-testid="ai-insights-panel" />,
+}));
+
+vi.mock('@/services/ai/aiProxyClient', () => ({
+  isAIProxyConfigured: vi.fn(() => false),
+}));
+
+import { useData, useVMs, useAllVMs, useCustomProfiles, usePreflightChecks, useMigrationAssessment, useWavePlanning } from '@/hooks';
 
 const mockVMs = [
   {
@@ -205,7 +232,7 @@ describe('VSIMigrationPage', () => {
 
   it('redirects to home when no data is loaded', () => {
     vi.mocked(useData).mockReturnValue({ rawData: null } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue([]);
+    vi.mocked(useAllVMs).mockReturnValue([]);
 
     render(
       <MemoryRouter>
@@ -218,7 +245,7 @@ describe('VSIMigrationPage', () => {
 
   it('renders page with data', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -231,7 +258,7 @@ describe('VSIMigrationPage', () => {
 
   it('displays readiness score', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -244,7 +271,7 @@ describe('VSIMigrationPage', () => {
 
   it('renders tabs for different sections', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -259,7 +286,7 @@ describe('VSIMigrationPage', () => {
 
   it('displays pre-flight check metrics', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -273,7 +300,7 @@ describe('VSIMigrationPage', () => {
 
   it('shows blockers notification when blockers exist', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
     vi.mocked(usePreflightChecks).mockReturnValue({
       ...mockPreflightChecks,
       blockerCount: 5,
@@ -291,7 +318,7 @@ describe('VSIMigrationPage', () => {
 
   it('renders cost estimation component', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -304,7 +331,7 @@ describe('VSIMigrationPage', () => {
 
   it('renders complexity assessment panel', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -317,7 +344,7 @@ describe('VSIMigrationPage', () => {
 
   it('renders wave planning panel', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
+    vi.mocked(useAllVMs).mockReturnValue(mockVMs as unknown as ReturnType<typeof useVMs>);
 
     render(
       <MemoryRouter>
@@ -330,7 +357,7 @@ describe('VSIMigrationPage', () => {
 
   it('handles zero VMs gracefully', () => {
     vi.mocked(useData).mockReturnValue({ rawData: mockRawData } as unknown as ReturnType<typeof useData>);
-    vi.mocked(useVMs).mockReturnValue([]);
+    vi.mocked(useAllVMs).mockReturnValue([]);
 
     render(
       <MemoryRouter>

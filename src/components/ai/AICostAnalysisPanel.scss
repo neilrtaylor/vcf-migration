@@ -1,0 +1,103 @@
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+
+.ai-cost-analysis-panel {
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  margin-bottom: spacing.$spacing-05;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+
+    h4 {
+      @include type.type-style('heading-compact-01');
+      margin: 0;
+    }
+  }
+
+  &__loading {
+    padding: spacing.$spacing-05 0;
+  }
+
+  &__skeleton {
+    margin-top: spacing.$spacing-05;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+  }
+
+  &__section {
+    h5 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-03;
+    }
+
+    p {
+      @include type.type-style('body-01');
+      margin: 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    ol,
+    ul {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      padding-left: spacing.$spacing-07;
+      margin: 0;
+    }
+  }
+
+  &__recommendations {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-04;
+  }
+
+  &__recommendation {
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    border-radius: 4px;
+
+    p {
+      @include type.type-style('body-01');
+      margin: spacing.$spacing-02 0 0 0;
+    }
+  }
+
+  &__recommendation-header {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    flex-wrap: wrap;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: spacing.$spacing-03;
+    border-top: 1px solid var(--cds-border-subtle);
+  }
+
+  &--unavailable {
+    opacity: 0.7;
+  }
+
+  &__unavailable-text {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-secondary, #525252);
+  }
+}

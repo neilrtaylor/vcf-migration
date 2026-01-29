@@ -1,0 +1,73 @@
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+
+.chat-page {
+  padding-top: spacing.$spacing-07;
+
+  &__heading {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+  }
+
+  &__description {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary);
+    margin-bottom: spacing.$spacing-07;
+  }
+
+  &__main {
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__chat-container {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  &__panel {
+    height: 600px;
+  }
+
+  &__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+  }
+
+  &__topics {
+    h4 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-04;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+
+      li {
+        @include type.type-style('body-compact-01');
+        padding: spacing.$spacing-02 0;
+        color: var(--cds-text-secondary);
+        border-bottom: 1px solid var(--cds-border-subtle);
+
+        &:last-child {
+          border-bottom: none;
+        }
+      }
+    }
+  }
+
+  &__privacy {
+    h4 {
+      @include type.type-style('heading-compact-01');
+      margin-bottom: spacing.$spacing-03;
+    }
+
+    p {
+      @include type.type-style('body-compact-01');
+      color: var(--cds-text-secondary);
+      margin: 0;
+    }
+  }
+}

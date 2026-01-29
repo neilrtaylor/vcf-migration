@@ -13,31 +13,40 @@ import type { FilterOption } from '@/components/tables';
 import type { ColumnDef } from '@tanstack/react-table';
 import './StoragePage.scss';
 
+// Interface for datastore utilization table rows
+interface DatastoreUtilRow {
+  name: string;
+  type: string;
+  size: number;
+  used: number;
+  free: number;
+  utilization: number;
+  vmCount: number;
+  hostCount: number;
+}
+
+// Extract datastore type from label (format: "TYPE (count)")
+const extractTypeFromLabel = (label: string): string => {
+  const match = label.match(/^(.+?)\s*\(/);
+  return match ? match[1] : label;
+};
+
+// Color-coded utilization cell renderer
+const getUtilizationColor = (value: number): string => {
+  if (value >= 80) return 'var(--cds-support-error, #da1e28)';
+  if (value >= 50) return 'var(--cds-support-warning, #f1c21b)';
+  return 'var(--cds-support-success, #24a148)';
+};
+
 export function StoragePage() {
   const { rawData } = useData();
   const { chartFilter, setFilter, clearFilter } = useChartFilter();
   const [selectedDatastore, setSelectedDatastore] = useState<string | null>(null);
 
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
-
-  const datastores = rawData.vDatastore;
-  const vms = rawData.vInfo.filter(vm => !vm.template);
-  const vDisks = rawData.vDisk || [];
-
-  // Calculate datastore-level storage metrics
-  const totalCapacityTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.capacityMiB, 0));
-  const totalUsedTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.inUseMiB, 0));
-  const totalFreeTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.freeMiB, 0));
-  const avgUtilization = totalCapacityTiB > 0 ? (totalUsedTiB / totalCapacityTiB) * 100 : 0;
-
-  // Calculate VM-level storage metrics
-  const vmProvisionedMiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0);
-  const vmInUseMiB = vms.reduce((sum, vm) => sum + vm.inUseMiB, 0);
-  const vmProvisionedTiB = mibToTiB(vmProvisionedMiB);
-  const vmInUseTiB = mibToTiB(vmInUseMiB);
-  const vmStorageEfficiency = vmProvisionedMiB > 0 ? (vmInUseMiB / vmProvisionedMiB) * 100 : 0;
+  // Derived data with optional chaining for use in hooks
+  const datastores = useMemo(() => rawData?.vDatastore ?? [], [rawData?.vDatastore]);
+  const vms = useMemo(() => (rawData?.vInfo ?? []).filter(vm => !vm.template), [rawData?.vInfo]);
+  const vDisks = useMemo(() => rawData?.vDisk ?? [], [rawData?.vDisk]);
 
   // Build VM-to-datastore mapping from vDisk data
   const vmToDatastores = useMemo(() => {
@@ -85,91 +94,15 @@ export function StoragePage() {
     });
   }, [vms, selectedDatastore, vmToDatastores]);
 
-  // Datastore type distribution
-  const typeDistribution = datastores.reduce((acc, ds) => {
-    const type = ds.type || 'Unknown';
-    if (!acc[type]) {
-      acc[type] = { count: 0, capacityMiB: 0 };
-    }
-    acc[type].count++;
-    acc[type].capacityMiB += ds.capacityMiB;
-    return acc;
-  }, {} as Record<string, { count: number; capacityMiB: number }>);
-
-  const typeChartData = Object.entries(typeDistribution)
-    .map(([type, data]) => ({
-      label: `${type} (${data.count})`,
-      value: mibToTiB(data.capacityMiB),
-    }))
-    .sort((a, b) => b.value - a.value);
-
-  // Datastores with high utilization (>80%)
-  const highUtilDatastores = datastores
-    .filter(ds => {
-      const utilization = ds.capacityMiB > 0 ? (ds.inUseMiB / ds.capacityMiB) * 100 : 0;
-      return utilization > 80;
-    })
-    .sort((a, b) => {
-      const utilA = a.capacityMiB > 0 ? (a.inUseMiB / a.capacityMiB) * 100 : 0;
-      const utilB = b.capacityMiB > 0 ? (b.inUseMiB / b.capacityMiB) * 100 : 0;
-      return utilB - utilA;
-    })
-    .slice(0, 10)
-    .map(ds => ({
-      label: ds.name,
-      value: ds.capacityMiB > 0 ? (ds.inUseMiB / ds.capacityMiB) * 100 : 0,
-    }));
-
-  // Extract datastore type from label (format: "TYPE (count)")
-  const extractTypeFromLabel = (label: string): string => {
-    const match = label.match(/^(.+?)\s*\(/);
-    return match ? match[1] : label;
-  };
-
   // Filter datastores based on active filter
-  const filteredDatastores = chartFilter && chartFilter.dimension === 'datastoreType'
-    ? datastores.filter(ds => (ds.type || 'Unknown') === extractTypeFromLabel(chartFilter.value))
-    : datastores;
-
-  // Top storage consumers (VMs) - all VMs (no direct datastore link)
-  const topStorageVMs = [...vms]
-    .sort((a, b) => b.provisionedMiB - a.provisionedMiB)
-    .slice(0, 15)
-    .map(vm => ({
-      label: vm.vmName,
-      value: mibToGiB(vm.provisionedMiB),
-    }));
-
-  // Top datastores by usage - filtered
-  const topDatastoresFiltered = [...filteredDatastores]
-    .sort((a, b) => b.inUseMiB - a.inUseMiB)
-    .slice(0, 15)
-    .map((ds) => ({
-      label: ds.name,
-      value: mibToGiB(ds.inUseMiB),
-    }));
-
-  // Click handler for datastore type chart
-  const handleTypeClick = (label: string) => {
-    if (chartFilter?.value === label && chartFilter?.dimension === 'datastoreType') {
-      clearFilter();
-    } else {
-      setFilter('datastoreType', label, 'typeChart');
+  const filteredDatastores = useMemo(() => {
+    if (chartFilter && chartFilter.dimension === 'datastoreType') {
+      return datastores.filter(ds => (ds.type || 'Unknown') === extractTypeFromLabel(chartFilter.value));
     }
-  };
+    return datastores;
+  }, [datastores, chartFilter]);
 
   // Datastore utilization table data
-  interface DatastoreUtilRow {
-    name: string;
-    type: string;
-    size: number;
-    used: number;
-    free: number;
-    utilization: number;
-    vmCount: number;
-    hostCount: number;
-  }
-
   const datastoreUtilTableData: DatastoreUtilRow[] = useMemo(() =>
     filteredDatastores
       .filter(ds => ds.capacityMiB > 0)
@@ -186,13 +119,6 @@ export function StoragePage() {
       .sort((a, b) => b.utilization - a.utilization),
     [filteredDatastores]
   );
-
-  // Color-coded utilization cell renderer
-  const getUtilizationColor = (value: number): string => {
-    if (value >= 80) return 'var(--cds-support-error, #da1e28)';
-    if (value >= 50) return 'var(--cds-support-warning, #f1c21b)';
-    return 'var(--cds-support-success, #24a148)';
-  };
 
   const datastoreUtilColumns: ColumnDef<DatastoreUtilRow, unknown>[] = useMemo(() => [
     {
@@ -259,27 +185,110 @@ export function StoragePage() {
   ], []);
 
   // Datastore utilization heatmap data (grouped by datacenter)
-  const datastoreUtilHeatmap: HeatmapCell[] = datastores
-    .filter(ds => ds.capacityMiB > 0)
+  const datastoreUtilHeatmap: HeatmapCell[] = useMemo(() =>
+    datastores
+      .filter(ds => ds.capacityMiB > 0)
+      .sort((a, b) => {
+        // Sort by datacenter, then by utilization
+        const dcCompare = (a.datacenter || '').localeCompare(b.datacenter || '');
+        if (dcCompare !== 0) return dcCompare;
+        const utilA = (a.inUseMiB / a.capacityMiB) * 100;
+        const utilB = (b.inUseMiB / b.capacityMiB) * 100;
+        return utilB - utilA;
+      })
+      .slice(0, 30) // Limit to 30 datastores
+      .map(ds => {
+        const utilization = (ds.inUseMiB / ds.capacityMiB) * 100;
+        const dsName = ds.name.length > 30 ? ds.name.substring(0, 27) + '...' : ds.name;
+        return {
+          row: dsName,
+          col: 'Utilization',
+          value: utilization,
+          label: `${utilization.toFixed(0)}%`,
+        };
+      }),
+    [datastores]
+  );
+
+  // Early return AFTER all hooks have been called
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
+
+  // Calculate datastore-level storage metrics
+  const totalCapacityTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.capacityMiB, 0));
+  const totalUsedTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.inUseMiB, 0));
+  const totalFreeTiB = mibToTiB(datastores.reduce((sum, ds) => sum + ds.freeMiB, 0));
+  const avgUtilization = totalCapacityTiB > 0 ? (totalUsedTiB / totalCapacityTiB) * 100 : 0;
+
+  // Calculate VM-level storage metrics
+  const vmProvisionedMiB = vms.reduce((sum, vm) => sum + vm.provisionedMiB, 0);
+  const vmInUseMiB = vms.reduce((sum, vm) => sum + vm.inUseMiB, 0);
+  const vmProvisionedTiB = mibToTiB(vmProvisionedMiB);
+  const vmInUseTiB = mibToTiB(vmInUseMiB);
+  const vmStorageEfficiency = vmProvisionedMiB > 0 ? (vmInUseMiB / vmProvisionedMiB) * 100 : 0;
+
+  // Datastore type distribution
+  const typeDistribution = datastores.reduce((acc, ds) => {
+    const type = ds.type || 'Unknown';
+    if (!acc[type]) {
+      acc[type] = { count: 0, capacityMiB: 0 };
+    }
+    acc[type].count++;
+    acc[type].capacityMiB += ds.capacityMiB;
+    return acc;
+  }, {} as Record<string, { count: number; capacityMiB: number }>);
+
+  const typeChartData = Object.entries(typeDistribution)
+    .map(([type, data]) => ({
+      label: `${type} (${data.count})`,
+      value: mibToTiB(data.capacityMiB),
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  // Datastores with high utilization (>80%)
+  const highUtilDatastores = datastores
+    .filter(ds => {
+      const utilization = ds.capacityMiB > 0 ? (ds.inUseMiB / ds.capacityMiB) * 100 : 0;
+      return utilization > 80;
+    })
     .sort((a, b) => {
-      // Sort by datacenter, then by utilization
-      const dcCompare = (a.datacenter || '').localeCompare(b.datacenter || '');
-      if (dcCompare !== 0) return dcCompare;
-      const utilA = (a.inUseMiB / a.capacityMiB) * 100;
-      const utilB = (b.inUseMiB / b.capacityMiB) * 100;
+      const utilA = a.capacityMiB > 0 ? (a.inUseMiB / a.capacityMiB) * 100 : 0;
+      const utilB = b.capacityMiB > 0 ? (b.inUseMiB / b.capacityMiB) * 100 : 0;
       return utilB - utilA;
     })
-    .slice(0, 30) // Limit to 30 datastores
-    .map(ds => {
-      const utilization = (ds.inUseMiB / ds.capacityMiB) * 100;
-      const dsName = ds.name.length > 30 ? ds.name.substring(0, 27) + '...' : ds.name;
-      return {
-        row: dsName,
-        col: 'Utilization',
-        value: utilization,
-        label: `${utilization.toFixed(0)}%`,
-      };
-    });
+    .slice(0, 10)
+    .map(ds => ({
+      label: ds.name,
+      value: ds.capacityMiB > 0 ? (ds.inUseMiB / ds.capacityMiB) * 100 : 0,
+    }));
+
+  // Top storage consumers (VMs) - all VMs (no direct datastore link)
+  const topStorageVMs = [...vms]
+    .sort((a, b) => b.provisionedMiB - a.provisionedMiB)
+    .slice(0, 15)
+    .map(vm => ({
+      label: vm.vmName,
+      value: mibToGiB(vm.provisionedMiB),
+    }));
+
+  // Top datastores by usage - filtered
+  const topDatastoresFiltered = [...filteredDatastores]
+    .sort((a, b) => b.inUseMiB - a.inUseMiB)
+    .slice(0, 15)
+    .map((ds) => ({
+      label: ds.name,
+      value: mibToGiB(ds.inUseMiB),
+    }));
+
+  // Click handler for datastore type chart
+  const handleTypeClick = (label: string) => {
+    if (chartFilter?.value === label && chartFilter?.dimension === 'datastoreType') {
+      clearFilter();
+    } else {
+      setFilter('datastoreType', label, 'typeChart');
+    }
+  };
 
   return (
     <div className="storage-page">

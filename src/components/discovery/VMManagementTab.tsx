@@ -2,6 +2,8 @@
  * VMManagementTab Component
  *
  * Full VM listing with the ability to:
+ * - View auto-excluded VMs (templates, powered-off, VMware infrastructure)
+ * - Override auto-exclusions (force-include)
  * - Exclude/include VMs from migration scope
  * - Override auto-detected workload types
  * - Add user notes per VM
@@ -37,6 +39,7 @@ import {
   Grid,
   Column,
   Tooltip,
+  Dropdown,
 } from '@carbon/react';
 import {
   Download,
@@ -48,6 +51,8 @@ import {
 } from '@carbon/icons-react';
 import type { VirtualMachine } from '@/types/rvtools';
 import type { UseVMOverridesReturn } from '@/hooks/useVMOverrides';
+import type { AutoExclusionResult } from '@/utils/autoExclusion';
+import { NO_AUTO_EXCLUSION } from '@/utils/autoExclusion';
 import { getVMIdentifier } from '@/utils/vmIdentifier';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
 import workloadPatterns from '@/data/workloadPatterns.json';
@@ -58,8 +63,12 @@ import './VMManagementTab.scss';
 interface VMManagementTabProps {
   vms: VirtualMachine[];
   vmOverrides: UseVMOverridesReturn;
+  autoExclusionMap: Map<string, AutoExclusionResult>;
   poweredOnOnly?: boolean;
 }
+
+type ExclusionSource = 'auto' | 'manual' | 'none';
+type FilterOption = 'all' | 'included' | 'auto-excluded' | 'manually-excluded' | 'overridden';
 
 interface VMRow {
   id: string;
@@ -73,7 +82,12 @@ interface VMRow {
   guestOS: string;
   detectedWorkload: string | null;
   effectiveWorkload: string;
-  isExcluded: boolean;
+  isAutoExcluded: boolean;
+  autoExclusionLabels: string[];
+  isForceIncluded: boolean;
+  isManuallyExcluded: boolean;
+  isEffectivelyExcluded: boolean;
+  exclusionSource: ExclusionSource;
   hasNotes: boolean;
   notes: string;
 }
@@ -107,12 +121,22 @@ function getWorkloadCategories(): Array<{ id: string; text: string }> {
   return items;
 }
 
+// Filter options for the dropdown
+const FILTER_OPTIONS: Array<{ id: FilterOption; text: string }> = [
+  { id: 'all', text: 'All VMs' },
+  { id: 'included', text: 'Included' },
+  { id: 'auto-excluded', text: 'Auto-Excluded' },
+  { id: 'manually-excluded', text: 'Manually Excluded' },
+  { id: 'overridden', text: 'Overridden' },
+];
+
 // ===== COMPONENT =====
 
-export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMManagementTabProps) {
+export function VMManagementTab({ vms, vmOverrides, autoExclusionMap, poweredOnOnly = false }: VMManagementTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [statusFilter, setStatusFilter] = useState<FilterOption>('all');
   const [editingNotes, setEditingNotes] = useState<{ vmId: string; vmName: string; notes: string } | null>(null);
   const [editingWorkload, setEditingWorkload] = useState<{ vmId: string; vmName: string; current: string | undefined } | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -121,8 +145,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
 
   const workloadCategories = useMemo(() => getWorkloadCategories(), []);
 
-  // Filter and transform VMs
-  // Note: We depend on vmOverrides.overrides to ensure re-render when overrides change
+  // Build VM rows with auto-exclusion data
   const vmRows = useMemo((): VMRow[] => {
     const filtered = poweredOnOnly ? vms.filter(vm => vm.powerState === 'poweredOn') : vms;
 
@@ -131,6 +154,17 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
       const detected = detectWorkload(vm);
       const overrideWorkload = vmOverrides.getWorkloadType(vmId);
       const notes = vmOverrides.getNotes(vmId) || '';
+      const autoResult = autoExclusionMap.get(vmId) ?? NO_AUTO_EXCLUSION;
+      const isForceIncluded = vmOverrides.isForceIncluded(vmId);
+      const isManuallyExcluded = vmOverrides.isExcluded(vmId);
+      const isEffectivelyExcluded = vmOverrides.isEffectivelyExcluded(vmId, autoResult.isAutoExcluded);
+
+      let exclusionSource: ExclusionSource = 'none';
+      if (isManuallyExcluded && !isForceIncluded) {
+        exclusionSource = 'manual';
+      } else if (autoResult.isAutoExcluded && !isForceIncluded) {
+        exclusionSource = 'auto';
+      }
 
       return {
         id: vmId,
@@ -144,26 +178,48 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
         guestOS: vm.guestOS || 'Unknown',
         detectedWorkload: detected,
         effectiveWorkload: overrideWorkload || detected || 'Unclassified',
-        isExcluded: vmOverrides.isExcluded(vmId),
+        isAutoExcluded: autoResult.isAutoExcluded,
+        autoExclusionLabels: autoResult.labels,
+        isForceIncluded,
+        isManuallyExcluded,
+        isEffectivelyExcluded,
+        exclusionSource,
         hasNotes: notes.length > 0,
         notes,
       };
     });
-  }, [vms, poweredOnOnly, vmOverrides.overrides, vmOverrides.getWorkloadType, vmOverrides.getNotes, vmOverrides.isExcluded]);
+  }, [vms, poweredOnOnly, vmOverrides, autoExclusionMap]);
+
+  // Apply status filter
+  const statusFilteredRows = useMemo(() => {
+    switch (statusFilter) {
+      case 'included':
+        return vmRows.filter(r => !r.isEffectivelyExcluded);
+      case 'auto-excluded':
+        return vmRows.filter(r => r.isAutoExcluded && !r.isForceIncluded);
+      case 'manually-excluded':
+        return vmRows.filter(r => r.isManuallyExcluded && !r.isAutoExcluded);
+      case 'overridden':
+        return vmRows.filter(r => r.isForceIncluded);
+      default:
+        return vmRows;
+    }
+  }, [vmRows, statusFilter]);
 
   // Filter by search term
   const filteredRows = useMemo(() => {
-    if (!searchTerm) return vmRows;
+    if (!searchTerm) return statusFilteredRows;
     const term = searchTerm.toLowerCase();
-    return vmRows.filter(row =>
+    return statusFilteredRows.filter(row =>
       row.vmName.toLowerCase().includes(term) ||
       row.cluster.toLowerCase().includes(term) ||
       row.datacenter.toLowerCase().includes(term) ||
       row.guestOS.toLowerCase().includes(term) ||
       row.effectiveWorkload.toLowerCase().includes(term) ||
-      row.notes.toLowerCase().includes(term)
+      row.notes.toLowerCase().includes(term) ||
+      row.autoExclusionLabels.some(l => l.toLowerCase().includes(term))
     );
-  }, [vmRows, searchTerm]);
+  }, [statusFilteredRows, searchTerm]);
 
   // Paginate
   const paginatedRows = useMemo(() => {
@@ -172,8 +228,24 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
   }, [filteredRows, page, pageSize]);
 
   // Stats
-  const includedCount = vmRows.filter(r => !r.isExcluded).length;
-  const excludedCount = vmRows.filter(r => r.isExcluded).length;
+  const includedCount = vmRows.filter(r => !r.isEffectivelyExcluded).length;
+  const autoExcludedCount = vmRows.filter(r => r.isAutoExcluded && !r.isForceIncluded).length;
+  const manuallyExcludedCount = vmRows.filter(r => r.isManuallyExcluded && !r.isAutoExcluded).length;
+  const overriddenCount = vmRows.filter(r => r.isForceIncluded).length;
+
+  // Auto-exclusion breakdown
+  const autoExcludedBreakdown = useMemo(() => {
+    const breakdown = { templates: 0, poweredOff: 0, vmwareInfra: 0, windowsInfra: 0 };
+    for (const row of vmRows) {
+      if (row.isAutoExcluded && !row.isForceIncluded) {
+        if (row.autoExclusionLabels.includes('Template')) breakdown.templates++;
+        if (row.autoExclusionLabels.includes('Powered Off')) breakdown.poweredOff++;
+        if (row.autoExclusionLabels.includes('VMware Infrastructure')) breakdown.vmwareInfra++;
+        if (row.autoExclusionLabels.includes('Windows AD/DNS')) breakdown.windowsInfra++;
+      }
+    }
+    return breakdown;
+  }, [vmRows]);
 
   // ===== ACTIONS =====
 
@@ -190,11 +262,37 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
       const vmRow = vmRows.find(r => r.id === row.id);
       return { vmId: row.id, vmName: vmRow?.vmName || '' };
     });
-    vmOverrides.bulkSetExcluded(toInclude, false);
+    // For auto-excluded VMs, use forceInclude; for manually excluded, use setExcluded(false)
+    const autoExcludedVMs = toInclude.filter(vm => {
+      const vmRow = vmRows.find(r => r.id === vm.vmId);
+      return vmRow?.isAutoExcluded;
+    });
+    const manuallyExcludedVMs = toInclude.filter(vm => {
+      const vmRow = vmRows.find(r => r.id === vm.vmId);
+      return !vmRow?.isAutoExcluded;
+    });
+    if (autoExcludedVMs.length > 0) {
+      vmOverrides.bulkSetForceIncluded(autoExcludedVMs, true);
+    }
+    if (manuallyExcludedVMs.length > 0) {
+      vmOverrides.bulkSetExcluded(manuallyExcludedVMs, false);
+    }
   }, [vmRows, vmOverrides]);
 
   const handleToggleExclusion = useCallback((row: VMRow) => {
-    vmOverrides.setExcluded(row.id, row.vmName, !row.isExcluded);
+    if (row.isAutoExcluded && !row.isForceIncluded) {
+      // Auto-excluded VM: force-include it
+      vmOverrides.setForceIncluded(row.id, row.vmName, true);
+    } else if (row.isForceIncluded) {
+      // Force-included VM: revert to auto-excluded
+      vmOverrides.setForceIncluded(row.id, row.vmName, false);
+    } else if (row.isManuallyExcluded) {
+      // Manually excluded: include
+      vmOverrides.setExcluded(row.id, row.vmName, false);
+    } else {
+      // Normal included: exclude
+      vmOverrides.setExcluded(row.id, row.vmName, true);
+    }
   }, [vmOverrides]);
 
   const handleEditNotes = useCallback((row: VMRow) => {
@@ -214,18 +312,16 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
       vmName: row.vmName,
       current: vmOverrides.getWorkloadType(row.id) || row.detectedWorkload || undefined,
     });
-  }, [vmOverrides.getWorkloadType]);
+  }, [vmOverrides]);
 
   const handleSaveWorkload = useCallback((item: { id: string; text: string } | string | null | undefined) => {
     if (editingWorkload) {
-      // Handle string (custom typed value) or object (selected from list)
       const text = typeof item === 'string' ? item : item?.text;
       const id = typeof item === 'string' ? 'custom' : item?.id;
 
       if (text && id !== 'unclassified') {
         vmOverrides.setWorkloadType(editingWorkload.vmId, editingWorkload.vmName, text);
       } else {
-        // Clear override
         vmOverrides.setWorkloadType(editingWorkload.vmId, editingWorkload.vmName, undefined);
       }
       setEditingWorkload(null);
@@ -259,7 +355,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
   }, [importJson, vmOverrides]);
 
   const handleExportCSV = useCallback(() => {
-    const headers = ['VM Name', 'Cluster', 'Datacenter', 'Power State', 'vCPUs', 'Memory (GiB)', 'Storage (GiB)', 'Guest OS', 'Workload Type', 'Status', 'Notes'];
+    const headers = ['VM Name', 'Cluster', 'Datacenter', 'Power State', 'vCPUs', 'Memory (GiB)', 'Storage (GiB)', 'Guest OS', 'Workload Type', 'Status', 'Auto-Exclusion Reasons', 'Notes'];
     const rows = filteredRows.map(row => [
       row.vmName,
       row.cluster,
@@ -270,7 +366,8 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
       row.storageGiB.toString(),
       row.guestOS,
       row.effectiveWorkload,
-      row.isExcluded ? 'Excluded' : 'Included',
+      row.isEffectivelyExcluded ? (row.exclusionSource === 'auto' ? 'Auto-Excluded' : 'Excluded') : (row.isForceIncluded ? 'Included (Override)' : 'Included'),
+      row.autoExclusionLabels.join('; '),
       row.notes,
     ]);
 
@@ -288,6 +385,20 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
     URL.revokeObjectURL(url);
   }, [filteredRows]);
 
+  // Helper to get the action menu text for a row
+  function getActionText(row: VMRow): string {
+    if (row.isAutoExcluded && !row.isForceIncluded) {
+      return 'Include in Migration';
+    }
+    if (row.isForceIncluded) {
+      return 'Revert to Auto-Excluded';
+    }
+    if (row.isManuallyExcluded) {
+      return 'Include in Migration';
+    }
+    return 'Exclude from Migration';
+  }
+
   // ===== RENDER =====
 
   const headers = [
@@ -297,10 +408,38 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
     { key: 'memoryGiB', header: 'Memory' },
     { key: 'storageGiB', header: 'Storage' },
     { key: 'effectiveWorkload', header: 'Workload Type' },
-    { key: 'status', header: 'Status' },
+    { key: 'status', header: 'Migration Status' },
     { key: 'notes', header: 'Notes' },
     { key: 'actions', header: '' },
   ];
+
+  // Render status tags for a row
+  function renderStatusTags(row: VMRow) {
+    if (row.isForceIncluded) {
+      // Force-included: show green Included + outline Override tag
+      return (
+        <span style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+          <Tag type="green" size="sm">Included</Tag>
+          <Tag type="outline" size="sm">Override</Tag>
+        </span>
+      );
+    }
+    if (row.isAutoExcluded) {
+      // Auto-excluded: show Auto-Excluded tag + magenta tags per reason
+      return (
+        <span style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+          <Tag type="red" size="sm">Auto-Excluded</Tag>
+          {row.autoExclusionLabels.map(label => (
+            <Tag key={label} type="magenta" size="sm">{label}</Tag>
+          ))}
+        </span>
+      );
+    }
+    if (row.isManuallyExcluded) {
+      return <Tag type="gray" size="sm">Excluded</Tag>;
+    }
+    return <Tag type="green" size="sm">Included</Tag>;
+  }
 
   return (
     <div className="vm-management-tab">
@@ -327,37 +466,47 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
 
       {/* Summary tiles */}
       <Grid className="vm-management-tab__summary" narrow>
-        <Column lg={4} md={2} sm={2}>
+        <Column lg={3} md={2} sm={2}>
           <Tile className="vm-management-tab__summary-tile">
-            <span className="vm-management-tab__summary-label">Included VMs</span>
+            <span className="vm-management-tab__summary-label">Included</span>
             <span className="vm-management-tab__summary-value vm-management-tab__summary-value--included">
               {formatNumber(includedCount)}
             </span>
           </Tile>
         </Column>
-        <Column lg={4} md={2} sm={2}>
+        <Column lg={3} md={2} sm={2}>
+          <Tooltip label={`Templates: ${autoExcludedBreakdown.templates}, Powered Off: ${autoExcludedBreakdown.poweredOff}, VMware Infra: ${autoExcludedBreakdown.vmwareInfra}, Windows AD/DNS: ${autoExcludedBreakdown.windowsInfra}`} align="bottom">
+            <Tile className="vm-management-tab__summary-tile">
+              <span className="vm-management-tab__summary-label">Auto-Excluded</span>
+              <span className="vm-management-tab__summary-value vm-management-tab__summary-value--auto-excluded">
+                {formatNumber(autoExcludedCount)}
+              </span>
+            </Tile>
+          </Tooltip>
+        </Column>
+        <Column lg={3} md={2} sm={2}>
           <Tile className="vm-management-tab__summary-tile">
-            <span className="vm-management-tab__summary-label">Excluded VMs</span>
+            <span className="vm-management-tab__summary-label">Manually Excluded</span>
             <span className="vm-management-tab__summary-value vm-management-tab__summary-value--excluded">
-              {formatNumber(excludedCount)}
+              {formatNumber(manuallyExcludedCount)}
             </span>
           </Tile>
         </Column>
-        <Column lg={4} md={2} sm={2}>
+        <Column lg={3} md={2} sm={2}>
           <Tile className="vm-management-tab__summary-tile">
-            <span className="vm-management-tab__summary-label">With Overrides</span>
+            <span className="vm-management-tab__summary-label">Overridden</span>
             <span className="vm-management-tab__summary-value">
-              {formatNumber(vmOverrides.overrideCount)}
+              {formatNumber(overriddenCount)}
             </span>
           </Tile>
         </Column>
         <Column lg={4} md={2} sm={2}>
           <Tile className="vm-management-tab__summary-tile vm-management-tab__summary-tile--actions">
             <Button size="sm" kind="ghost" renderIcon={Download} onClick={handleExportSettings}>
-              Export Settings
+              Export
             </Button>
             <Button size="sm" kind="ghost" renderIcon={Upload} onClick={() => setShowImportModal(true)}>
-              Import Settings
+              Import
             </Button>
           </Tile>
         </Column>
@@ -412,6 +561,20 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
                     value={searchTerm}
                     persistent
                   />
+                  <Dropdown
+                    id="status-filter"
+                    titleText=""
+                    label="Filter"
+                    items={FILTER_OPTIONS}
+                    itemToString={(item) => item?.text || ''}
+                    selectedItem={FILTER_OPTIONS.find(o => o.id === statusFilter) || FILTER_OPTIONS[0]}
+                    onChange={({ selectedItem }) => {
+                      setStatusFilter(selectedItem?.id || 'all');
+                      setPage(1);
+                    }}
+                    size="sm"
+                    className="vm-management-tab__status-filter"
+                  />
                   <Button
                     kind="ghost"
                     size="sm"
@@ -449,11 +612,17 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
                     const originalRow = paginatedRows.find(r => r.id === row.id);
                     if (!originalRow) return null;
 
+                    const rowClassName = originalRow.isEffectivelyExcluded
+                      ? 'vm-management-tab__row--excluded'
+                      : originalRow.isForceIncluded
+                        ? 'vm-management-tab__row--overridden'
+                        : '';
+
                     return (
                       <TableRow
                         {...getRowProps({ row })}
                         key={row.id}
-                        className={originalRow.isExcluded ? 'vm-management-tab__row--excluded' : ''}
+                        className={rowClassName}
                       >
                         <TableSelectRow {...getSelectionProps({ row })} />
                         <TableCell>{originalRow.vmName}</TableCell>
@@ -479,11 +648,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
                           )}
                         </TableCell>
                         <TableCell>
-                          {originalRow.isExcluded ? (
-                            <Tag type="gray" size="sm">Excluded</Tag>
-                          ) : (
-                            <Tag type="green" size="sm">Included</Tag>
-                          )}
+                          {renderStatusTags(originalRow)}
                         </TableCell>
                         <TableCell>
                           {originalRow.hasNotes && (
@@ -495,7 +660,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
                         <TableCell>
                           <OverflowMenu size="sm" flipped iconDescription="Actions">
                             <OverflowMenuItem
-                              itemText={originalRow.isExcluded ? 'Include in Migration' : 'Exclude from Migration'}
+                              itemText={getActionText(originalRow)}
                               onClick={() => handleToggleExclusion(originalRow)}
                             />
                             <OverflowMenuItem
@@ -531,7 +696,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
           <Tag type="gray" size="sm">
             {formatNumber(filteredRows.length)} VMs
           </Tag>
-          {searchTerm && (
+          {(searchTerm || statusFilter !== 'all') && (
             <Tag type="blue" size="sm">
               Filtered from {formatNumber(vmRows.length)}
             </Tag>
@@ -595,9 +760,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
           }
           allowCustomValue
           onChange={({ selectedItem, inputValue }) => {
-            // Handle custom typed value or selected item
             if (inputValue && !selectedItem) {
-              // User typed a custom value and pressed enter or blurred
               handleSaveWorkload({ id: 'custom', text: inputValue });
             } else {
               handleSaveWorkload(selectedItem);
@@ -626,7 +789,7 @@ export function VMManagementTab({ vms, vmOverrides, poweredOnOnly = true }: VMMa
         <TextArea
           id="import-json"
           labelText="Settings JSON"
-          placeholder='{"version":1,"overrides":{}...}'
+          placeholder='{"version":2,"overrides":{}...}'
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
           rows={10}

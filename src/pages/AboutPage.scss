@@ -64,6 +64,24 @@
     gap: spacing.$spacing-02;
   }
 
+  &__claude-link {
+    display: inline-flex;
+    align-items: center;
+    gap: spacing.$spacing-02;
+    color: var(--cds-text-primary, #161616);
+    text-decoration: none;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--cds-link-primary, #0f62fe);
+      text-decoration: none;
+    }
+
+    svg:last-child {
+      opacity: 0.6;
+    }
+  }
+
   // Tech stack
   &__tech-grid {
     display: grid;

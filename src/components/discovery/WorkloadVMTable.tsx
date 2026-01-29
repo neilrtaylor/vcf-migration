@@ -24,9 +24,11 @@ import {
   Button,
   Pagination,
   ClickableTile,
+  Tooltip,
 } from '@carbon/react';
 import { Close, DocumentExport } from '@carbon/icons-react';
 import { formatNumber } from '@/utils/formatters';
+import type { VMClassificationResult } from '@/services/ai/types';
 import './WorkloadVMTable.scss';
 
 // ===== TYPES =====
@@ -36,12 +38,13 @@ export interface WorkloadMatch {
   category: string;
   categoryName: string;
   matchedPattern: string;
-  source: 'name' | 'annotation';
+  source: 'name' | 'annotation' | 'ai' | 'user' | 'maintainer';
 }
 
 interface WorkloadVMTableProps {
   matches: WorkloadMatch[];
   workloadsByCategory: Record<string, { name: string; vms: Set<string> }>;
+  aiClassifications?: Record<string, VMClassificationResult>;
 }
 
 interface WorkloadRow {
@@ -55,7 +58,7 @@ interface WorkloadRow {
 
 // ===== COMPONENT =====
 
-export function WorkloadVMTable({ matches, workloadsByCategory }: WorkloadVMTableProps) {
+export function WorkloadVMTable({ matches, workloadsByCategory, aiClassifications }: WorkloadVMTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -69,7 +72,10 @@ export function WorkloadVMTable({ matches, workloadsByCategory }: WorkloadVMTabl
       category: match.category,
       categoryName: match.categoryName,
       matchedPattern: match.matchedPattern,
-      source: match.source === 'name' ? 'VM Name' : 'Annotation',
+      source: match.source === 'user' ? 'User Override'
+            : match.source === 'ai' ? 'AI'
+            : match.source === 'name' ? 'VM Name'
+            : 'Annotation',
     }));
   }, [matches]);
 
@@ -225,16 +231,53 @@ export function WorkloadVMTable({ matches, workloadsByCategory }: WorkloadVMTabl
                   const originalRow = paginatedRows.find(r => r.id === row.id);
                   if (!originalRow) return null;
 
+                  const matchObj = matches.find(m => m.vmName === originalRow.vmName && m.category === originalRow.category);
+                  const isUserOverride = matchObj?.source === 'user';
+                  const isAI = matchObj?.source === 'ai';
+
+                  const aiResult = aiClassifications?.[originalRow.vmName];
+                  const hasAI = aiResult?.source === 'ai';
+                  const aiDisagrees = hasAI && !isUserOverride && !isAI && aiResult.workloadType &&
+                    aiResult.workloadType.toLowerCase() !== originalRow.categoryName.toLowerCase();
+
                   return (
                     <TableRow {...getRowProps({ row })} key={row.id}>
                       <TableCell>{originalRow.vmName}</TableCell>
                       <TableCell>
-                        <Tag type="blue" size="sm">{originalRow.categoryName}</Tag>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+                          <Tag type="blue" size="sm">{originalRow.categoryName}</Tag>
+                          {isUserOverride && (
+                            <Tag type="cyan" size="sm">User</Tag>
+                          )}
+                          {isAI && hasAI && (
+                            <Tooltip label={aiResult.reasoning || 'AI-classified workload'} align="bottom">
+                              <button type="button" style={{ all: 'unset', cursor: 'help' }}>
+                                <Tag type="purple" size="sm">AI {Math.round(aiResult.confidence * 100)}%</Tag>
+                              </button>
+                            </Tooltip>
+                          )}
+                          {!isUserOverride && !isAI && hasAI && aiDisagrees && (
+                            <Tooltip label={`AI suggests: ${aiResult.workloadType}. ${aiResult.reasoning || ''}`} align="bottom">
+                              <button type="button" style={{ all: 'unset', cursor: 'help' }}>
+                                <Tag type="purple" size="sm">AI: {aiResult.workloadType} {Math.round(aiResult.confidence * 100)}%</Tag>
+                              </button>
+                            </Tooltip>
+                          )}
+                          {!isUserOverride && !isAI && hasAI && !aiDisagrees && (
+                            <Tooltip label={aiResult.reasoning || 'AI-classified workload'} align="bottom">
+                              <button type="button" style={{ all: 'unset', cursor: 'help' }}>
+                                <Tag type="purple" size="sm">AI {Math.round(aiResult.confidence * 100)}%</Tag>
+                              </button>
+                            </Tooltip>
+                          )}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <code className="workload-vm-table__pattern">{originalRow.matchedPattern}</code>
                       </TableCell>
-                      <TableCell>{originalRow.source}</TableCell>
+                      <TableCell>
+                        {originalRow.source}
+                      </TableCell>
                     </TableRow>
                   );
                 })}

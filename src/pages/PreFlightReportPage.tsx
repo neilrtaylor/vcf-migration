@@ -84,14 +84,9 @@ export function PreFlightReportPage() {
   const [mode, setMode] = useState<CheckMode>('roks');
   const [showFailuresOnly, setShowFailuresOnly] = useState(false);
 
-  // Redirect to landing if no data
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
-
   // Run pre-flight checks
   const checkResults = useMemo(
-    () => runPreFlightChecks(rawData, mode),
+    () => rawData ? runPreFlightChecks(rawData, mode) : [],
     [rawData, mode]
   );
 
@@ -119,6 +114,11 @@ export function PreFlightReportPage() {
   const vmsReady = checkResults.filter(
     (r) => r.blockerCount === 0 && r.warningCount === 0
   ).length;
+
+  // Redirect to landing if no data
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
 
   const handleModeChange = (evt: { name?: string | number }) => {
     if (evt.name === 'roks' || evt.name === 'vsi') {

@@ -67,6 +67,43 @@ interface ROKSMachineType {
   storage?: Array<{ size: number; count: number; type: string }>;
 }
 
+// Profile types for transformed data
+interface TransformedVSIProfile {
+  name: string;
+  vcpus: number;
+  memoryGiB: number;
+  bandwidthGbps: number;
+  hourlyRate: number;
+  monthlyRate: number;
+}
+
+interface TransformedBareMetalProfile {
+  name: string;
+  physicalCores: number;
+  vcpus: number;
+  memoryGiB: number;
+  hasNvme: boolean;
+  nvmeDisks?: number;
+  nvmeSizeGiB?: number;
+  totalNvmeGiB?: number;
+  roksSupported: boolean;
+  hourlyRate: number;
+  monthlyRate: number;
+  useCase: string;
+  description: string;
+}
+
+// Config type
+interface IBMCloudConfig {
+  version?: string;
+  baseCurrency?: string;
+  notes?: string;
+  apiEndpoints?: Record<string, string>;
+  vsiProfiles?: Record<string, TransformedVSIProfile[]>;
+  bareMetalProfiles?: Record<string, TransformedBareMetalProfile[]>;
+  [key: string]: unknown;
+}
+
 // Get API key from environment
 function getApiKey(): string {
   const apiKey = process.env.VITE_IBM_CLOUD_API_KEY || process.env.IBM_CLOUD_API_KEY;
@@ -194,8 +231,8 @@ function getFamilyFromName(name: string): string {
 }
 
 // Transform VPC instance profiles
-function transformVPCProfiles(profiles: VPCInstanceProfile[], existingConfig: any): any {
-  const grouped: Record<string, any[]> = {
+function transformVPCProfiles(profiles: VPCInstanceProfile[], existingConfig: IBMCloudConfig): Record<string, TransformedVSIProfile[]> {
+  const grouped: Record<string, TransformedVSIProfile[]> = {
     balanced: [],
     compute: [],
     memory: [],
@@ -243,9 +280,9 @@ function transformVPCProfiles(profiles: VPCInstanceProfile[], existingConfig: an
 function transformBareMetalProfiles(
   vpcProfiles: VPCBareMetalProfile[],
   roksTypes: ROKSMachineType[],
-  existingConfig: any
-): any {
-  const grouped: Record<string, any[]> = {
+  existingConfig: IBMCloudConfig
+): Record<string, TransformedBareMetalProfile[]> {
+  const grouped: Record<string, TransformedBareMetalProfile[]> = {
     balanced: [],
     compute: [],
     memory: [],
@@ -264,7 +301,7 @@ function transformBareMetalProfiles(
   }
 
   // Build lookup of existing pricing and metadata
-  const existingProfiles: Record<string, any> = {};
+  const existingProfiles: Record<string, TransformedBareMetalProfile> = {};
   for (const family of Object.keys(existingConfig.bareMetalProfiles || {})) {
     for (const profile of existingConfig.bareMetalProfiles[family] || []) {
       existingProfiles[profile.name] = profile;
@@ -293,7 +330,7 @@ function transformBareMetalProfiles(
     // Get existing pricing/metadata
     const existing = existingProfiles[profile.name];
 
-    const transformed: any = {
+    const transformed: TransformedBareMetalProfile = {
       name: profile.name,
       physicalCores: profile.cpu_core_count.value,
       vcpus: profile.cpu_core_count.value * 2, // Hyperthreading
@@ -339,12 +376,12 @@ async function main() {
 
   // Load existing config
   console.log('Loading existing configuration...');
-  let existingConfig: any = {};
+  let existingConfig: IBMCloudConfig = {};
   try {
     const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-    existingConfig = JSON.parse(content);
+    existingConfig = JSON.parse(content) as IBMCloudConfig;
     console.log(`  Loaded ${CONFIG_PATH}`);
-  } catch (err) {
+  } catch {
     console.warn('  Warning: Could not load existing config, starting fresh');
   }
 
@@ -374,9 +411,9 @@ async function main() {
     // Count profiles
     const vsiCount = Object.values(vsiProfiles).flat().length;
     const bmCount = Object.values(bareMetalProfilesTransformed).flat().length;
-    const roksCount = (bareMetalProfilesTransformed.balanced?.filter((p: any) => p.roksSupported)?.length || 0) +
-      (bareMetalProfilesTransformed.compute?.filter((p: any) => p.roksSupported)?.length || 0) +
-      (bareMetalProfilesTransformed.memory?.filter((p: any) => p.roksSupported)?.length || 0);
+    const roksCount = (bareMetalProfilesTransformed.balanced?.filter((p) => p.roksSupported)?.length || 0) +
+      (bareMetalProfilesTransformed.compute?.filter((p) => p.roksSupported)?.length || 0) +
+      (bareMetalProfilesTransformed.memory?.filter((p) => p.roksSupported)?.length || 0);
 
     console.log(`  VSI profiles: ${vsiCount}`);
     console.log(`  Bare metal profiles: ${bmCount} (${roksCount} ROKS-supported)`);

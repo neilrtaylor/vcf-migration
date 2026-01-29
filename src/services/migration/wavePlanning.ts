@@ -243,6 +243,7 @@ export function getWaveChartData(
  */
 export function getWaveResources(
   waves: WaveGroup[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _isNetworkMode: boolean
 ): Array<{
   name: string;

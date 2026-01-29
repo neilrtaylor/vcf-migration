@@ -344,7 +344,8 @@ export function calculateROKSCost(
   // Compute nodes (bare metal)
   const computeProfile = pricingToUse.bareMetal[input.computeProfile as keyof typeof pricingToUse.bareMetal];
   if (computeProfile && input.computeNodes > 0) {
-    const monthlyRate = computeProfile.monthlyRate * multiplier;
+    const isCustomNoPricing = computeProfile.isCustom && (!computeProfile.monthlyRate || computeProfile.monthlyRate === 0);
+    const monthlyRate = isCustomNoPricing ? 0 : computeProfile.monthlyRate * multiplier;
     lineItems.push({
       category: 'Compute',
       description: `Bare Metal - ${input.computeProfile}`,
@@ -353,7 +354,9 @@ export function calculateROKSCost(
       unitCost: monthlyRate,
       monthlyCost: input.computeNodes * monthlyRate,
       annualCost: input.computeNodes * monthlyRate * 12,
-      notes: computeProfile.description,
+      notes: isCustomNoPricing
+        ? 'Custom profile - no pricing available'
+        : computeProfile.description,
     });
   }
 

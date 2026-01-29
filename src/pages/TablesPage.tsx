@@ -202,13 +202,9 @@ interface VSourceRow {
 export function TablesPage() {
   const { rawData } = useData();
 
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
-
   // Prepare VM data
   const vmData: VMRow[] = useMemo(() =>
-    rawData.vInfo.map((vm, index) => ({
+    (rawData?.vInfo ?? []).map((vm, index) => ({
       id: String(index),
       name: vm.vmName,
       powerState: vm.powerState,
@@ -220,11 +216,11 @@ export function TablesPage() {
       host: vm.host || 'N/A',
       datacenter: vm.datacenter || 'N/A',
     })),
-  [rawData.vInfo]);
+  [rawData?.vInfo]);
 
   // Prepare datastore data
   const datastoreData: DatastoreRow[] = useMemo(() =>
-    rawData.vDatastore.map((ds, index) => ({
+    (rawData?.vDatastore ?? []).map((ds, index) => ({
       id: String(index),
       name: ds.name,
       type: ds.type || 'Unknown',
@@ -235,11 +231,11 @@ export function TablesPage() {
       hostCount: ds.hostCount,
       datacenter: ds.datacenter || 'N/A',
     })),
-  [rawData.vDatastore]);
+  [rawData?.vDatastore]);
 
   // Prepare snapshot data
   const snapshotData: SnapshotRow[] = useMemo(() =>
-    rawData.vSnapshot.map((snap, index) => ({
+    (rawData?.vSnapshot ?? []).map((snap, index) => ({
       id: String(index),
       vmName: snap.vmName,
       snapshotName: snap.snapshotName,
@@ -249,11 +245,11 @@ export function TablesPage() {
       quiesced: snap.quiesced,
       cluster: snap.cluster || 'N/A',
     })),
-  [rawData.vSnapshot]);
+  [rawData?.vSnapshot]);
 
   // Prepare host data
   const hostData: HostRow[] = useMemo(() =>
-    rawData.vHost.map((host, index) => ({
+    (rawData?.vHost ?? []).map((host, index) => ({
       id: String(index),
       name: host.name,
       powerState: host.powerState,
@@ -267,11 +263,11 @@ export function TablesPage() {
       cluster: host.cluster || 'N/A',
       datacenter: host.datacenter || 'N/A',
     })),
-  [rawData.vHost]);
+  [rawData?.vHost]);
 
   // Prepare network data
   const networkData: NetworkRow[] = useMemo(() =>
-    rawData.vNetwork.map((nic, index) => ({
+    (rawData?.vNetwork ?? []).map((nic, index) => ({
       id: String(index),
       vmName: nic.vmName,
       powerState: nic.powerState,
@@ -285,11 +281,11 @@ export function TablesPage() {
       datacenter: nic.datacenter || 'N/A',
       cluster: nic.cluster || 'N/A',
     })),
-  [rawData.vNetwork]);
+  [rawData?.vNetwork]);
 
   // Prepare resource pool data
   const resourcePoolData: ResourcePoolRow[] = useMemo(() =>
-    rawData.vResourcePool.map((rp, index) => ({
+    (rawData?.vResourcePool ?? []).map((rp, index) => ({
       id: String(index),
       name: rp.name,
       configStatus: rp.configStatus,
@@ -301,11 +297,11 @@ export function TablesPage() {
       datacenter: rp.datacenter || 'N/A',
       cluster: rp.cluster || 'N/A',
     })),
-  [rawData.vResourcePool]);
+  [rawData?.vResourcePool]);
 
   // Prepare cluster data
   const clusterData: ClusterRow[] = useMemo(() =>
-    rawData.vCluster.map((cluster, index) => ({
+    (rawData?.vCluster ?? []).map((cluster, index) => ({
       id: String(index),
       name: cluster.name,
       configStatus: cluster.configStatus,
@@ -318,11 +314,11 @@ export function TablesPage() {
       drsEnabled: cluster.drsEnabled,
       datacenter: cluster.datacenter || 'N/A',
     })),
-  [rawData.vCluster]);
+  [rawData?.vCluster]);
 
   // Prepare vCPU data
   const vcpuData: VCPURow[] = useMemo(() =>
-    rawData.vCPU.map((cpu, index) => ({
+    (rawData?.vCPU ?? []).map((cpu, index) => ({
       id: String(index),
       vmName: cpu.vmName,
       powerState: cpu.powerState,
@@ -334,11 +330,11 @@ export function TablesPage() {
       limit: cpu.limit,
       hotAddEnabled: cpu.hotAddEnabled,
     })),
-  [rawData.vCPU]);
+  [rawData?.vCPU]);
 
   // Prepare vMemory data
   const vmemoryData: VMemoryRow[] = useMemo(() =>
-    rawData.vMemory.map((mem, index) => ({
+    (rawData?.vMemory ?? []).map((mem, index) => ({
       id: String(index),
       vmName: mem.vmName,
       powerState: mem.powerState,
@@ -350,11 +346,11 @@ export function TablesPage() {
       activeGiB: mem.active !== null ? Math.round(mibToGiB(mem.active) * 10) / 10 : 0,
       consumedGiB: mem.consumed !== null ? Math.round(mibToGiB(mem.consumed) * 10) / 10 : 0,
     })),
-  [rawData.vMemory]);
+  [rawData?.vMemory]);
 
   // Prepare vDisk data
   const vdiskData: VDiskRow[] = useMemo(() =>
-    rawData.vDisk.map((disk, index) => ({
+    (rawData?.vDisk ?? []).map((disk, index) => ({
       id: String(index),
       vmName: disk.vmName,
       powerState: disk.powerState,
@@ -366,11 +362,11 @@ export function TablesPage() {
       datacenter: disk.datacenter || 'N/A',
       cluster: disk.cluster || 'N/A',
     })),
-  [rawData.vDisk]);
+  [rawData?.vDisk]);
 
   // Prepare vCD data
   const vcdData: VCDRow[] = useMemo(() =>
-    rawData.vCD.map((cd, index) => ({
+    (rawData?.vCD ?? []).map((cd, index) => ({
       id: String(index),
       vmName: cd.vmName,
       powerState: cd.powerState,
@@ -380,11 +376,11 @@ export function TablesPage() {
       datacenter: cd.datacenter || 'N/A',
       cluster: cd.cluster || 'N/A',
     })),
-  [rawData.vCD]);
+  [rawData?.vCD]);
 
   // Prepare vTools data
   const vtoolsData: VToolsRow[] = useMemo(() =>
-    rawData.vTools.map((tools, index) => ({
+    (rawData?.vTools ?? []).map((tools, index) => ({
       id: String(index),
       vmName: tools.vmName,
       powerState: tools.powerState,
@@ -394,11 +390,11 @@ export function TablesPage() {
       upgradePolicy: tools.upgradePolicy,
       syncTime: tools.syncTime,
     })),
-  [rawData.vTools]);
+  [rawData?.vTools]);
 
   // Prepare vLicense data
   const vlicenseData: VLicenseRow[] = useMemo(() =>
-    rawData.vLicense.map((license, index) => ({
+    (rawData?.vLicense ?? []).map((license, index) => ({
       id: String(index),
       name: license.name,
       licenseKey: license.licenseKey,
@@ -410,11 +406,11 @@ export function TablesPage() {
       productName: license.productName,
       productVersion: license.productVersion,
     })),
-  [rawData.vLicense]);
+  [rawData?.vLicense]);
 
   // Prepare vSource data
   const vsourceData: VSourceRow[] = useMemo(() =>
-    rawData.vSource.map((source, index) => ({
+    (rawData?.vSource ?? []).map((source, index) => ({
       id: String(index),
       server: source.server,
       ipAddress: source.ipAddress || 'N/A',
@@ -423,7 +419,7 @@ export function TablesPage() {
       osType: source.osType || 'N/A',
       apiVersion: source.apiVersion || 'N/A',
     })),
-  [rawData.vSource]);
+  [rawData?.vSource]);
 
   // VM column definitions
   const vmColumns: ColumnDef<VMRow, unknown>[] = useMemo(() => [
@@ -1205,6 +1201,10 @@ export function TablesPage() {
       header: 'API Version',
     },
   ], []);
+
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
 
   return (
     <div className="tables-page">

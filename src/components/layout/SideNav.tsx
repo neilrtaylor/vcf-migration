@@ -26,8 +26,13 @@ import {
   DataShare,
   Migrate,
   Help,
+  Chat,
+  Settings,
 } from '@carbon/icons-react';
+import { Tag } from '@carbon/react';
 import { useHasData } from '@/hooks';
+import { useAISettings } from '@/hooks/useAISettings';
+import { isAIProxyConfigured } from '@/services/ai/aiProxyClient';
 import { ROUTES } from '@/utils/constants';
 
 interface SideNavProps {
@@ -38,6 +43,8 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const hasData = useHasData();
+  const { settings: aiSettings } = useAISettings();
+  const aiConfigured = isAIProxyConfigured();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -136,6 +143,28 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
         </SideNavLink>
 
         <SideNavLink
+          renderIcon={Table}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.tables, true)}
+          isActive={isActive(ROUTES.tables)}
+          className={!hasData ? 'sidenav-link--disabled' : ''}
+        >
+          Data Tables
+        </SideNavLink>
+
+        <SideNavDivider />
+
+        <SideNavLink
+          renderIcon={Search}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.discovery, true)}
+          isActive={isActive(ROUTES.discovery)}
+          className={!hasData ? 'sidenav-link--disabled' : ''}
+        >
+          Discovery
+        </SideNavLink>
+
+        <SideNavLink
           renderIcon={LogoKubernetes}
           href="#"
           onClick={(e) => handleNavClick(e, ROUTES.roksMigration, true)}
@@ -165,27 +194,25 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
           Pre-Flight Report
         </SideNavLink>
 
-        <SideNavLink
-          renderIcon={Search}
-          href="#"
-          onClick={(e) => handleNavClick(e, ROUTES.discovery, true)}
-          isActive={isActive(ROUTES.discovery)}
-          className={!hasData ? 'sidenav-link--disabled' : ''}
-        >
-          Workload Discovery
-        </SideNavLink>
-
-        <SideNavLink
-          renderIcon={Table}
-          href="#"
-          onClick={(e) => handleNavClick(e, ROUTES.tables, true)}
-          isActive={isActive(ROUTES.tables)}
-          className={!hasData ? 'sidenav-link--disabled' : ''}
-        >
-          Data Tables
-        </SideNavLink>
-
         <SideNavDivider />
+
+        <SideNavLink
+          renderIcon={Settings}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.settings)}
+          isActive={isActive(ROUTES.settings)}
+        >
+          Settings
+        </SideNavLink>
+
+        <SideNavLink
+          renderIcon={Help}
+          href="#"
+          onClick={(e) => handleNavClick(e, ROUTES.about)}
+          isActive={isActive(ROUTES.about)}
+        >
+          About
+        </SideNavLink>
 
         <SideNavLink
           renderIcon={Information}
@@ -233,12 +260,17 @@ export function SideNav({ isExpanded = true }: SideNavProps) {
         </SideNavLink>
 
         <SideNavLink
-          renderIcon={Help}
+          renderIcon={Chat}
           href="#"
-          onClick={(e) => handleNavClick(e, ROUTES.about)}
-          isActive={isActive(ROUTES.about)}
+          onClick={(e) => handleNavClick(e, ROUTES.chat)}
+          isActive={isActive(ROUTES.chat)}
         >
-          About
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            AI Assistant
+            {aiConfigured && !aiSettings.enabled && (
+              <Tag type="gray" size="sm">Off</Tag>
+            )}
+          </span>
         </SideNavLink>
       </SideNavItems>
     </CarbonSideNav>

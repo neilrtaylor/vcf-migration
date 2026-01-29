@@ -95,7 +95,7 @@ export function ProfileSelector({
 
     for (const family of families) {
       const familyProfiles = Object.entries(STANDARD_PROFILES)
-        .filter(([_, spec]) => spec.family === family)
+        .filter(([, spec]) => spec.family === family)
         .map(([name, spec]) => ({
           id: name,
           text: name,

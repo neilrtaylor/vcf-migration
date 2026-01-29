@@ -19,6 +19,8 @@ export interface TransformedProfile {
   nvmeSizeGiB?: number;
   totalNvmeGiB?: number;
   roksSupported?: boolean;  // Whether this profile is available for ROKS/Kubernetes worker nodes
+  isCustom?: boolean;       // Whether this is a custom (non-IBM Cloud) profile
+  tag?: string;             // Custom display tag (e.g., "On-Prem", "Lab")
 }
 
 // ===== CONSTANTS =====

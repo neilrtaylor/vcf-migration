@@ -1,9 +1,10 @@
 // Migration Readiness Section
 
 import { Paragraph, Table, TableRow, PageBreak, HeadingLevel, BorderStyle } from 'docx';
+import type { MigrationInsights } from '@/services/ai/types';
 import reportTemplates from '@/data/reportTemplates.json';
 import { STYLES, type DocumentContent, type VMReadiness } from '../types';
-import { createHeading, createParagraph, createBulletList, createTableCell, createTableDescription, createTableLabel } from '../utils/helpers';
+import { createHeading, createParagraph, createBulletList, createTableCell, createTableDescription, createTableLabel, createAISection } from '../utils/helpers';
 
 // Type assertion for templates with table/figure descriptions
 const templates = reportTemplates as typeof reportTemplates & {
@@ -11,7 +12,7 @@ const templates = reportTemplates as typeof reportTemplates & {
   figureDescriptions: Record<string, { title: string; description: string }>;
 };
 
-export function buildMigrationReadiness(readiness: VMReadiness[], maxIssueVMs: number): DocumentContent[] {
+export function buildMigrationReadiness(readiness: VMReadiness[], maxIssueVMs: number, aiInsights?: MigrationInsights | null): DocumentContent[] {
   const readinessTemplates = reportTemplates.migrationReadiness;
   const blockerVMs = readiness.filter((r) => r.hasBlocker).slice(0, maxIssueVMs);
   const warningVMs = readiness.filter((r) => r.hasWarning && !r.hasBlocker).slice(0, maxIssueVMs);
@@ -172,6 +173,18 @@ export function buildMigrationReadiness(readiness: VMReadiness[], maxIssueVMs: n
   riskItems.push('Application Dependencies: Without application dependency mapping, there is risk of service disruption if dependent VMs are migrated in separate waves.');
 
   sections.push(...createBulletList(riskItems));
+
+  // Add AI risk assessment if available
+  if (aiInsights?.riskAssessment) {
+    sections.push(
+      ...createAISection(
+        '3.5 AI Risk Assessment',
+        aiInsights.riskAssessment,
+        HeadingLevel.HEADING_2
+      )
+    );
+  }
+
   sections.push(new Paragraph({ children: [new PageBreak()] }));
 
   return sections;

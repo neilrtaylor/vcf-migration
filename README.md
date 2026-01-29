@@ -28,6 +28,7 @@ This section covers how to use the VCF Migration application for migration plann
   - **Disk Capacity** — Full disk size from vDisk inventory (use when VMs may grow to full capacity)
   - **In Use (recommended)** — Actual consumed storage including snapshots
   - **Provisioned** — Allocated capacity including thin-provisioned promises (most conservative)
+- **Custom Bare Metal Profiles** — Define custom (e.g., future) bare metal profiles in `ibmCloudConfig.json` for ROKS sizing alongside standard IBM Cloud profiles
 
 #### VPC VSI (Virtual Server Instances)
 - **VSI Profile Mapping** — Automatic mapping of VMs to appropriate IBM Cloud VSI profiles
@@ -111,7 +112,7 @@ The guide covers:
 - Importing RVTools data
 - Understanding the Dashboard
 - Infrastructure analysis (Compute, Storage, Network, Clusters, Hosts)
-- Workload discovery and VM management
+- Workload discovery and VM management (with maintainer-configurable classification and auto-exclusion)
 - Migration assessment (ROKS and VSI)
 - Wave planning
 - Cost estimation
@@ -335,9 +336,140 @@ VITE_PRICING_PROXY_URL=https://your-function-url
 
 # Profiles proxy URL (optional - for production deployments)
 VITE_PROFILES_PROXY_URL=https://your-function-url
+
+# AI proxy URL (optional - enables AI-powered features)
+VITE_AI_PROXY_URL=https://your-ai-proxy-url
+
+# AI proxy API key (optional - shared secret for AI proxy auth)
+VITE_AI_PROXY_API_KEY=your-shared-secret
 ```
 
 Without an API key, the application uses static pricing data from `ibmCloudConfig.json`.
+
+### AI Features (Optional)
+
+The application includes optional AI-powered features using IBM watsonx.ai:
+
+- **Workload Classification** — LLM-based VM workload detection with confidence scores and purple "AI" source tags
+- **Right-Sizing Recommendations** — AI-recommended VSI profiles considering workload context with source indicators
+- **Migration Insights** — Executive summaries, risk assessments, and actionable recommendations (shows "AI Unavailable" state with link to Settings when disabled)
+- **Chat Assistant** — Conversational interface for migration planning questions (disabled state with tooltip when AI toggled off)
+- **Wave Planning Analysis** — AI-powered wave strategy suggestions with per-wave risk narratives and dependency warnings
+- **Cost Optimization** — Prioritized cost reduction recommendations with estimated savings for VSI deployments
+- **Remediation Guidance** — Step-by-step AI-generated remediation instructions for migration blockers with alternatives
+- **AI-Enhanced Reports** — DOCX, PDF, Excel, and BOM exports include AI-generated insights (executive summary, risk assessment, recommendations, cost optimizations) with watsonx.ai disclaimer
+- **AI Settings Page** — Dedicated settings page (`/settings`) with AI toggle, proxy connectivity test, consent management, and cache controls
+- **AI Status Indicators** — Visual indicators across the app showing AI availability: SideNav "Off" tag, disabled chat widget, and AI source labels on classifications
+
+#### Prerequisites
+
+AI features require the **watsonx.ai Runtime** service (formerly Watson Machine Learning). This is the inference service that provides the `/ml/v1/text/generation` and `/ml/v1/text/chat` API endpoints used by the proxy. These are public endpoints (`us-south.ml.cloud.ibm.com`) — no VPN or private network connectivity is required. Watson Studio is **not** required — the proxy only performs inference against a pre-trained foundation model.
+
+You will need:
+
+1. **watsonx.ai Runtime** service instance provisioned in your IBM Cloud account
+2. A **watsonx.ai project** with the Runtime service associated to it (provides the project ID)
+3. The **IBM Granite model** (`ibm/granite-3-8b-instruct`) enabled in that project
+4. An **IBM Cloud API key** with least-privilege access to the Runtime service (see below)
+
+#### Creating the API Key
+
+Create a dedicated service ID with only the permissions required for watsonx.ai inference:
+
+```bash
+# Log in to IBM Cloud
+ibmcloud login --sso
+
+# Target your resource group (where your watsonx.ai Runtime instance lives)
+ibmcloud target -g <your-resource-group>
+
+# Create a service ID for the AI proxy
+ibmcloud iam service-id-create vcf-ai-proxy \
+  --description "Least-privilege service ID for VCF Migration AI proxy"
+
+# Grant Writer role on watsonx.ai Runtime (Watson Machine Learning)
+# Writer is the minimum role required for text generation and chat inference.
+# Scope to your specific Runtime instance to avoid account-wide access.
+ibmcloud iam service-policy-create vcf-ai-proxy \
+  --roles Writer \
+  --service-name pm-20 \
+  --service-instance <your-watsonx-runtime-instance-crn>
+
+# Create an API key for the service ID
+ibmcloud iam service-api-key-create vcf-ai-proxy-key vcf-ai-proxy \
+  --description "API key for VCF Migration AI proxy" \
+  --output json
+```
+
+The `--service-instance` flag scopes access to a single watsonx.ai Runtime instance. To find your instance ID:
+
+```bash
+ibmcloud resource service-instances --service-name pm-20 --output json | \
+  jq '.[].id'
+```
+
+> **Roles summary:** The service ID needs only the **Writer** service role on the `pm-20` (Watson Machine Learning) service. No platform roles, no Watson Studio access, and no other service permissions are required.
+
+#### Setting Up the AI Proxy
+
+```bash
+# 1. Provision watsonx.ai Runtime service in IBM Cloud console
+# 2. Create a watsonx.ai project and associate the Runtime service
+# 3. Enable ibm/granite-3-8b-instruct model in the project
+# 4. Create the API key (see "Creating the API Key" above)
+
+# 5. Add the service ID as a collaborator on the watsonx.ai project
+#    The IAM policy grants access to the Runtime service, but each watsonx.ai
+#    project manages its own member list separately. Without this step, API calls
+#    will fail with a 403 "not a member of the project" error.
+#
+#    In the watsonx.ai console:
+#      a. Open your project
+#      b. Go to Manage > Access Control
+#      c. Click "Add collaborators" > "Add service IDs"
+#      d. Search for "vcf-ai-proxy" and add it with the Editor role
+
+# 6. Generate a shared secret for frontend-to-proxy authentication
+openssl rand -hex 32
+# Save this value — you'll use it for AI_PROXY_API_KEY and VITE_AI_PROXY_API_KEY
+
+# 7. Find your watsonx.ai project ID (GUID, not name)
+#    Option A: watsonx.ai console → your project → Manage tab
+#    Option B:
+ibmcloud resource service-instances --service-name pm-20 --output json | jq '.[].guid'
+
+# 8. Install proxy dependencies
+cd functions/ai-proxy
+npm install
+
+# 9. Create (or select) a Code Engine project
+ibmcloud ce project create --name vcf-migration-ai
+
+ibmcloud ce app create --name vcf-ai-proxy \
+  --source . \
+  --env IBM_CLOUD_API_KEY=<api-key-from-step-4> \
+  --env WATSONX_PROJECT_ID=<project-guid-from-step-7> \
+  --env WATSONX_MODEL_ID=ibm/granite-3-8b-instruct \
+  --env AI_PROXY_API_KEY=<shared-secret-from-step-6>
+
+# If the app already exists, use update instead:
+# ibmcloud ce app update --name vcf-ai-proxy \
+#   --env IBM_CLOUD_API_KEY=<api-key-from-step-4> \
+#   --env WATSONX_PROJECT_ID=<project-guid-from-step-7> \
+#   --env WATSONX_MODEL_ID=ibm/granite-3-8b-instruct \
+#   --env AI_PROXY_API_KEY=<shared-secret-from-step-6>
+
+# 10. Get the proxy URL
+ibmcloud ce app get --name vcf-ai-proxy --output url
+
+# 11. Add proxy URL and shared secret to frontend .env
+VITE_AI_PROXY_URL=<url-from-step-10>
+VITE_AI_PROXY_API_KEY=<shared-secret-from-step-6>   # Must match AI_PROXY_API_KEY
+
+# 12. Enable AI features in the app's Settings page (/settings)
+```
+
+AI features are always optional. Without the AI proxy configured, the app falls back to existing rule-based logic. Only aggregated environment summaries are sent to watsonx.ai (never individual VM names or IPs).
 
 ### Architecture: Pricing Proxy
 
@@ -371,6 +503,49 @@ npm run build
 ```
 
 ---
+
+## Maintainer Configuration
+
+Maintainers configure workload classification and migration scope in `src/data/workloadPatterns.json`. This file controls three independent systems:
+
+### Authoritative Classifications (`authoritativeClassifications`)
+
+Pin specific VMs to a workload type by name pattern. **AI cannot override these** — only users can via the UI.
+
+```json
+"authoritativeClassifications": {
+  "rules": [
+    {
+      "id": "network-edge-appliances",
+      "match": "contains",
+      "patterns": ["cust-edge", "service-edge"],
+      "category": "network",
+      "description": "Network edge appliances"
+    }
+  ]
+}
+```
+
+Match types: `contains`, `startsWith`, `endsWith`, `exact`, `regex`. The `category` value must be a key from the `categories` section (which defines the available workload types).
+
+### Workload Types (`categories`)
+
+Defines the available workload types (e.g., Databases, Middleware) with fallback pattern matching. Patterns are used **only when AI is not available** and no authoritative rule matched.
+
+### Auto-Exclusion Rules (`autoExclusionRules`)
+
+Control migration **scope** — which VMs are automatically excluded (templates, powered-off, VMware infrastructure). Independent from classification. Users can override via the UI.
+
+### Classification Precedence
+
+| Priority | Source | Set by | AI can override? |
+|----------|--------|--------|-----------------|
+| 1 | User override | User (UI) | N/A |
+| 2 | Authoritative | Maintainer (`authoritativeClassifications`) | **No** |
+| 3 | AI | watsonx.ai (when available) | N/A |
+| 4 | Pattern match | Maintainer (`categories` patterns) | Yes |
+
+Auto-exclusion is independent — a VM can be classified as "Network Equipment" AND auto-excluded from migration at the same time.
 
 ## Data Maintenance
 
@@ -465,3 +640,9 @@ Built with:
 - [IBM Carbon Design System](https://carbondesignsystem.com/)
 - [ExcelJS](https://github.com/exceljs/exceljs)
 - [Chart.js](https://www.chartjs.org/)
+
+
+curl -X POST "https://api.dataplatform.cloud.ibm.com/v2/projects/4cb7c99d-c50b-456d-9160-f9fbd0a44b1d/settings" \
+-H "Authorization: Bearer $(ibmcloud iam oauth-tokens --output json | jq -r '.iam_token')" \
+-H "Content-Type: application/json" \                                      
+-d '{"compute": [{"crn": "crn:v1:bluemix:public:pm-20:us-south:a/3cfdf229dfeb4afb8bf3f1067a9003e3:2412f745-0c10-4836-8188-c5e0fdbc6a2c::", "name": "watsonx.ai-vcf-migration", "type": "machine_learning"}]}'  

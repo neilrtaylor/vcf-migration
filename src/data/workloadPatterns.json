@@ -1,10 +1,43 @@
 {
-  "version": "1.0",
-  "description": "Patterns for detecting application workloads from VM names and annotations",
+  "version": "1.1",
+  "description": "Maintainer configuration for workload classification and auto-exclusion. This file controls two independent systems.",
+  "_maintainerGuide": {
+    "overview": "This file has three sections that the maintainer controls. Classification and auto-exclusion are INDEPENDENT — a VM can be classified AND excluded.",
+    "authoritativeClassifications": {
+      "purpose": "Maintainer-defined CLASSIFICATION — pins specific VMs to a workload type. AI CANNOT override these. Only a user can override via the UI.",
+      "priority": "Highest classification priority after user overrides. Precedence: User > Maintainer > AI > Pattern Match.",
+      "howToAdd": "Add an entry with match type (contains, startsWith, endsWith, exact, regex), patterns array, and a 'category' key referencing a workload type defined in 'categories'."
+    },
+    "categories": {
+      "purpose": "Defines workload types (e.g., Databases, Middleware) and FALLBACK pattern matching. Patterns here are used when AI is not available and no maintainer authoritative rule matched.",
+      "priority": "Lowest classification priority — only used as fallback when AI is unavailable.",
+      "howToAdd": "Add a new key under 'categories' with name, icon, description, and patterns array. Patterns are matched case-insensitively against VM names and annotations."
+    },
+    "autoExclusionRules": {
+      "purpose": "Migration SCOPE — determines which VMs are auto-excluded from migration (e.g., templates, powered-off, VMware infrastructure).",
+      "priority": "Auto-exclusion ALWAYS applies regardless of AI or classification. Independent from workload type assignment.",
+      "userOverride": "Users can force-include auto-excluded VMs or manually exclude included VMs via the UI.",
+      "howToAdd": "Add fieldRules for VM property checks (template, powerState) or namePatterns for VM name matching (contains, startsWith, endsWith, exact, regex)."
+    },
+    "example": "A 'cust-edge' VM has an authoritativeClassification pinning it to 'network' (Network Equipment). It also has an autoExclusionRule excluding it from migration. AI cannot reclassify it, but a user can override both the workload type and the exclusion."
+  },
+  "authoritativeClassifications": {
+    "description": "Maintainer-defined classifications that AI CANNOT override. Only user overrides take priority. Use this to pin specific VMs to a workload type by name pattern.",
+    "rules": [
+      {
+        "id": "network-edge-appliances",
+        "match": "contains",
+        "patterns": ["cust-edge", "service-edge"],
+        "category": "network",
+        "description": "Network edge appliances — always classify as Network Equipment regardless of AI"
+      }
+    ]
+  },
   "categories": {
     "middleware": {
       "name": "Middleware / Application Servers",
       "icon": "Application",
+      "description": "Application servers and web infrastructure often require reconfiguration for cloud deployment. Consider containerizing stateless middleware where possible, and verify vendor support for the target platform.",
       "patterns": [
         "jboss", "wildfly", "tomcat", "weblogic", "websphere", "spring",
         "nginx", "apache", "httpd", "iis", "haproxy", "envoy", "istio"
@@ -13,6 +46,7 @@
     "databases": {
       "name": "Databases",
       "icon": "DataBase",
+      "description": "Database VMs require careful migration planning due to data integrity, replication, and performance requirements. Consider managed database services where appropriate, and plan for data migration windows.",
       "patterns": [
         "oracle", "postgres", "postgresql", "mysql", "mariadb", "mssql",
         "sqlserver", "sql-server", "mongodb", "mongo", "redis", "cassandra",
@@ -23,6 +57,7 @@
     "enterprise": {
       "name": "Enterprise Applications",
       "icon": "Enterprise",
+      "description": "Enterprise applications (SAP, SharePoint, etc.) often have complex dependencies, licensing constraints, and vendor-specific migration requirements. Engage application owners early in the planning process.",
       "patterns": [
         "sap", "hana", "s4hana", "documentum", "filenet", "sas",
         "sharepoint", "exchange", "dynamics", "peoplesoft", "siebel",
@@ -32,6 +67,7 @@
     "backup": {
       "name": "Backup & Recovery",
       "icon": "Save",
+      "description": "Backup and recovery infrastructure may need to be replaced with cloud-native solutions. Evaluate IBM Cloud backup services and ensure data protection continuity during migration.",
       "patterns": [
         "veeam", "veritas", "netbackup", "commvault", "avamar", "networker",
         "datadomain", "rubrik", "cohesity", "arcserve", "acronis", "zerto",
@@ -41,6 +77,7 @@
     "security": {
       "name": "Security & Compliance",
       "icon": "Security",
+      "description": "Security appliances and compliance tools may require platform-specific alternatives in IBM Cloud. Review VPC Security Groups, Network ACLs, and IBM Cloud security services as potential replacements.",
       "patterns": [
         "paloalto", "palo-alto", "qualys", "cyberark", "checkpoint",
         "fortinet", "fortigate", "crowdstrike", "carbon-black", "carbonblack",
@@ -51,6 +88,7 @@
     "monitoring": {
       "name": "Monitoring & Management",
       "icon": "Dashboard",
+      "description": "Monitoring and management tools may need reconfiguration or replacement with cloud-native observability solutions. Consider IBM Cloud Monitoring, Log Analysis, and Activity Tracker.",
       "patterns": [
         "nagios", "zabbix", "prometheus", "grafana", "datadog", "dynatrace",
         "appdynamics", "newrelic", "solarwinds", "prtg", "icinga", "cacti",
@@ -60,14 +98,16 @@
     "virtualization": {
       "name": "Virtualization Infrastructure",
       "icon": "VirtualMachine",
+      "description": "VMware virtualization infrastructure (vCenter, NSX, vSAN) is typically not migrated. These components are replaced by the target platform's native infrastructure.",
       "patterns": [
         "vcenter", "vsphere", "vsan", "nsx", "vrni", "vra", "vrops",
-        "srm", "hcx", "horizon", "vdi", "citrix", "xenapp", "xendesktop"
+        "srm", "hcx", "horizon", "vdi", "citrix", "xenapp", "xendesktop", "vcls"
       ]
     },
     "containers": {
       "name": "Container Platforms",
       "icon": "ContainerImage",
+      "description": "Existing container platforms may be consolidated into the target ROKS environment. Evaluate container workload portability and orchestration compatibility.",
       "patterns": [
         "kubernetes", "k8s", "openshift", "ocp", "docker", "rancher",
         "tanzu", "aks", "eks", "gke", "harbor", "registry", "helm"
@@ -76,6 +116,7 @@
     "messaging": {
       "name": "Messaging & Integration",
       "icon": "Email",
+      "description": "Messaging and integration middleware requires careful handling of message queues and data in-flight during migration. Consider IBM Cloud Event Streams (Kafka) and MQ services.",
       "patterns": [
         "rabbitmq", "kafka", "activemq", "mq", "ibmmq", "tibco",
         "mulesoft", "boomi", "apigee", "kong", "wso2", "camel"
@@ -84,6 +125,7 @@
     "storage": {
       "name": "Storage Systems",
       "icon": "ObjectStorage",
+      "description": "Virtual storage appliances may need to be replaced with IBM Cloud Block Storage, File Storage, or Object Storage services depending on access patterns and performance requirements.",
       "patterns": [
         "netapp", "pure", "purestorage", "emc", "powerstore", "unity",
         "vnx", "vmax", "isilon", "ecs", "ceph", "gluster", "minio",
@@ -93,17 +135,20 @@
     "network": {
       "name": "Network Equipment",
       "icon": "Network",
+      "description": "Virtual network appliances (routers, load balancers, firewalls) often require platform-specific alternatives. Consider IBM Cloud VPC native services like Load Balancer for VPC, Security Groups, and Network ACLs as potential replacements.",
       "patterns": [
         "cisco", "ucs", "nexus", "aci", "f5", "bigip", "ltm", "gtm",
         "infoblox", "bluecat", "dns", "dhcp", "loadbalancer", "lb",
         "firewall", "fw", "router", "switch", "vpn", "proxy",
         "fortigate", "fgt", "fortinet",
-        "paloalto", "palo-alto", "pan-", "juniper", "srx", "junos"
+        "paloalto", "palo-alto", "pan-", "juniper", "srx", "junos",
+        "cust-edge", "service-edge"
       ]
     },
     "cloud": {
       "name": "Cloud Services",
       "icon": "Cloud",
+      "description": "Existing cloud service integrations and infrastructure-as-code tools may need reconfiguration for the IBM Cloud target environment. Review Terraform providers and automation scripts.",
       "patterns": [
         "aws", "amazon", "azure", "gcp", "google", "ibmcloud", "oci",
         "cloudformation", "terraform", "ansible", "puppet", "chef"
@@ -112,6 +157,7 @@
     "devops": {
       "name": "DevOps & CI/CD",
       "icon": "Build",
+      "description": "CI/CD pipelines and DevOps tools typically continue operating after migration with updated deployment targets. Plan for pipeline reconfiguration to target IBM Cloud environments.",
       "patterns": [
         "jenkins", "gitlab", "github", "bitbucket", "bamboo", "teamcity",
         "artifactory", "nexus", "sonar", "sonarqube", "jira", "confluence"
@@ -120,11 +166,91 @@
     "identity": {
       "name": "Identity & Access",
       "icon": "UserAccess",
+      "description": "Identity and access management services are critical infrastructure. Plan for integration with IBM Cloud IAM and ensure directory services connectivity is maintained during migration.",
       "patterns": [
         "ldap", "activedirectory", "ad", "adfs", "okta", "ping", "keycloak",
         "sso", "saml", "oauth", "radius", "tacacs", "ipa", "freeipa"
       ]
     }
+  },
+  "autoExclusionRules": {
+    "description": "Migration SCOPE rules — auto-exclude VMs from migration. Independent from classification (categories above). Always applies regardless of AI. Users can override via UI. A VM can match multiple rules.",
+    "fieldRules": [
+      {
+        "id": "template",
+        "label": "Template",
+        "field": "template",
+        "value": true,
+        "description": "VM is a template, not a running workload"
+      },
+      {
+        "id": "powered-off",
+        "label": "Powered Off",
+        "field": "powerState",
+        "operator": "notEquals",
+        "value": "poweredOn",
+        "description": "VM is not powered on"
+      }
+    ],
+    "namePatterns": [
+      {
+        "id": "vmware-nsx-edge",
+        "label": "VMware Infrastructure",
+        "match": "contains",
+        "patterns": ["nsx-edge", "edge-node"],
+        "description": "NSX-T edge appliances (T0/T1 gateways)"
+      },
+      {
+        "id": "vmware-nsx-edge-regex",
+        "label": "VMware Infrastructure",
+        "match": "regex",
+        "patterns": ["\\bedge[-_]?\\d", "t[01][-_]?edge"],
+        "excludePatterns": ["cust-edge", "service-edge"],
+        "description": "NSX edge naming conventions (edge-01, t0-edge, etc.) excluding network appliances"
+      },
+      {
+        "id": "vmware-nsx-controller",
+        "label": "VMware Infrastructure",
+        "match": "contains",
+        "patterns": ["nsxt-ctrlmgr", "nsx-manager", "nsx-controller"],
+        "description": "NSX-T controller/manager VMs"
+      },
+      {
+        "id": "vmware-usage-meter",
+        "label": "VMware Infrastructure",
+        "match": "contains",
+        "patterns": ["usage-meter", "usagemeter"],
+        "description": "VMware usage meter (license tracking)"
+      },
+      {
+        "id": "vmware-vcls",
+        "label": "VMware Infrastructure",
+        "match": "startsWith",
+        "patterns": ["vcls-", "vcls"],
+        "description": "vCLS (vSphere Cluster Services) VMs"
+      },
+      {
+        "id": "vmware-vcenter",
+        "label": "VMware Infrastructure",
+        "match": "contains",
+        "patterns": ["vcenter", "vcsa"],
+        "description": "vCenter Server Appliance (VCSA)"
+      },
+      {
+        "id": "windows-adns",
+        "label": "Windows AD/DNS",
+        "match": "startsWith",
+        "patterns": ["adnsvcs"],
+        "description": "Windows AD/DNS infrastructure servers"
+      },
+      {
+        "id": "network-edge-appliance",
+        "label": "Network Edge Appliance",
+        "match": "contains",
+        "patterns": ["cust-edge", "service-edge"],
+        "description": "Network edge appliances (e.g., Cisco routers) — not VMware infrastructure"
+      }
+    ]
   },
   "appliances": {
     "name": "Virtual Appliances",

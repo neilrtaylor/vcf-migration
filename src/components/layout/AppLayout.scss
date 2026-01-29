@@ -8,6 +8,15 @@
     background-color: var(--cds-background);
     min-height: calc(100vh - 48px); // Account for header height
   }
+
+  &__ai-warning {
+    position: fixed;
+    bottom: spacing.$spacing-07;
+    right: spacing.$spacing-07;
+    z-index: 9000;
+    max-width: 28rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
 }
 
 // PDF Export Modal styles

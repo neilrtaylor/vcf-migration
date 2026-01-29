@@ -1,4 +1,5 @@
 // Enhanced data table with TanStack Table integration
+/* eslint-disable react-refresh/only-export-components */
 import { useState } from 'react';
 import {
   useReactTable,

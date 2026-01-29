@@ -99,6 +99,14 @@ export function transformProxyToAppPricing(proxyData: ProxyPricingResponse): IBM
     }
   }
 
+  // Merge custom profiles from static data (proxy never returns these)
+  // Custom profiles include Future profiles and user-defined configurations
+  for (const [profileName, profile] of Object.entries(staticPricing.bareMetal)) {
+    if (profile.isCustom && !bareMetalProfiles[profileName]) {
+      bareMetalProfiles[profileName] = profile;
+    }
+  }
+
   // Transform block storage from proxy format
   const blockStorageTiers: Record<string, BlockStorageTier> = {};
   if (proxyData.blockStorage) {

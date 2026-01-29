@@ -272,6 +272,33 @@ This aligns well with the goal of keeping the application lightweight while stil
 
 ---
 
+## IBM watsonx.ai
+
+**IBM watsonx.ai** provides AI-powered features for the migration tool, including workload classification, right-sizing recommendations, migration insights, and a context-aware chatbot. The integration uses IBM Granite foundation models via the watsonx.ai text generation and chat APIs.
+
+### Architecture
+
+AI features are optional and follow the same Code Engine proxy pattern as the pricing and profiles integrations:
+
+- **Code Engine AI Proxy** (`functions/ai-proxy/`) — Express.js server that authenticates with IBM Cloud IAM, manages prompts, and caches responses to control API costs
+- **Client Services** (`src/services/ai/`) — TypeScript API clients, caching, and context builders
+- **React Hooks** (`src/hooks/useAI*.ts`) — State management for AI features with loading states and fallback behavior
+
+### Use Cases
+
+| Feature | Description |
+|---------|-------------|
+| **Workload Classification** | LLM-based VM workload detection with confidence scores, complementing regex-based pattern matching |
+| **Right-Sizing** | AI-recommended IBM Cloud VSI profiles considering workload context and over-provisioning detection |
+| **Migration Insights** | Executive summaries, risk assessments, and actionable recommendations generated from environment data |
+| **Chat Assistant** | Conversational interface for migration planning questions, aware of the user's loaded environment data |
+
+### Privacy
+
+Only aggregated environment summaries (VM counts, resource totals, workload categories) are sent to watsonx.ai. Individual VM names, IP addresses, and raw RVTools data are never transmitted.
+
+---
+
 ## Summary
 
 This technology stack combines a modern React frontend with strong typing, fast build tooling, and an enterprise-grade design system. Together, these technologies provide a scalable foundation for building a robust UI to support VMware Cloud Foundation migration and infrastructure analysis workflows.

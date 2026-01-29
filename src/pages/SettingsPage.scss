@@ -1,0 +1,93 @@
+// Settings page styles
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.settings-page {
+  &__title {
+    @include type.type-style('heading-04');
+    margin-bottom: spacing.$spacing-03;
+    color: var(--cds-text-primary, #161616);
+  }
+
+  &__subtitle {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__tile {
+    padding: spacing.$spacing-05;
+    height: 100%;
+  }
+
+  &__row-heading {
+    @include type.type-style('heading-02');
+    color: var(--cds-text-secondary, #525252);
+  }
+
+  &__section-title {
+    @include type.type-style('heading-03');
+    color: var(--cds-text-primary, #161616);
+    margin-bottom: spacing.$spacing-04;
+    padding-bottom: spacing.$spacing-03;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+  }
+
+  &__toggle-row {
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__consent {
+    margin-top: spacing.$spacing-04;
+  }
+
+  &__privacy-notice {
+    margin-top: spacing.$spacing-04;
+    padding: spacing.$spacing-03;
+    background-color: var(--cds-layer-02, #f4f4f4);
+    border-radius: 4px;
+
+    p {
+      @include type.type-style('body-compact-01');
+      color: var(--cds-text-secondary, #525252);
+    }
+  }
+
+  &__status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: spacing.$spacing-03 0;
+  }
+
+  &__status-label {
+    @include type.type-style('body-compact-01');
+    color: var(--cds-text-primary, #161616);
+    font-weight: 600;
+  }
+
+  &__error-detail {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-error, #da1e28);
+    margin-top: spacing.$spacing-02;
+  }
+
+  &__cache-description {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary, #525252);
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  &__cache-actions {
+    display: flex;
+    gap: spacing.$spacing-03;
+    flex-wrap: wrap;
+  }
+
+  &__warning-notice {
+    margin-bottom: spacing.$spacing-03;
+  }
+}

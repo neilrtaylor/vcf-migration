@@ -2,7 +2,7 @@
 
 import type { RVToolsData, VirtualMachine, VDiskInfo, VSnapshotInfo, VToolsInfo } from '@/types/rvtools';
 import { mibToGiB, getHardwareVersionNumber } from '@/utils/formatters';
-import { isVMwareInfrastructureVM } from '@/hooks/useData';
+import { isVMwareInfrastructureVM } from '@/utils/autoExclusion';
 import { HW_VERSION_MINIMUM, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import ibmCloudConfig from '@/data/ibmCloudConfig.json';
 import osCompatibilityData from '@/data/redhatOSCompatibility.json';

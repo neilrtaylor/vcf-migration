@@ -148,7 +148,9 @@ export const ROUTES = {
   vsiMigrationMethods: '/vsi-migration-methods',
   mtvDocumentation: '/mtv-documentation',
   overheadReference: '/overhead-reference',
+  settings: '/settings',
   about: '/about',
+  chat: '/chat',
 } as const;
 
 // Local storage keys

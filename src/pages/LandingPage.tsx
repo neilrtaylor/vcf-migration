@@ -1,9 +1,11 @@
 // Landing page with file upload
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Column, Tile } from '@carbon/react';
+import { Grid, Column, Tile, Tag } from '@carbon/react';
+import { WatsonHealthAiResults } from '@carbon/icons-react';
 import { FileUpload } from '@/components/upload';
 import { useData } from '@/hooks';
+import { isAIProxyConfigured } from '@/services/ai/aiProxyClient';
 import type { RVToolsData } from '@/types';
 import { ROUTES } from '@/utils/constants';
 import './LandingPage.scss';
@@ -84,6 +86,47 @@ export function LandingPage() {
             </Grid>
           </div>
         </Column>
+
+        {isAIProxyConfigured() && (
+          <Column lg={16} md={8} sm={4}>
+            <Tile className="landing-page__ai-tile">
+              <div className="landing-page__ai-header">
+                <WatsonHealthAiResults size={24} />
+                <h3>Enhanced with AI</h3>
+                <Tag type="purple" size="sm">watsonx.ai</Tag>
+              </div>
+              <p className="landing-page__ai-description">
+                This application is connected to IBM watsonx.ai for AI-powered analysis. When enabled in Settings, you'll also get:
+              </p>
+              <Grid>
+                <Column lg={4} md={4} sm={4}>
+                  <div className="landing-page__ai-feature">
+                    <strong>Workload Classification</strong>
+                    <p>LLM-based workload detection with confidence scoring for each VM.</p>
+                  </div>
+                </Column>
+                <Column lg={4} md={4} sm={4}>
+                  <div className="landing-page__ai-feature">
+                    <strong>Migration Insights</strong>
+                    <p>Executive summaries, risk assessments, and actionable recommendations.</p>
+                  </div>
+                </Column>
+                <Column lg={4} md={4} sm={4}>
+                  <div className="landing-page__ai-feature">
+                    <strong>Cost Optimization</strong>
+                    <p>Right-sizing suggestions and prioritized cost reduction recommendations.</p>
+                  </div>
+                </Column>
+                <Column lg={4} md={4} sm={4}>
+                  <div className="landing-page__ai-feature">
+                    <strong>AI-Enhanced Reports</strong>
+                    <p>DOCX, PDF, and Excel exports enriched with AI-generated analysis.</p>
+                  </div>
+                </Column>
+              </Grid>
+            </Tile>
+          </Column>
+        )}
       </Grid>
     </div>
   );

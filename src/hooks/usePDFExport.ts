@@ -11,6 +11,7 @@ export interface PDFExportOptions {
   includeClusters?: boolean;
   includeHosts?: boolean;
   includeResourcePools?: boolean;
+  aiInsights?: import('@/services/ai/types').MigrationInsights | null;
 }
 
 export interface UsePDFExportReturn {

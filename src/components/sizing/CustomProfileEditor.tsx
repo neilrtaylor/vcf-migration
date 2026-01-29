@@ -70,6 +70,7 @@ export function CustomProfileEditor({
   const [showForm, setShowForm] = useState(false);
 
   // Reset form when modal closes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) {
       setFormState(initialFormState);
@@ -78,6 +79,7 @@ export function CustomProfileEditor({
       setShowForm(false);
     }
   }, [isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const validateForm = (): boolean => {
     if (!formState.name.trim()) {

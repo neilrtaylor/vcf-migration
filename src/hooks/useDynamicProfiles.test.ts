@@ -28,6 +28,7 @@ const mockBareMetalProfiles: BareMetalProfilesByFamily = {
   compute: [],
   memory: [],
   veryHighMemory: [],
+  custom: [],
 };
 
 const mockStaticProfiles: IBMCloudProfiles = {

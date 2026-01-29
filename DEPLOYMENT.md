@@ -389,8 +389,19 @@ ibmcloud ce application get --name vcf-migration --output url
 To redeploy:
 
 ```bash
-ibmcloud ce app update --name vcf-migration  --build-source . 
+# Ensure the correct project is selected first
+ibmcloud ce project list
+ibmcloud ce project select --name <project-containing-vcf-migration>
+
+# Then update the app
+ibmcloud ce app update --name vcf-migration --build-source .
 ```
+
+> **Note**: The frontend app and AI proxy are in separate Code Engine projects:
+> - **`vcf-migration`** project contains the `vcf-migration` frontend app
+> - **`vcf-migration-ai`** project contains the `vcf-ai-proxy` app
+>
+> Use `ibmcloud ce project select --name <project>` to switch between them before running update commands. Use `ibmcloud ce application list` to verify which apps are in the currently selected project.
 
 ### Step 3: Custom Domain (Optional)
 
@@ -706,6 +717,89 @@ The API key needs these permissions for the profiles proxy:
 |---------|------|---------|
 | VPC Infrastructure Services | Viewer | Read VSI/Bare Metal profiles |
 | Kubernetes Service | Viewer | Read ROKS machine types |
+
+---
+
+## Code Engine AI Proxy
+
+The AI proxy provides watsonx.ai integration for AI-powered features (classification, rightsizing, insights, chat, wave suggestions, cost optimization, remediation guidance).
+
+### Deploy the AI Proxy
+
+```bash
+# Select (or create) the AI proxy project
+ibmcloud ce project select --name vcf-migration-ai
+
+# Deploy from the ai-proxy source directory
+cd functions/ai-proxy
+ibmcloud ce app create --name vcf-ai-proxy \
+  --build-source . \
+  --strategy dockerfile \
+  --port 8080 \
+  --min-scale 1 \
+  --max-scale 3 \
+  --env IBM_CLOUD_API_KEY="your-ibm-cloud-api-key" \
+  --env WATSONX_PROJECT_ID="your-watsonx-project-id" \
+  --env AI_PROXY_API_KEY="your-shared-secret"
+
+# Get the URL
+ibmcloud ce app get --name vcf-ai-proxy --output url
+```
+
+### Redeploy the AI Proxy
+
+```bash
+# Select the AI proxy project
+ibmcloud ce project select --name vcf-migration-ai
+
+# Update from source
+cd functions/ai-proxy
+ibmcloud ce app update --name vcf-ai-proxy --build-source .
+```
+
+### Configure the Frontend
+
+Add the AI proxy URL to your `.env` file:
+
+```bash
+VITE_AI_PROXY_URL=https://vcf-ai-proxy.xxxx.us-south.codeengine.appdomain.cloud
+VITE_AI_PROXY_API_KEY=your-shared-secret
+```
+
+Then rebuild and redeploy the frontend.
+
+### AI Proxy Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check (unauthenticated) |
+| `POST /api/classify` | Workload classification |
+| `POST /api/rightsizing` | VSI profile recommendations |
+| `POST /api/insights` | Migration insights |
+| `POST /api/chat` | Conversational assistant |
+| `POST /api/wave-suggestions` | Wave planning analysis |
+| `POST /api/cost-optimization` | Cost optimization recommendations |
+| `POST /api/remediation` | Blocker remediation guidance |
+
+---
+
+## Redeploying Both Apps
+
+The frontend and AI proxy are in separate Code Engine projects. To redeploy both:
+
+```bash
+# 1. Redeploy the AI proxy
+ibmcloud ce project select --name vcf-migration-ai
+cd functions/ai-proxy
+ibmcloud ce app update --name vcf-ai-proxy --build-source .
+
+# 2. Redeploy the frontend
+ibmcloud ce project select --name vcf-migration
+cd /path/to/vcf-migration   # project root
+ibmcloud ce app update --name vcf-migration --build-source .
+```
+
+Use `ibmcloud ce project list` to see available projects and which is currently selected. Use `ibmcloud ce application list` to see apps in the selected project.
 
 ---
 

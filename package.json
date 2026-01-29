@@ -1,7 +1,7 @@
 {
   "name": "rvtools-analyzer",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.1.1",
   "description": "RVTools Analysis Web Application for VMware infrastructure visualization and IBM Cloud migration planning",
   "license": "MIT",
   "author": "Neil Taylor",

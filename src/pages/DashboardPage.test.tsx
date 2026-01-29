@@ -9,6 +9,37 @@ vi.mock('@/hooks', () => ({
   useData: vi.fn(),
   useVMs: vi.fn(),
   useChartFilter: vi.fn(),
+  useVMOverrides: vi.fn(() => ({
+    overrides: {},
+    isExcluded: () => false,
+    isForceIncluded: () => false,
+    isEffectivelyExcluded: () => false,
+    getWorkloadType: () => undefined,
+    getNotes: () => undefined,
+    excludedCount: 0,
+    forceIncludedCount: 0,
+    overrideCount: 0,
+  })),
+  useAutoExclusion: vi.fn(() => ({
+    autoExclusionMap: new Map(),
+    getAutoExclusionById: () => ({ isAutoExcluded: false, reasons: [], labels: [] }),
+    autoExcludedCount: 0,
+    autoExcludedBreakdown: { templates: 0, poweredOff: 0, vmwareInfrastructure: 0, windowsInfrastructure: 0 },
+  })),
+}));
+
+// Mock AI components and services
+vi.mock('@/components/ai/AIInsightsPanel', () => ({
+  AIInsightsPanel: () => <div data-testid="ai-insights-panel" />,
+}));
+
+vi.mock('@/services/ai/aiProxyClient', () => ({
+  isAIProxyConfigured: vi.fn(() => false),
+}));
+
+vi.mock('@/utils/vmIdentifier', () => ({
+  getVMIdentifier: vi.fn((vm: { vmName: string }) => vm.vmName),
+  getEnvironmentFingerprint: vi.fn(() => 'test-fingerprint'),
 }));
 
 // Mock chart components

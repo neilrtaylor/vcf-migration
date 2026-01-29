@@ -11,10 +11,70 @@ import {
 } from '@carbon/react';
 import { TopNav } from './TopNav';
 import { SideNav } from './SideNav';
+import { ChatWidget } from '@/components/ai/ChatWidget';
 import { ROUTES } from '@/utils/constants';
-import { useData, usePDFExport, useExcelExport, useDocxExport } from '@/hooks';
+import { useData, usePDFExport, useExcelExport, useDocxExport, useAISettings } from '@/hooks';
+import { isAIProxyConfigured } from '@/services/ai/aiProxyClient';
+import { fetchAIInsights } from '@/services/ai/aiInsightsApi';
+import { buildInsightsInput } from '@/services/ai/insightsInputBuilder';
+import { createLogger } from '@/utils/logger';
 import type { PDFExportOptions } from '@/hooks/usePDFExport';
+import type { RVToolsData } from '@/types/rvtools';
+import type { MigrationInsights } from '@/services/ai/types';
 import './AppLayout.scss';
+
+const logger = createLogger('AppLayout');
+
+const AI_INSIGHTS_TIMEOUT_MS = 45000;
+
+/**
+ * Fetch AI insights with timeout and logging.
+ * Returns { insights, warning } — warning is set if insights could not be fetched.
+ */
+async function fetchInsightsForExport(
+  rawData: RVToolsData,
+  exportType: string,
+): Promise<{ insights: MigrationInsights | null; warning: string | null }> {
+  logger.info(`[${exportType}] Fetching AI insights for export`);
+  try {
+    const insightsInput = buildInsightsInput(rawData);
+    logger.debug(`[${exportType}] InsightsInput built`, {
+      totalVMs: insightsInput.totalVMs,
+      totalVCPUs: insightsInput.totalVCPUs,
+      totalMemoryGiB: insightsInput.totalMemoryGiB,
+    });
+
+    const result = await Promise.race([
+      fetchAIInsights(insightsInput),
+      new Promise<'timeout'>((resolve) =>
+        setTimeout(() => resolve('timeout'), AI_INSIGHTS_TIMEOUT_MS)
+      ),
+    ]);
+
+    if (result === 'timeout') {
+      logger.warn(`[${exportType}] AI insights timed out after ${AI_INSIGHTS_TIMEOUT_MS / 1000}s`);
+      return { insights: null, warning: `AI insights timed out after ${AI_INSIGHTS_TIMEOUT_MS / 1000}s — report generated without AI sections.` };
+    }
+
+    if (!result) {
+      logger.warn(`[${exportType}] AI insights returned null (proxy may have returned empty/invalid data)`);
+      return { insights: null, warning: 'AI insights returned empty data — report generated without AI sections.' };
+    }
+
+    logger.info(`[${exportType}] AI insights fetched successfully`, {
+      hasExecutiveSummary: !!result.executiveSummary,
+      hasRiskAssessment: !!result.riskAssessment,
+      recommendationsCount: result.recommendations.length,
+      costOptimizationsCount: result.costOptimizations.length,
+      hasMigrationStrategy: !!result.migrationStrategy,
+    });
+    return { insights: result, warning: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[${exportType}] AI insights fetch failed`, error instanceof Error ? error : new Error(message));
+    return { insights: null, warning: `AI insights failed: ${message} — report generated without AI sections.` };
+  }
+}
 
 const DEFAULT_OPTIONS: PDFExportOptions = {
   includeDashboard: true,
@@ -32,9 +92,12 @@ export function AppLayout() {
   const { isExporting, error, exportPDF } = usePDFExport();
   const { exportExcel } = useExcelExport();
   const { exportDocx } = useDocxExport();
+  const { settings: aiSettings } = useAISettings();
   const [isSideNavExpanded] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportOptions, setExportOptions] = useState<PDFExportOptions>(DEFAULT_OPTIONS);
+  const [, setIsDocxExporting] = useState(false);
+  const [aiWarning, setAIWarning] = useState<string | null>(null);
 
   const handleUploadClick = useCallback(() => {
     navigate(ROUTES.home);
@@ -44,21 +107,40 @@ export function AppLayout() {
     setIsExportModalOpen(true);
   }, []);
 
-  const handleExportExcelClick = useCallback(() => {
-    if (rawData) {
-      exportExcel(rawData);
+  const handleExportExcelClick = useCallback(async () => {
+    if (!rawData) return;
+    setAIWarning(null);
+
+    let aiInsights = null;
+    if (aiSettings.enabled && isAIProxyConfigured()) {
+      const { insights, warning } = await fetchInsightsForExport(rawData, 'Excel');
+      aiInsights = insights;
+      if (warning) setAIWarning(warning);
     }
-  }, [rawData, exportExcel]);
+
+    exportExcel(rawData, undefined, aiInsights);
+  }, [rawData, exportExcel, aiSettings.enabled]);
 
   const handleExportDocxClick = useCallback(async () => {
-    if (rawData) {
-      try {
-        await exportDocx(rawData);
-      } catch {
-        // Error is handled by the hook
+    if (!rawData) return;
+    setAIWarning(null);
+
+    setIsDocxExporting(true);
+    try {
+      let aiInsights = null;
+      if (aiSettings.enabled && isAIProxyConfigured()) {
+        const { insights, warning } = await fetchInsightsForExport(rawData, 'DOCX');
+        aiInsights = insights;
+        if (warning) setAIWarning(warning);
       }
+
+      await exportDocx(rawData, { aiInsights });
+    } catch {
+      // Error is handled by the hook
+    } finally {
+      setIsDocxExporting(false);
     }
-  }, [rawData, exportDocx]);
+  }, [rawData, exportDocx, aiSettings.enabled]);
 
   const handleCloseExportModal = useCallback(() => {
     setIsExportModalOpen(false);
@@ -99,14 +181,22 @@ export function AppLayout() {
 
   const handleExport = useCallback(async () => {
     if (!rawData) return;
+    setAIWarning(null);
 
     try {
-      await exportPDF(rawData, exportOptions);
+      let aiInsights = null;
+      if (aiSettings.enabled && isAIProxyConfigured()) {
+        const { insights, warning } = await fetchInsightsForExport(rawData, 'PDF');
+        aiInsights = insights;
+        if (warning) setAIWarning(warning);
+      }
+
+      await exportPDF(rawData, { ...exportOptions, aiInsights });
       setIsExportModalOpen(false);
     } catch {
       // Error is handled by the hook
     }
-  }, [rawData, exportOptions, exportPDF]);
+  }, [rawData, exportOptions, exportPDF, aiSettings.enabled]);
 
   return (
     <div className="app-layout">
@@ -120,6 +210,21 @@ export function AppLayout() {
       <Content className="app-layout__content">
         <Outlet />
       </Content>
+
+      {/* AI insights warning notification */}
+      {aiWarning && (
+        <InlineNotification
+          kind="warning"
+          title="AI Insights"
+          subtitle={aiWarning}
+          lowContrast
+          onCloseButtonClick={() => setAIWarning(null)}
+          className="app-layout__ai-warning"
+        />
+      )}
+
+      {/* AI Chat Widget */}
+      <ChatWidget />
 
       {/* PDF Export Modal */}
       <Modal

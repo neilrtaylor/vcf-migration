@@ -1,9 +1,10 @@
 // Cost Estimation Section
 
 import { Paragraph, Table, TableRow, TextRun, PageBreak, HeadingLevel, BorderStyle, ShadingType, AlignmentType } from 'docx';
+import type { MigrationInsights } from '@/services/ai/types';
 import reportTemplates from '@/data/reportTemplates.json';
 import { STYLES, type DocumentContent, type ROKSSizing, type VSIMapping } from '../types';
-import { createHeading, createParagraph, createBulletList, createTableCell, createTableDescription, createTableLabel } from '../utils/helpers';
+import { createHeading, createParagraph, createBulletList, createTableCell, createTableDescription, createTableLabel, createAISection } from '../utils/helpers';
 
 // Type assertion for templates with table/figure descriptions
 const templates = reportTemplates as typeof reportTemplates & {
@@ -13,7 +14,8 @@ const templates = reportTemplates as typeof reportTemplates & {
 
 export function buildCostEstimation(
   roksSizing: ROKSSizing,
-  vsiMappings: VSIMapping[]
+  vsiMappings: VSIMapping[],
+  aiInsights?: MigrationInsights | null
 ): DocumentContent[] {
   const costTemplates = reportTemplates.costEstimation;
 
@@ -30,7 +32,7 @@ export function buildCostEstimation(
   const costRatio = totalVSIMonthlyCost > 0 ? (roksMonthlyCost / totalVSIMonthlyCost).toFixed(1) : 'N/A';
   const annualDifference = (roksMonthlyCost - totalVSIMonthlyCost) * 12;
 
-  return [
+  const sections: DocumentContent[] = [
     createHeading('8. ' + costTemplates.title, HeadingLevel.HEADING_1),
     createParagraph(costTemplates.introduction),
     createParagraph(costTemplates.disclaimer, { spacing: { after: 240 } }),
@@ -187,7 +189,20 @@ export function buildCostEstimation(
     new Paragraph({ spacing: { before: 240 } }),
     createHeading('8.3 ' + costTemplates.notes.title, HeadingLevel.HEADING_2),
     ...createBulletList(costTemplates.notes.items),
-
-    new Paragraph({ children: [new PageBreak()] }),
   ];
+
+  // Add AI cost optimizations if available
+  if (aiInsights?.costOptimizations && aiInsights.costOptimizations.length > 0) {
+    sections.push(
+      ...createAISection(
+        '8.4 AI Cost Optimization Suggestions',
+        aiInsights.costOptimizations,
+        HeadingLevel.HEADING_2
+      )
+    );
+  }
+
+  sections.push(new Paragraph({ children: [new PageBreak()] }));
+
+  return sections;
 }

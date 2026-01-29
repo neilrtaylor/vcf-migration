@@ -156,7 +156,8 @@ export function useSubnetOverrides(): UseSubnetOverridesReturn {
     if (!subnet || subnet.trim() === '') {
       // Remove the override if clearing
       setData(prev => {
-        const { [portGroup]: _, ...rest } = prev.overrides;
+        const { [portGroup]: _removed, ...rest } = prev.overrides;
+        void _removed; // Silence unused variable warning
         return {
           ...prev,
           overrides: rest,
@@ -183,7 +184,8 @@ export function useSubnetOverrides(): UseSubnetOverridesReturn {
 
   const removeOverride = useCallback((portGroup: string) => {
     setData(prev => {
-      const { [portGroup]: _, ...rest } = prev.overrides;
+      const { [portGroup]: _removed, ...rest } = prev.overrides;
+      void _removed; // Silence unused variable warning
       return {
         ...prev,
         overrides: rest,

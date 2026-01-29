@@ -4,10 +4,10 @@ import { useState, useMemo, lazy, Suspense } from 'react';
 import { Grid, Column, Tile, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, Button, InlineNotification, Loading, Tooltip } from '@carbon/react';
 import { Navigate } from 'react-router-dom';
 import { Settings, Reset, ArrowUp, ArrowDown, Information } from '@carbon/icons-react';
-import { useData, useVMs, useCustomProfiles, usePreflightChecks, useMigrationAssessment, useWavePlanning, useVMOverrides } from '@/hooks';
+import { useData, useAllVMs, useCustomProfiles, usePreflightChecks, useMigrationAssessment, useWavePlanning, useVMOverrides, useAIRightsizing, useAutoExclusion } from '@/hooks';
 import { ROUTES, HW_VERSION_MINIMUM, HW_VERSION_RECOMMENDED, SNAPSHOT_WARNING_AGE_DAYS, SNAPSHOT_BLOCKER_AGE_DAYS } from '@/utils/constants';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
-import { getVMIdentifier } from '@/utils/vmIdentifier';
+import { getVMIdentifier, getEnvironmentFingerprint } from '@/utils/vmIdentifier';
 import { DoughnutChart, HorizontalBarChart } from '@/components/charts';
 import { EnhancedDataTable } from '@/components/tables';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -15,6 +15,12 @@ import { MetricCard, RedHatDocLink, RemediationPanel } from '@/components/common
 import { CostEstimation } from '@/components/cost';
 import { ProfileSelector } from '@/components/sizing';
 import { ComplexityAssessmentPanel, WavePlanningPanel, OSCompatibilityPanel } from '@/components/migration';
+import { AIInsightsPanel } from '@/components/ai/AIInsightsPanel';
+import { AIWaveAnalysisPanel } from '@/components/ai/AIWaveAnalysisPanel';
+import { AICostAnalysisPanel } from '@/components/ai/AICostAnalysisPanel';
+import { AIRemediationPanel } from '@/components/ai/AIRemediationPanel';
+import { isAIProxyConfigured } from '@/services/ai/aiProxyClient';
+import type { InsightsInput, NetworkSummaryForAI, WaveSuggestionInput, CostOptimizationInput, RemediationInput } from '@/services/ai/types';
 
 // Lazy load CustomProfileEditor - only loaded when user opens the modal
 const CustomProfileEditor = lazy(() =>
@@ -27,11 +33,12 @@ import './MigrationPage.scss';
 
 export function VSIMigrationPage() {
   const { rawData } = useData();
-  const allVms = useVMs();
+  const allVmsRaw = useAllVMs();
   const [showCustomProfileEditor, setShowCustomProfileEditor] = useState(false);
 
   // VM overrides for exclusions
   const vmOverrides = useVMOverrides();
+  const { getAutoExclusionById } = useAutoExclusion();
 
   // Custom profiles state
   const {
@@ -46,23 +53,55 @@ export function VSIMigrationPage() {
     removeCustomProfile,
   } = useCustomProfiles();
 
-  // Filter out excluded VMs
+  // Filter out excluded VMs using unified three-tier exclusion
   const vms = useMemo(() => {
-    return allVms.filter(vm => {
+    return allVmsRaw.filter(vm => {
       const vmId = getVMIdentifier(vm);
-      return !vmOverrides.isExcluded(vmId);
+      const autoResult = getAutoExclusionById(vmId);
+      return !vmOverrides.isEffectivelyExcluded(vmId, autoResult.isAutoExcluded);
     });
-  }, [allVms, vmOverrides]);
+  }, [allVmsRaw, vmOverrides, getAutoExclusionById]);
 
-  if (!rawData) {
-    return <Navigate to={ROUTES.home} replace />;
-  }
+  // AI rightsizing - environment fingerprint for cache scoping
+  const envFingerprint = useMemo(() => {
+    return rawData ? getEnvironmentFingerprint(rawData) : '';
+  }, [rawData]);
 
-  const poweredOnVMs = vms.filter(vm => vm.powerState === 'poweredOn');
-  const snapshots = rawData.vSnapshot;
-  const tools = rawData.vTools;
-  const disks = rawData.vDisk;
-  const networks = rawData.vNetwork;
+  // Derive data from rawData - these are used by hooks below
+  const snapshots = useMemo(() => rawData?.vSnapshot ?? [], [rawData?.vSnapshot]);
+  const tools = useMemo(() => rawData?.vTools ?? [], [rawData?.vTools]);
+  const disks = useMemo(() => rawData?.vDisk ?? [], [rawData?.vDisk]);
+  const networks = useMemo(() => rawData?.vNetwork ?? [], [rawData?.vNetwork]);
+  const poweredOnVMs = useMemo(() => vms.filter(vm => vm.powerState === 'poweredOn'), [vms]);
+
+  // AI rightsizing inputs
+  const aiRightsizingInputs = useMemo(() => {
+    return poweredOnVMs.map(vm => ({
+      vmName: vm.vmName,
+      vCPUs: vm.cpus,
+      memoryMB: vm.memory,
+      storageMB: 0,
+      guestOS: vm.guestOS || undefined,
+      powerState: vm.powerState,
+    }));
+  }, [poweredOnVMs]);
+
+  const aiProfileSummaries = useMemo(() => {
+    const profiles = getVSIProfiles();
+    const all = [...profiles.balanced, ...profiles.compute, ...profiles.memory];
+    return all.map(p => ({
+      name: p.name,
+      vcpus: p.vcpus,
+      memoryGiB: p.memoryGiB,
+      family: p.name.split('-')[0] || 'balanced',
+    }));
+  }, []);
+
+  const { recommendations: aiRecommendations } = useAIRightsizing(
+    aiRightsizingInputs,
+    aiProfileSummaries,
+    envFingerprint
+  );
 
   // ===== PRE-FLIGHT CHECKS (using hook) =====
   const {
@@ -81,16 +120,6 @@ export function VSIMigrationPage() {
     networks: networks,
     includeAllChecks: true, // Show all VPC checks as dropdowns
   });
-
-  // Additional display-only counts
-  const vmsWithSnapshots = new Set(snapshots.map(s => s.vmName)).size;
-  const vmsWithWarningSnapshots = new Set(
-    snapshots.filter(s => s.ageInDays > SNAPSHOT_WARNING_AGE_DAYS && s.ageInDays <= SNAPSHOT_BLOCKER_AGE_DAYS).map(s => s.vmName)
-  ).size;
-  const vmsWithToolsNotRunning = poweredOnVMs.filter(vm => {
-    const tool = tools.find(t => t.vmName === vm.vmName);
-    return tool && (tool.toolsStatus === 'toolsNotRunning' || tool.toolsStatus === 'guestToolsNotRunning');
-  }).length;
 
   // ===== MIGRATION ASSESSMENT (using hook) =====
   const {
@@ -118,6 +147,16 @@ export function VSIMigrationPage() {
     tools: tools,
     networks: networks,
   });
+
+  // Additional display-only counts
+  const vmsWithSnapshots = new Set(snapshots.map(s => s.vmName)).size;
+  const vmsWithWarningSnapshots = new Set(
+    snapshots.filter(s => s.ageInDays > SNAPSHOT_WARNING_AGE_DAYS && s.ageInDays <= SNAPSHOT_BLOCKER_AGE_DAYS).map(s => s.vmName)
+  ).size;
+  const vmsWithToolsNotRunning = poweredOnVMs.filter(vm => {
+    const tool = tools.find(t => t.vmName === vm.vmName);
+    return tool && (tool.toolsStatus === 'toolsNotRunning' || tool.toolsStatus === 'guestToolsNotRunning');
+  }).length;
 
   // ===== VPC VSI PROFILE MAPPING =====
   const vsiProfiles = getVSIProfiles();
@@ -203,14 +242,127 @@ export function VSIMigrationPage() {
 
   // ===== VSI SIZING FOR COST ESTIMATION =====
   const vsiSizing = useMemo<VSISizingInput>(() => {
-    const totalStorageGiB = disks.reduce((sum, d) => sum + mibToGiB(d.capacityMiB), 0);
+    // Only include disks from non-excluded powered-on VMs
+    const poweredOnVMNames = new Set(poweredOnVMs.map(vm => vm.vmName));
+    const filteredDisks = disks.filter(d => poweredOnVMNames.has(d.vmName));
+    const totalStorageGiB = filteredDisks.reduce((sum, d) => sum + mibToGiB(d.capacityMiB), 0);
     const profileGroupings = vmProfileMappings.reduce((acc, mapping) => {
       acc[mapping.profile.name] = (acc[mapping.profile.name] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const vmProfiles = Object.entries(profileGroupings).map(([profile, count]) => ({ profile, count }));
     return { vmProfiles, storageTiB: Math.ceil(totalStorageGiB / 1024) };
-  }, [vmProfileMappings, disks]);
+  }, [vmProfileMappings, disks, poweredOnVMs]);
+
+  // ===== AI INSIGHTS DATA =====
+  const insightsData = useMemo<InsightsInput | null>(() => {
+    if (!isAIProxyConfigured()) return null;
+    const totalStorageGiB = poweredOnVMs.reduce((sum, vm) => sum + mibToGiB(vm.inUseMiB), 0);
+    const scores = Array.isArray(complexityScores) ? complexityScores : [];
+    const complexSimple = scores.filter(s => s.score < 3).length;
+    const complexModerate = scores.filter(s => s.score >= 3 && s.score < 6).length;
+    const complexHigh = scores.filter(s => s.score >= 6 && s.score < 9).length;
+    const complexBlocker = scores.filter(s => s.score >= 9).length;
+    const blockerSummary: string[] = [];
+    if (blockerCount > 0) blockerSummary.push(`${blockerCount} pre-flight blockers`);
+    if (warningCount > 0) blockerSummary.push(`${warningCount} warnings`);
+    // Build network summary
+    const networkSummary: NetworkSummaryForAI[] = [];
+    const pgMap = new Map<string, { ips: Set<string>; vmNames: Set<string> }>();
+    networks.forEach(nic => {
+      const pg = nic.networkName || 'Unknown';
+      if (!pgMap.has(pg)) pgMap.set(pg, { ips: new Set(), vmNames: new Set() });
+      const entry = pgMap.get(pg)!;
+      entry.vmNames.add(nic.vmName);
+      if (nic.ipv4Address) entry.ips.add(nic.ipv4Address);
+    });
+    pgMap.forEach((data, portGroup) => {
+      const prefixes = new Set<string>();
+      data.ips.forEach(ip => {
+        const parts = ip.split('.');
+        if (parts.length >= 3) prefixes.add(`${parts[0]}.${parts[1]}.${parts[2]}.0/24`);
+      });
+      networkSummary.push({ portGroup, subnet: prefixes.size > 0 ? Array.from(prefixes).sort().join(', ') : 'N/A', vmCount: data.vmNames.size });
+    });
+
+    return {
+      totalVMs: poweredOnVMs.length,
+      totalExcluded: allVmsRaw.length - vms.length,
+      totalVCPUs: vsiTotalVCPUs,
+      totalMemoryGiB: vsiTotalMemory,
+      totalStorageTiB: Math.ceil(totalStorageGiB / 1024),
+      clusterCount: new Set(poweredOnVMs.map(vm => vm.cluster).filter(Boolean)).size,
+      hostCount: rawData?.vHost.length ?? 0,
+      datastoreCount: rawData?.vDatastore.length ?? 0,
+      workloadBreakdown: familyCounts,
+      complexitySummary: { simple: complexSimple, moderate: complexModerate, complex: complexHigh, blocker: complexBlocker },
+      blockerSummary,
+      networkSummary,
+      migrationTarget: 'vsi',
+    };
+  }, [poweredOnVMs, allVmsRaw.length, vms.length, vsiTotalVCPUs, vsiTotalMemory, complexityScores, blockerCount, warningCount, familyCounts, networks, rawData]);
+
+  // ===== AI WAVE SUGGESTIONS DATA =====
+  const waveSuggestionData = useMemo<WaveSuggestionInput | null>(() => {
+    if (!isAIProxyConfigured()) return null;
+    const activeWaves = wavePlanning.wavePlanningMode === 'network' ? wavePlanning.networkWaves : wavePlanning.complexityWaves;
+    if (!activeWaves || activeWaves.length === 0) return null;
+    return {
+      waves: wavePlanning.waveResources.map(w => ({
+        name: w.name,
+        vmCount: w.vmCount,
+        totalVCPUs: w.vcpus,
+        totalMemoryGiB: w.memoryGiB,
+        totalStorageGiB: w.storageGiB,
+        avgComplexity: 0,
+        hasBlockers: w.hasBlockers,
+        workloadTypes: [],
+      })),
+      totalVMs: poweredOnVMs.length,
+      migrationTarget: 'vsi',
+    };
+  }, [wavePlanning.wavePlanningMode, wavePlanning.networkWaves, wavePlanning.complexityWaves, wavePlanning.waveResources, poweredOnVMs.length]);
+
+  // ===== AI COST OPTIMIZATION DATA =====
+  const costOptimizationData = useMemo<CostOptimizationInput | null>(() => {
+    if (!isAIProxyConfigured()) return null;
+    if (vmProfileMappings.length === 0) return null;
+    const profileCounts = new Map<string, { count: number; workloadType: string }>();
+    vmProfileMappings.forEach(m => {
+      const key = m.profile.name;
+      const existing = profileCounts.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        const family = key.startsWith('mx') ? 'memory' : key.startsWith('cx') ? 'compute' : 'balanced';
+        profileCounts.set(key, { count: 1, workloadType: family });
+      }
+    });
+    return {
+      vmProfiles: Array.from(profileCounts.entries()).map(([profile, data]) => ({
+        profile,
+        count: data.count,
+        workloadType: data.workloadType,
+      })),
+      totalMonthlyCost: 0,
+      migrationTarget: 'vsi',
+      region: 'us-south',
+    };
+  }, [vmProfileMappings]);
+
+  // ===== AI REMEDIATION DATA =====
+  const remediationAIData = useMemo<RemediationInput | null>(() => {
+    if (!isAIProxyConfigured()) return null;
+    if (remediationItems.length === 0) return null;
+    return {
+      blockers: remediationItems.map(item => ({
+        type: item.name,
+        affectedVMCount: item.affectedCount,
+        details: item.description,
+      })),
+      migrationTarget: 'vsi',
+    };
+  }, [remediationItems]);
 
   // ===== VM DETAILS FOR BOM EXPORT =====
   const vmDetails = useMemo<VMDetail[]>(() => poweredOnVMs.map(vm => {
@@ -269,6 +421,22 @@ export function VSIMigrationPage() {
             {currentIsBurstable !== isBurstable && row.original.isOverridden && (
               <Tag type="teal" size="sm">Override</Tag>
             )}
+            {aiRecommendations[row.original.vmName]?.source === 'ai' && (() => {
+              const aiRec = aiRecommendations[row.original.vmName];
+              const tooltipText = aiRec.reasoning + (aiRec.isOverprovisioned ? ' (Overprovisioned)' : '');
+              return (
+                <>
+                  <Tooltip label={tooltipText} align="bottom">
+                    <button type="button" style={{ all: 'unset', cursor: 'help' }}>
+                      <Tag type="purple" size="sm">AI: {aiRec.recommendedProfile}</Tag>
+                    </button>
+                  </Tooltip>
+                  {aiRec.isOverprovisioned && (
+                    <Tag type="warm-gray" size="sm">Overprovisioned</Tag>
+                  )}
+                </>
+              );
+            })()}
           </span>
         );
       },
@@ -326,6 +494,11 @@ export function VSIMigrationPage() {
       },
     },
   ];
+
+  // Early return if no data - placed after all hooks
+  if (!rawData) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
 
   return (
     <div className="migration-page">
@@ -393,6 +566,7 @@ export function VSIMigrationPage() {
               <Tab>Wave Planning</Tab>
               <Tab>OS Compatibility</Tab>
               <Tab>Complexity</Tab>
+              <Tab>AI Insights</Tab>
             </TabList>
             <TabPanels>
               {/* Pre-Flight Checks Panel */}
@@ -505,6 +679,10 @@ export function VSIMigrationPage() {
                   <Column lg={16} md={8} sm={4}>
                     <RemediationPanel items={remediationItems} title="Remediation" showAffectedVMs={true} />
                   </Column>
+
+                  <Column lg={16} md={8} sm={4}>
+                    <AIRemediationPanel data={remediationAIData} title="AI Remediation Guidance (VSI)" />
+                  </Column>
                 </Grid>
               </TabPanel>
 
@@ -607,6 +785,9 @@ export function VSIMigrationPage() {
                   <Column lg={16} md={8} sm={4}>
                     <CostEstimation type="vsi" vsiSizing={vsiSizing} vmDetails={vmDetails} title="VPC VSI Cost Estimation" />
                   </Column>
+                  <Column lg={16} md={8} sm={4}>
+                    <AICostAnalysisPanel data={costOptimizationData} title="AI Cost Optimization (VSI)" />
+                  </Column>
                 </Grid>
               </TabPanel>
 
@@ -624,6 +805,9 @@ export function VSIMigrationPage() {
                   waveResources={wavePlanning.waveResources}
                   vmDetails={vmDetails}
                 />
+                <div style={{ marginTop: '1rem' }}>
+                  <AIWaveAnalysisPanel data={waveSuggestionData} title="AI Wave Analysis (VSI)" />
+                </div>
               </TabPanel>
 
               {/* OS Compatibility Panel - Using shared component */}
@@ -639,6 +823,15 @@ export function VSIMigrationPage() {
                   chartData={complexityChartData}
                   topComplexVMs={topComplexVMs}
                 />
+              </TabPanel>
+
+              {/* AI Insights Panel */}
+              <TabPanel>
+                <Grid className="migration-page__tab-content">
+                  <Column lg={16} md={8} sm={4}>
+                    <AIInsightsPanel data={insightsData} title="AI Migration Insights (VSI)" />
+                  </Column>
+                </Grid>
               </TabPanel>
             </TabPanels>
           </Tabs>

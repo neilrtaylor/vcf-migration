@@ -46,9 +46,10 @@ interface CostEstimationProps {
   roksNodeDetails?: ROKSNodeDetail[];
   title?: string;
   showPricingRefresh?: boolean;
+  onProfileSelect?: (profileId: string) => void;
 }
 
-export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNodeDetails, title, showPricingRefresh = true }: CostEstimationProps) {
+export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNodeDetails, title, showPricingRefresh = true, onProfileSelect }: CostEstimationProps) {
   const [region, setRegion] = useState<RegionCode>('us-south');
   const [discountType, setDiscountType] = useState<DiscountType>('onDemand');
   const showDetails = true; // Always show details
@@ -125,8 +126,9 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
       };
     });
 
-    // Sort by monthly cost to find most efficient
-    const sortedCosts = [...costs].sort((a, b) => a.estimate.totalMonthly - b.estimate.totalMonthly);
+    // Sort by monthly cost to find most efficient (exclude unpriced custom profiles)
+    const priceableCosts = costs.filter(c => !(c.profile.isCustom && (!c.profile.monthlyRate || c.profile.monthlyRate === 0)));
+    const sortedCosts = [...priceableCosts].sort((a, b) => a.estimate.totalMonthly - b.estimate.totalMonthly);
     const lowestCostProfileId = sortedCosts[0]?.profile.id;
 
     return costs.map(c => ({
@@ -134,6 +136,11 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
       isBestValue: c.profile.id === lowestCostProfileId,
     }));
   }, [type, roksSizing, region, discountType, pricing]);
+
+  // Detect if the selected profile has no pricing (custom profile with $0 rates)
+  const hasUnpriceableCompute = estimate?.lineItems.some(
+    item => item.category === 'Compute' && item.notes === 'Custom profile - no pricing available'
+  ) ?? false;
 
   if (!estimate) {
     return (
@@ -155,17 +162,19 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
     { key: 'annualCost', header: 'Annual' },
   ];
 
-  const tableRows = estimate.lineItems.map((item, idx) => ({
-    id: `item-${idx}`,
-    category: item.category,
-    description: item.description,
-    quantity: `${item.quantity.toLocaleString()} ${item.unit}`,
-    // Use precise formatting for small unit costs (e.g., per-GB storage costs)
-    unitCost: item.unitCost < 1 ? formatCurrencyPrecise(item.unitCost) : formatCurrency(item.unitCost),
-    monthlyCost: formatCurrency(item.monthlyCost),
-    annualCost: formatCurrency(item.annualCost),
-    notes: item.notes,
-  }));
+  const tableRows = estimate.lineItems.map((item, idx) => {
+    const isUnpriceable = item.notes === 'Custom profile - no pricing available';
+    return {
+      id: `item-${idx}`,
+      category: item.category,
+      description: item.description,
+      quantity: `${item.quantity.toLocaleString()} ${item.unit}`,
+      unitCost: isUnpriceable ? 'N/A' : (item.unitCost < 1 ? formatCurrencyPrecise(item.unitCost) : formatCurrency(item.unitCost)),
+      monthlyCost: isUnpriceable ? 'Unable to Price' : formatCurrency(item.monthlyCost),
+      annualCost: isUnpriceable ? 'Unable to Price' : formatCurrency(item.annualCost),
+      notes: item.notes,
+    };
+  });
 
   const handleExport = async (format: 'text' | 'json' | 'csv' | 'xlsx') => {
     if (format === 'xlsx') {
@@ -367,16 +376,17 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
       <div className="cost-estimation__summary">
         <MetricCard
           label="Monthly Cost"
-          value={formatCurrency(estimate.totalMonthly)}
-          detail={estimate.discountPct > 0 ? `${estimate.discountPct}% discount applied` : undefined}
-          variant="primary"
+          value={hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.totalMonthly)}
+          detail={hasUnpriceableCompute ? 'Custom profile has no pricing data' : (estimate.discountPct > 0 ? `${estimate.discountPct}% discount applied` : undefined)}
+          variant={hasUnpriceableCompute ? 'warning' : 'primary'}
         />
         <MetricCard
           label="Annual Cost"
-          value={formatCurrency(estimate.totalAnnual)}
-          variant="info"
+          value={hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.totalAnnual)}
+          detail={hasUnpriceableCompute ? 'Custom profile has no pricing data' : undefined}
+          variant={hasUnpriceableCompute ? 'warning' : 'info'}
         />
-        {estimate.discountPct > 0 && (
+        {!hasUnpriceableCompute && estimate.discountPct > 0 && (
           <MetricCard
             label="Annual Savings"
             value={formatCurrency(estimate.discountAmountAnnual)}
@@ -393,19 +403,27 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
           </h4>
           <p className="cost-estimation__profile-comparison-subtitle">
             Costs for {roksSizing?.computeNodes || 0} nodes with {roksSizing?.useNvme ? 'NVMe storage' : 'block storage'}
+            {onProfileSelect && ' — click a profile to select it in the Sizing Calculator'}
           </p>
           <div className="cost-estimation__profile-grid">
             {allProfileCosts.map(({ profile, estimate: profileEstimate, isSelected, isBestValue }) => (
               <div
                 key={profile.id}
-                className={`cost-estimation__profile-card ${isSelected ? 'cost-estimation__profile-card--selected' : ''} ${isBestValue ? 'cost-estimation__profile-card--best-value' : ''}`}
+                className={`cost-estimation__profile-card ${isSelected ? 'cost-estimation__profile-card--selected' : ''} ${isBestValue ? 'cost-estimation__profile-card--best-value' : ''} ${onProfileSelect ? 'cost-estimation__profile-card--clickable' : ''}`}
+                onClick={onProfileSelect ? () => onProfileSelect(profile.id) : undefined}
+                onKeyDown={onProfileSelect ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onProfileSelect(profile.id); } } : undefined}
+                role={onProfileSelect ? 'button' : undefined}
+                tabIndex={onProfileSelect ? 0 : undefined}
+                aria-label={onProfileSelect ? `Select ${profile.id} profile in Sizing Calculator` : undefined}
               >
                 <div className="cost-estimation__profile-card-header">
                   <span className="cost-estimation__profile-name">{profile.id}</span>
                   <div className="cost-estimation__profile-tags">
                     {isBestValue && <Tag type="green" size="sm">Best Value</Tag>}
                     {isSelected && <Tag type="blue" size="sm">Selected</Tag>}
-                    {profile.roksSupported ? (
+                    {profile.isCustom && profile.tag ? (
+                      <Tag type="purple" size="sm">{profile.tag}</Tag>
+                    ) : profile.roksSupported ? (
                       <Tag type="teal" size="sm">ROKS</Tag>
                     ) : (
                       <Tag type="gray" size="sm">VPC Only</Tag>
@@ -423,16 +441,24 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
                   <Tag type="gray" size="sm">{profile.family}</Tag>
                 </div>
                 <div className="cost-estimation__profile-costs">
-                  <div className="cost-estimation__profile-cost-row">
-                    <span className="cost-estimation__profile-cost-label">Monthly</span>
-                    <span className="cost-estimation__profile-cost-value">{formatCurrency(profileEstimate.totalMonthly)}</span>
-                  </div>
-                  <div className="cost-estimation__profile-cost-row">
-                    <span className="cost-estimation__profile-cost-label">Annual</span>
-                    <span className="cost-estimation__profile-cost-value cost-estimation__profile-cost-value--annual">{formatCurrency(profileEstimate.totalAnnual)}</span>
-                  </div>
+                  {profile.isCustom && (!profile.monthlyRate || profile.monthlyRate === 0) ? (
+                    <div className="cost-estimation__profile-cost-row">
+                      <span className="cost-estimation__profile-cost-value cost-estimation__profile-cost-value--unavailable">Unable to Price</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="cost-estimation__profile-cost-row">
+                        <span className="cost-estimation__profile-cost-label">Monthly</span>
+                        <span className="cost-estimation__profile-cost-value">{formatCurrency(profileEstimate.totalMonthly)}</span>
+                      </div>
+                      <div className="cost-estimation__profile-cost-row">
+                        <span className="cost-estimation__profile-cost-label">Annual</span>
+                        <span className="cost-estimation__profile-cost-value cost-estimation__profile-cost-value--annual">{formatCurrency(profileEstimate.totalAnnual)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                {isBestValue && !isSelected && (
+                {isBestValue && !isSelected && !(profile.isCustom && (!profile.monthlyRate || profile.monthlyRate === 0)) && (
                   <div className="cost-estimation__profile-savings">
                     Save {formatCurrency((estimate.totalAnnual - profileEstimate.totalAnnual))}/year
                   </div>
@@ -469,11 +495,11 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
                   {/* Subtotal row */}
                   <TableRow className="cost-estimation__subtotal-row">
                     <TableCell colSpan={4}><strong>Subtotal</strong></TableCell>
-                    <TableCell><strong>{formatCurrency(estimate.subtotalMonthly)}</strong></TableCell>
-                    <TableCell><strong>{formatCurrency(estimate.subtotalAnnual)}</strong></TableCell>
+                    <TableCell><strong>{hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.subtotalMonthly)}</strong></TableCell>
+                    <TableCell><strong>{hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.subtotalAnnual)}</strong></TableCell>
                   </TableRow>
                   {/* Discount row */}
-                  {estimate.discountPct > 0 && (
+                  {!hasUnpriceableCompute && estimate.discountPct > 0 && (
                     <TableRow className="cost-estimation__discount-row">
                       <TableCell colSpan={4}>
                         <em>Discount ({estimate.discountPct}%)</em>
@@ -485,8 +511,8 @@ export function CostEstimation({ type, roksSizing, vsiSizing, vmDetails, roksNod
                   {/* Total row */}
                   <TableRow className="cost-estimation__total-row">
                     <TableCell colSpan={4}><strong>Total</strong></TableCell>
-                    <TableCell><strong>{formatCurrency(estimate.totalMonthly)}</strong></TableCell>
-                    <TableCell><strong>{formatCurrency(estimate.totalAnnual)}</strong></TableCell>
+                    <TableCell><strong>{hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.totalMonthly)}</strong></TableCell>
+                    <TableCell><strong>{hasUnpriceableCompute ? 'Unable to Price' : formatCurrency(estimate.totalAnnual)}</strong></TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

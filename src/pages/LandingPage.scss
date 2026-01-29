@@ -69,4 +69,48 @@
       color: theme.$text-secondary;
     }
   }
+
+  &__ai-tile {
+    padding: spacing.$spacing-06;
+    margin-top: spacing.$spacing-07;
+    border-left: 3px solid #8a3ffc;
+  }
+
+  &__ai-header {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    margin-bottom: spacing.$spacing-04;
+
+    h3 {
+      @include type.type-style('heading-03');
+      margin: 0;
+      color: theme.$text-primary;
+    }
+
+    svg {
+      color: #8a3ffc;
+    }
+  }
+
+  &__ai-description {
+    @include type.type-style('body-01');
+    color: theme.$text-secondary;
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  &__ai-feature {
+    strong {
+      @include type.type-style('heading-compact-01');
+      display: block;
+      margin-bottom: spacing.$spacing-02;
+      color: theme.$text-primary;
+    }
+
+    p {
+      @include type.type-style('body-compact-01');
+      color: theme.$text-secondary;
+      margin: 0;
+    }
+  }
 }

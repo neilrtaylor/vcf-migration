@@ -145,7 +145,8 @@ export function useCustomProfiles(): UseCustomProfilesReturn {
 
   const removeProfileOverride = useCallback((vmName: string) => {
     setProfileOverrides(prev => {
-      const { [vmName]: _, ...rest } = prev;
+      const { [vmName]: _removed, ...rest } = prev;
+      void _removed; // Silence unused variable warning
       return rest;
     });
   }, []);

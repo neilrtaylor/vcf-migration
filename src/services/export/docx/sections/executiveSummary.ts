@@ -2,10 +2,11 @@
 
 import { Paragraph, TextRun, PageBreak, HeadingLevel } from 'docx';
 import type { RVToolsData } from '@/types/rvtools';
+import type { MigrationInsights } from '@/services/ai/types';
 import { mibToTiB } from '@/utils/formatters';
 import reportTemplates from '@/data/reportTemplates.json';
 import { STYLES, CHART_COLORS, type DocumentContent, type VMReadiness, type ChartData } from '../types';
-import { createHeading, createParagraph, createBulletList, createStyledTable, createTableDescription, createTableLabel, createFigureDescription, createFigureLabel } from '../utils/helpers';
+import { createHeading, createParagraph, createBulletList, createStyledTable, createTableDescription, createTableLabel, createFigureDescription, createFigureLabel, createAISection } from '../utils/helpers';
 import { generatePieChart, createChartParagraph } from '../utils/charts';
 import { AlignmentType } from 'docx';
 
@@ -17,7 +18,8 @@ const templates = reportTemplates as typeof reportTemplates & {
 
 export async function buildExecutiveSummary(
   rawData: RVToolsData,
-  readiness: VMReadiness[]
+  readiness: VMReadiness[],
+  aiInsights?: MigrationInsights | null
 ): Promise<DocumentContent[]> {
   const execTemplates = reportTemplates.executiveSummary;
   const vms = rawData.vInfo.filter((vm) => !vm.template);
@@ -194,9 +196,20 @@ export async function buildExecutiveSummary(
     createParagraph(execTemplates.recommendations.vsiTitle, { bold: true }),
     createParagraph(execTemplates.recommendations.vsiRecommended),
     ...createBulletList(execTemplates.recommendations.vsiReasons),
-
-    new Paragraph({ children: [new PageBreak()] }),
   ];
+
+  // Add AI executive summary if available
+  if (aiInsights?.executiveSummary) {
+    sections.push(
+      ...createAISection(
+        'AI-Generated Executive Summary',
+        aiInsights.executiveSummary,
+        HeadingLevel.HEADING_2
+      )
+    );
+  }
+
+  sections.push(new Paragraph({ children: [new PageBreak()] }));
 
   return sections;
 }

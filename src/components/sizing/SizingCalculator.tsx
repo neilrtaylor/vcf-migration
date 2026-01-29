@@ -12,11 +12,13 @@ import {
   RadioButtonGroup,
   RadioButton,
 } from '@carbon/react';
-import { useData, useDynamicProfiles } from '@/hooks';
+import { useData, useDynamicProfiles, useDynamicPricing, useVMOverrides } from '@/hooks';
+import { getVMIdentifier } from '@/utils/vmIdentifier';
 import { formatNumber, formatBytes } from '@/utils/formatters';
 import { ProfilesRefresh } from '@/components/profiles';
 import { StorageBreakdownBar, STORAGE_SEGMENT_COLORS } from './StorageBreakdownBar';
 import { ResourceBreakdownBar, RESOURCE_SEGMENT_COLORS } from './ResourceBreakdownBar';
+import { getBareMetalProfiles as getPricedProfiles } from '@/services/costEstimation';
 import ibmCloudConfig from '@/data/ibmCloudConfig.json';
 import virtualizationOverhead from '@/data/virtualizationOverhead.json';
 import './SizingCalculator.scss';
@@ -31,6 +33,8 @@ interface BareMetalProfile {
   nvmeSizeGiB?: number;
   totalNvmeGiB?: number;
   roksSupported?: boolean;
+  isCustom?: boolean;
+  tag?: string;
   useCase?: string;
   description?: string;
 }
@@ -44,11 +48,14 @@ export interface SizingResult {
 
 interface SizingCalculatorProps {
   onSizingChange?: (sizing: SizingResult) => void;
+  requestedProfile?: string | null;
+  onRequestedProfileHandled?: () => void;
 }
 
-export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
+export function SizingCalculator({ onSizingChange, requestedProfile, onRequestedProfileHandled }: SizingCalculatorProps) {
   const { rawData } = useData();
   const hasData = !!rawData;
+  const vmOverrides = useVMOverrides();
 
   // Dynamic profiles hook for refreshing from API
   const {
@@ -62,6 +69,9 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
     profileCounts,
   } = useDynamicProfiles();
 
+  // Dynamic pricing hook for best-value default selection
+  const { pricing } = useDynamicPricing();
+
   // Get bare metal profiles (flatten from family-organized structure)
   // Use dynamic profiles from API if available, otherwise fall back to static config
   const bareMetalProfiles = useMemo(() => {
@@ -72,28 +82,70 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       profiles.push(...(bmProfiles[family] as BareMetalProfile[]));
     }
 
-    // Sort: ROKS-supported profiles with NVMe first, then others
-    return profiles.sort((a, b) => {
-      // First, sort by ROKS support (supported first)
-      if (a.roksSupported && !b.roksSupported) return -1;
-      if (!a.roksSupported && b.roksSupported) return 1;
-      // Then by NVMe (with NVMe first)
+    // Sort order: Custom/Future profiles FIRST (at top of list for visibility)
+    // 1. Custom profiles with roksSupported (by memory desc)
+    // 2. Custom profiles without roksSupported (by memory desc)
+    // 3. Standard ROKS-supported profiles (by memory desc)
+    // 4. Standard non-ROKS profiles (by memory desc)
+    const sorted = profiles.sort((a, b) => {
+      const aGroup = a.isCustom
+        ? (a.roksSupported ? 1 : 2)
+        : (a.roksSupported ? 3 : 4);
+      const bGroup = b.isCustom
+        ? (b.roksSupported ? 1 : 2)
+        : (b.roksSupported ? 3 : 4);
+      if (aGroup !== bGroup) return aGroup - bGroup;
+      // Within same group: NVMe first, then by memory desc
       if (a.hasNvme && !b.hasNvme) return -1;
       if (!a.hasNvme && b.hasNvme) return 1;
-      // Then by memory (higher first)
       return b.memoryGiB - a.memoryGiB;
     });
+
+    // Debug: log profile counts
+    const customCount = sorted.filter(p => p.isCustom).length;
+    console.log('[Sizing Calculator] Bare metal profiles:', {
+      total: sorted.length,
+      custom: customCount,
+      firstFive: sorted.slice(0, 5).map(p => p.name),
+    });
+
+    return sorted;
   }, [dynamicProfiles.bareMetalProfiles]);
   const defaults = ibmCloudConfig.defaults;
 
-  // Default to first profile with NVMe (best for ROKS/ODF)
+  // Default to best-value profile: cheapest ROKS+NVMe profile by monthly rate
   const defaultProfileName = useMemo(() => {
-    const profile = bareMetalProfiles.find(p => p.hasNvme && p.roksSupported) || bareMetalProfiles[0];
-    return profile?.name || '';
-  }, [bareMetalProfiles]);
+    const pricedProfiles = getPricedProfiles(pricing);
+    // Find cheapest ROKS+NVMe profile with actual pricing
+    const candidates = pricedProfiles
+      .filter(p => p.hasNvme && p.roksSupported && p.monthlyRate > 0);
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => a.monthlyRate - b.monthlyRate);
+      return candidates[0].id;
+    }
+    // Fallback: first ROKS+NVMe profile from the display list
+    const fallback = bareMetalProfiles.find(p => p.hasNvme && p.roksSupported) || bareMetalProfiles[0];
+    return fallback?.name || '';
+  }, [bareMetalProfiles, pricing]);
 
   // Store only the profile NAME (string) to avoid object reference issues
   const [selectedProfileName, setSelectedProfileName] = useState<string>(() => defaultProfileName);
+  const hasUserSelectedProfile = useRef(false);
+
+  // Update default when pricing loads (only if user hasn't manually changed)
+  useEffect(() => {
+    if (!hasUserSelectedProfile.current && defaultProfileName) {
+      setSelectedProfileName(defaultProfileName);
+    }
+  }, [defaultProfileName]);
+
+  // Apply requested profile from parent (e.g., clicking a tile in Cost Estimation)
+  useEffect(() => {
+    if (requestedProfile && bareMetalProfiles.some(p => p.name === requestedProfile)) {
+      setSelectedProfileName(requestedProfile);
+      onRequestedProfileHandled?.();
+    }
+  }, [requestedProfile, bareMetalProfiles, onRequestedProfileHandled]);
 
   // Derive the full profile object from the name
   const selectedProfile = useMemo(() => {
@@ -196,8 +248,12 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
   const nodeRequirements = useMemo(() => {
     if (!hasData || !rawData) return null;
 
-    // Filter to only powered-on VMs (non-templates)
-    const vms = rawData.vInfo.filter(vm => !vm.template && vm.powerState === 'poweredOn');
+    // Filter to only powered-on VMs (non-templates), excluding user-excluded VMs
+    const vms = rawData.vInfo.filter(vm => {
+      if (vm.template || vm.powerState !== 'poweredOn') return false;
+      const vmId = getVMIdentifier(vm);
+      return !vmOverrides.isExcluded(vmId);
+    });
     const vmNames = new Set(vms.map(vm => vm.vmName));
 
     // Calculate base totals directly from rawData (before overhead)
@@ -325,7 +381,7 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
       limitingFactor,
       vmCount,
     };
-  }, [hasData, rawData, nodeCapacity, nodeRedundancy, evictionThreshold, storageMetric, annualGrowthRate, planningHorizonYears, virtOverhead, cpuFixedPerVM, cpuProportionalPercent, memoryFixedPerVMMiB, memoryProportionalPercent]);
+  }, [hasData, rawData, nodeCapacity, nodeRedundancy, evictionThreshold, storageMetric, annualGrowthRate, planningHorizonYears, virtOverhead, cpuFixedPerVM, cpuProportionalPercent, memoryFixedPerVMMiB, memoryProportionalPercent, vmOverrides]);
 
   // N+X Validation - checks if cluster can handle workload after nodeRedundancy failures
   const redundancyValidation = useMemo(() => {
@@ -429,12 +485,17 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
   }, [nodeRequirements, selectedProfileName, onSizingChange]);
 
   // Profile dropdown items - memoized to maintain stable references for Carbon Dropdown
+  // Custom/Future profiles appear first; show tag + ROKS status for custom profiles
   const profileItems = useMemo(() => bareMetalProfiles.map((p) => {
-    const roksLabel = p.roksSupported ? '✓ ROKS' : '✗ VPC Only';
     const nvmeLabel = p.hasNvme ? `${p.nvmeDisks}×${p.nvmeSizeGiB} GiB NVMe` : 'No NVMe';
+    const roksLabel = p.roksSupported ? 'ROKS' : 'VPC Only';
+    // For custom profiles, show tag + ROKS status; for standard, just ROKS status
+    const tagLabel = p.isCustom
+      ? `${p.tag || 'Custom'} | ${roksLabel}`
+      : (p.roksSupported ? '✓ ROKS' : '✗ VPC Only');
     return {
       id: p.name,
-      text: `${p.name} (${p.physicalCores}c/${p.vcpus}t, ${p.memoryGiB} GiB, ${nvmeLabel}) [${roksLabel}]`,
+      text: `${p.name} (${p.physicalCores}c/${p.vcpus}t, ${p.memoryGiB} GiB, ${nvmeLabel}) [${tagLabel}]`,
     };
   }), [bareMetalProfiles]);
 
@@ -462,13 +523,16 @@ export function SizingCalculator({ onSizingChange }: SizingCalculatorProps) {
               id="profile-selector"
               labelText="Select IBM Cloud Bare Metal Profile"
               value={selectedProfileName}
-              onChange={(e) => setSelectedProfileName(e.target.value)}
+              onChange={(e) => { hasUserSelectedProfile.current = true; setSelectedProfileName(e.target.value); }}
             >
               {profileItems.map((item) => (
                 <SelectItem key={item.id} value={item.id} text={item.text} />
               ))}
             </Select>
             <div className="sizing-calculator__profile-details">
+              {selectedProfile.isCustom && (
+                <Tag type="purple">{selectedProfile.tag || 'Custom'}</Tag>
+              )}
               <Tag type={selectedProfile.roksSupported ? 'green' : 'gray'}>
                 {selectedProfile.roksSupported ? 'ROKS Supported' : 'VPC Only'}
               </Tag>

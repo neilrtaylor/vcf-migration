@@ -1,6 +1,7 @@
 // DOCX Generator Types and Constants
 
 import { Paragraph, Table, AlignmentType, HeadingLevel } from 'docx';
+import type { MigrationInsights } from '@/services/ai/types';
 
 // Type alias for document content elements
 export type DocumentContent = Paragraph | Table;
@@ -13,6 +14,7 @@ export interface DocxExportOptions {
   includeVSI?: boolean;
   includeCosts?: boolean;
   maxIssueVMs?: number;
+  aiInsights?: MigrationInsights | null;
 }
 
 export interface VMReadiness {

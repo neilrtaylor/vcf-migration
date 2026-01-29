@@ -31,7 +31,19 @@ import type { VirtualMachine } from '@/types/rvtools';
 import type { UseVMOverridesReturn } from '@/hooks/useVMOverrides';
 import { getVMIdentifier } from '@/utils/vmIdentifier';
 import { formatNumber, mibToGiB } from '@/utils/formatters';
+import workloadPatterns from '@/data/workloadPatterns.json';
 import './CustomWorkloadTable.scss';
+
+// Helper: check if a workload type name matches a standard category
+type CategoryDef = { name: string; patterns: string[] };
+function isStandardCategory(typeName: string): boolean {
+  const categories = workloadPatterns.categories as Record<string, CategoryDef>;
+  const nameLower = typeName.toLowerCase();
+  for (const cat of Object.values(categories)) {
+    if (cat.name.toLowerCase() === nameLower) return true;
+  }
+  return false;
+}
 
 // ===== TYPES =====
 
@@ -68,6 +80,10 @@ export function CustomWorkloadTable({ vms, vmOverrides }: CustomWorkloadTablePro
       const workloadType = vmOverrides.getWorkloadType(vmId);
 
       if (workloadType) {
+        // Skip if this override maps to a standard workload category
+        // (those VMs now appear in the category sub-tab instead)
+        if (isStandardCategory(workloadType)) continue;
+
         result.push({
           id: vmId,
           vmName: vm.vmName,

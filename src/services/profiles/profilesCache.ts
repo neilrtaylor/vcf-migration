@@ -20,6 +20,7 @@ export interface BareMetalProfilesByFamily {
   compute: TransformedProfile[];
   memory: TransformedProfile[];
   veryHighMemory: TransformedProfile[];
+  custom: TransformedProfile[];
 }
 
 export interface IBMCloudProfiles {
@@ -87,6 +88,7 @@ function transformStaticToProfiles(): IBMCloudProfiles {
     compute: [],
     memory: [],
     veryHighMemory: [],
+    custom: [],
   };
 
   for (const [family, profiles] of Object.entries(staticProfilesData.bareMetalProfiles)) {
@@ -116,6 +118,53 @@ function transformStaticToProfiles(): IBMCloudProfiles {
       }));
     }
   }
+
+  // Transform custom bare metal profiles from static data
+  // Filter out custom profiles whose names already exist in standard profiles
+  const allStandardNames = new Set([
+    ...bareMetalProfiles.balanced.map(p => p.name),
+    ...bareMetalProfiles.compute.map(p => p.name),
+    ...bareMetalProfiles.memory.map(p => p.name),
+    ...bareMetalProfiles.veryHighMemory.map(p => p.name),
+  ]);
+
+  const allCustomProfiles = (staticProfilesData as { customBareMetalProfiles?: Array<{
+    name: string;
+    tag?: string;
+    physicalCores: number;
+    vcpus: number;
+    memoryGiB: number;
+    hasNvme: boolean;
+    nvmeDisks?: number;
+    nvmeSizeGiB?: number;
+    totalNvmeGiB?: number;
+    roksSupported?: boolean;
+  }> }).customBareMetalProfiles || [];
+
+  // Only include custom profiles that don't duplicate standard profiles
+  const customProfiles = allCustomProfiles.filter(p => !allStandardNames.has(p.name));
+
+  console.log('[Profiles Cache] Custom profiles from static JSON:', {
+    total: allCustomProfiles.length,
+    afterDedup: customProfiles.length,
+    duplicatesRemoved: allCustomProfiles.length - customProfiles.length,
+    names: customProfiles.slice(0, 5).map(p => p.name),
+  });
+
+  bareMetalProfiles.custom = customProfiles.map(p => ({
+    name: p.name,
+    family: 'custom',
+    vcpus: p.vcpus,
+    memoryGiB: p.memoryGiB,
+    physicalCores: p.physicalCores,
+    hasNvme: p.hasNvme,
+    nvmeDisks: p.nvmeDisks,
+    nvmeSizeGiB: p.nvmeSizeGiB,
+    totalNvmeGiB: p.totalNvmeGiB,
+    roksSupported: p.roksSupported,
+    isCustom: true,
+    tag: p.tag || 'Custom',
+  }));
 
   return {
     version: staticProfilesData.version,
